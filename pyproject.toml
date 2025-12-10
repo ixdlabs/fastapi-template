@@ -15,8 +15,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.5.0",
     "ruff>=0.14.8",
 ]
+
+
+[tool.ruff]
+line-length = 120
 
 
 [tool.alembic]
