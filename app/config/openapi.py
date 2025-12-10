@@ -1,13 +1,19 @@
+# This file is to customize the OpenAPI documentation interface.
+# It serves RapiDoc at /api/docs with custom theming.
+# This serves as an alternative to the default Swagger UI or ReDoc.
+# RapiDoc Docs: https://rapidocweb.com
+# Approach: https://github.com/fastapi/fastapi/issues/1198#issuecomment-609019113
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
+
+from app.config.settings import SettingsDep
 
 router = APIRouter()
 
 
-# Serve RapiDoc at /api/docs
-# https://github.com/fastapi/fastapi/issues/1198
 @router.get("/api/docs", response_class=HTMLResponse, include_in_schema=False)
-async def rapidoc(request: Request):
+async def rapidoc(request: Request, settings: SettingsDep):
     return f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -26,8 +32,8 @@ async def rapidoc(request: Request):
       show-method-in-nav-bar="as-colored-block"
       use-path-in-nav-bar="true"
       show-header="false"
-      nav-bg-color="#111827"
-      primary-color="#61A60A"
+      nav-bg-color="{settings.theme_color_background}"
+      primary-color="{settings.theme_color_primary}"
     >
     </rapi-doc>
   </body>
