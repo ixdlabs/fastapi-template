@@ -1,8 +1,8 @@
 from functools import lru_cache
 from typing import Annotated
 from fastapi import Depends
-from sqlalchemy.orm import DeclarativeBase, Session
-from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.config.settings import SettingsDep
 
@@ -13,13 +13,14 @@ class Base(DeclarativeBase):
 
 @lru_cache
 def create_db_engine(database_url: str):
-    return create_engine(database_url)
+    return create_async_engine(database_url, echo=True)
 
 
-def get_db_session(settings: SettingsDep):
+async def get_db_session_maker(settings: SettingsDep):
     engine = create_db_engine(settings.database_url)
-    with Session(engine) as session:
+    session_maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_maker() as session:
         yield session
 
 
-DbDep = Annotated[Session, Depends(get_db_session)]
+DbDep = Annotated[AsyncSession, Depends(get_db_session_maker)]
