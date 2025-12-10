@@ -2,6 +2,8 @@ from fastapi import FastAPI
 
 from app.config import openapi
 from app.config.logging import setup_logging
+from app.features.users import urls as user_urls
+
 
 setup_logging()
 
@@ -17,8 +19,4 @@ app = FastAPI(
 
 
 app.include_router(openapi.router)
-
-
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+app.include_router(user_urls.router)
