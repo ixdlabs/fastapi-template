@@ -9,6 +9,8 @@ from alembic import context
 from app.config.database import Base
 from app.config.settings import get_settings
 
+from app.features.users.models import User  # noqa: F401
+
 config = context.config
 target_metadata = Base.metadata
 
