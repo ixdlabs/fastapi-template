@@ -7,9 +7,12 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 
 from app.config.database import Base
+from app.config.logging import setup_logging
 from app.config.settings import get_settings
 
 from app.features.users.models import User  # noqa: F401
+
+setup_logging()
 
 config = context.config
 target_metadata = Base.metadata
