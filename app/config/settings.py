@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     theme_color_primary: str = "#61A60A"
     theme_color_background: str = "#111827"
 
+    database_url: str
+
     model_config = SettingsConfigDict(env_file=".env")
 
 
