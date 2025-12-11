@@ -1,12 +1,21 @@
 from datetime import datetime
+from typing import Annotated, Literal
 import uuid
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.config.auth import CurrentUserDep
 from app.config.database import DbDep
+from app.config.pagination import Page, paginate
 from app.features.users.models import User
+
+
+class UserFilterInput(BaseModel):
+    search: str | None = None
+    limit: int = Field(100, gt=0, le=100)
+    offset: int = Field(0, ge=0)
+    order_by: Literal["created_at", "updated_at"] = "created_at"
 
 
 class UserListOutput(BaseModel):
@@ -78,20 +87,28 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 
 
 @router.get("/")
-async def user_list(db: DbDep) -> list[UserListOutput]:
+async def user_list(db: DbDep, query: Annotated[UserFilterInput, Query()]) -> Page[UserListOutput]:
     stmt = select(User)
-    result = await db.execute(stmt)
-    users = result.scalars().all()
+    if query.search:
+        search_pattern = f"%{query.search}%"
+        stmt = stmt.where(
+            User.username.ilike(search_pattern)
+            | User.first_name.ilike(search_pattern)
+            | User.last_name.ilike(search_pattern)
+        )
 
-    return [
-        UserListOutput(
+    order_column = User.created_at if query.order_by == "created_at" else User.updated_at
+    stmt = stmt.order_by(order_column).limit(query.limit).offset(query.offset)
+
+    result = await paginate(db, stmt)
+    return result.map_to(
+        lambda user: UserListOutput(
             id=user.id,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,
         )
-        for user in users
-    ]
+    )
 
 
 # Delete user endpoint
