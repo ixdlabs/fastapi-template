@@ -2,8 +2,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import openapi
+from app.config.exceptions import custom_http_exception_handler
 from app.config.logging import setup_logging
 from app.features.users import urls as user_urls
+from starlette.exceptions import HTTPException
 
 
 @asynccontextmanager
@@ -26,3 +28,5 @@ app = FastAPI(
 
 app.include_router(openapi.router)
 app.include_router(user_urls.router)
+
+app.exception_handler(HTTPException)(custom_http_exception_handler)

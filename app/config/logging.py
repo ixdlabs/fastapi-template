@@ -10,9 +10,6 @@ def setup_logging():
     structlog_processors = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
-        structlog.processors.StackInfoRenderer(),
-        structlog.dev.set_exc_info,
-        structlog.processors.dict_tracebacks,
         structlog.processors.TimeStamper(fmt="iso"),
     ]
 
@@ -44,7 +41,6 @@ def setup_logging():
                     "()": structlog.stdlib.ProcessorFormatter,
                     "processors": [
                         *structlog_processors,
-                        structlog.stdlib.ProcessorFormatter.remove_processors_meta,
                         structlog.processors.JSONRenderer(),
                     ],
                 },
