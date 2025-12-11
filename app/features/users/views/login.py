@@ -44,9 +44,9 @@ router = APIRouter()
 
 @router.post("/oauth2/token")
 async def login_form(
-    input: Annotated[OAuth2PasswordRequestForm, Depends()], db: DbDep, settings: SettingsDep
+    form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DbDep, settings: SettingsDep
 ) -> OAuth2TokenResponse:
-    input = LoginInput(username=input.username, password=input.password)
+    input = LoginInput(username=form.username, password=form.password)
     result = await login(input, db, settings)
     return OAuth2TokenResponse(access_token=result.access_token, token_type="bearer")
 

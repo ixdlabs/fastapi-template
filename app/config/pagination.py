@@ -33,6 +33,8 @@ class Page[DataT](BaseModel):
 
 async def paginate[DataT](db: DbDep, items: Select[Tuple[DataT]]) -> Page[DataT]:
     """Paginates the given SQLAlchemy Select statement."""
-    total = await db.execute(items.with_only_columns([func.count()])).scalar_one()
-    results = await db.execute(items).scalars().all()
-    return Page[DataT](count=total, items=results)
+    total_result = await db.execute(items.with_only_columns(func.count()))
+    data_result = await db.execute(items)
+    total = total_result.scalar_one()
+    data = data_result.scalars().all()
+    return Page[DataT](count=total, items=data)
