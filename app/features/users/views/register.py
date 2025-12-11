@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import uuid
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 import jwt
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -32,6 +32,9 @@ class RegisterOutputUser(BaseModel):
 
 router = APIRouter()
 
+# Register endpoint
+# ----------------------------------------------------------------------------------------------------------------------
+
 
 @router.post("/register")
 async def register(input: RegisterInput, db: DbDep, settings: SettingsDep) -> RegisterOutput:
@@ -39,7 +42,7 @@ async def register(input: RegisterInput, db: DbDep, settings: SettingsDep) -> Re
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is not None:
-        raise HTTPException(status_code=400, detail="Username already exists")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
 
     password_hasher = PasswordHasher()
     user = User(

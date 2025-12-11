@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
+from typing import Annotated
 import uuid
 from argon2 import PasswordHasher
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import select
 import jwt
@@ -28,7 +30,29 @@ class LoginOutputUser(BaseModel):
     last_name: str
 
 
+class OAuth2TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
+
 router = APIRouter()
+
+
+# Token endpoint (for OAuth2 compatibility)
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@router.post("/oauth2/token")
+async def login_form(
+    input: Annotated[OAuth2PasswordRequestForm, Depends()], db: DbDep, settings: SettingsDep
+) -> OAuth2TokenResponse:
+    input = LoginInput(username=input.username, password=input.password)
+    result = await login(input, db, settings)
+    return OAuth2TokenResponse(access_token=result.access_token, token_type="bearer")
+
+
+# Login endpoint
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 @router.post("/login")
@@ -37,13 +61,13 @@ async def login(input: LoginInput, db: DbDep, settings: SettingsDep) -> LoginOut
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=400, detail="Invalid username or password")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid username or password")
 
     try:
         password_hasher = PasswordHasher()
         password_hasher.verify(user.hashed_password, input.password)
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid username or password")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid username or password")
 
     jwt_expiration = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expiration_minutes)
     jwt_payload = {"sub": str(user.id), "exp": jwt_expiration}
