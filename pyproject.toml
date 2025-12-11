@@ -18,6 +18,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=1.19.0",
     "pre-commit>=4.5.0",
     "ruff>=0.14.8",
 ]
@@ -30,3 +31,7 @@ line-length = 120
 [tool.alembic]
 script_location = "%(here)s/app/migrations"
 prepend_sys_path = ["."]
+
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
