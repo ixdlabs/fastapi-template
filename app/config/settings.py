@@ -1,14 +1,21 @@
-# This file contains code to load environment variables from a .env file
-# and provide application settings using Pydantic's BaseSettings.
-# The settings are provided as a dependency to enable easy testing.
-# Pydantic Docs: https://docs.pydantic.dev/latest/concepts/pydantic_settings
-# Fast API Docs: https://fastapi.tiangolo.com/advanced/settings
+"""
+This file contains code to load environment variables from a .env file
+and provide application settings using Pydantic's BaseSettings.
+The settings are provided as a dependency to enable easy testing.
+
+Pydantic Docs: https://docs.pydantic.dev/latest/concepts/pydantic_settings <br/>
+Fast API Docs: https://fastapi.tiangolo.com/advanced/settings
+"""
 
 from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Application settings class.
+# These are loaded from a .env file.
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class Settings(BaseSettings):
@@ -24,6 +31,11 @@ class Settings(BaseSettings):
     migration_logger_name: str = "console"
 
     model_config = SettingsConfigDict(env_file=".env")
+
+
+# Dependency that provides application settings.
+# The settings are cached to avoid recreating them on each request.
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 @lru_cache

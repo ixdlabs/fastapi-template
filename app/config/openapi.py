@@ -1,8 +1,11 @@
-# This file is to customize the OpenAPI documentation interface.
-# It serves RapiDoc at /api/docs with custom theming.
-# This serves as an alternative to the default Swagger UI or ReDoc.
-# RapiDoc Docs: https://rapidocweb.com
-# Approach: https://github.com/fastapi/fastapi/issues/1198#issuecomment-609019113
+"""
+This file is to customize the OpenAPI documentation interface.
+It serves RapiDoc at /api/docs with custom theming.
+This serves as an alternative to the default Swagger UI or ReDoc.
+
+RapiDoc Docs: https://rapidocweb.com <br/>
+Approach: https://github.com/fastapi/fastapi/issues/1198#issuecomment-609019113
+"""
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse

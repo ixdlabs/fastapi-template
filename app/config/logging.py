@@ -1,9 +1,20 @@
+"""
+This module sets up logging configuration for the application using structlog and the standard logging library.
+It defines multiple formatters and handlers to support different logging formats such as colored console output,
+plain console output, and JSON format.
+
+The `setup_logging` function will be called from various entry points (e.g., server, migrations) to initialize logging.
+
+https://www.structlog.org/en/stable/console-output.html <br/>
+https://www.structlog.org/en/stable/standard-library.html#rendering-using-structlog-based-formatters-within-logging
+"""
+
 import logging
 import logging.config
 import structlog
 
 
-def setup_logging(default_logger: str = "console", default_log_level: int = logging.INFO):
+def setup_logging(handler: str = "console", log_level: int = logging.INFO):
     logging.config.dictConfig(
         {
             "version": 1,
@@ -57,22 +68,22 @@ def setup_logging(default_logger: str = "console", default_log_level: int = logg
             },
             "loggers": {
                 "sqlalchemy.engine.Engine": {
-                    "handlers": [default_logger],
-                    "level": default_log_level,
+                    "handlers": [handler],
+                    "level": log_level,
                     "propagate": False,
                 },
                 "uvicorn.access": {
-                    "handlers": [default_logger],
-                    "level": default_log_level,
+                    "handlers": [handler],
+                    "level": log_level,
                     "propagate": False,
                 },
                 "django_structlog": {
-                    "handlers": [default_logger],
-                    "level": default_log_level,
+                    "handlers": [handler],
+                    "level": log_level,
                 },
                 "root": {
-                    "handlers": [default_logger],
-                    "level": default_log_level,
+                    "handlers": [handler],
+                    "level": log_level,
                 },
             },
         }

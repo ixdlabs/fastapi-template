@@ -2,11 +2,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import openapi
-from app.config.exceptions import custom_http_exception_handler
+from app.config.exceptions import register_exception_handlers
 from app.config.logging import setup_logging
 from app.config.settings import get_settings
 from app.features.users import urls as user_urls
-from starlette.exceptions import HTTPException
+
+
+# Application lifespan event to set up logging.
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 @asynccontextmanager
@@ -15,6 +18,9 @@ async def lifespan(_: FastAPI):
     setup_logging(settings.server_logger_name)
     yield
 
+
+# Create the FastAPI application.
+# ----------------------------------------------------------------------------------------------------------------------
 
 app = FastAPI(
     title="Sample API",
@@ -28,7 +34,10 @@ app = FastAPI(
 )
 
 
+# Register routers and exception handlers.
+# ----------------------------------------------------------------------------------------------------------------------
+
 app.include_router(openapi.router)
 app.include_router(user_urls.router)
 
-app.exception_handler(HTTPException)(custom_http_exception_handler)
+register_exception_handlers(app)
