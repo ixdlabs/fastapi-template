@@ -1,3 +1,11 @@
+"""
+Alembic migration environment configuration.
+This file is used by Alembic to run database migrations in both 'online' and 'offline' modes.
+It sets up the database connection using the application's settings and logging configuration.
+
+Important: This file
+"""
+
 import asyncio
 
 from sqlalchemy import pool
@@ -10,17 +18,18 @@ from app.config.database import Base
 from app.config.logging import setup_logging
 from app.config.settings import get_settings
 
+
+# Import all models here to ensure they are registered with Alembic's metadata.
+# This is required for Alembic to detect schema changes.
+# ----------------------------------------------------------------------------------------------------------------------
+
 from app.features.users.models import User  # noqa: F401
 
-settings = get_settings()
-setup_logging(settings.migration_logger_name)
 
-config = context.config
-target_metadata = Base.metadata
-
-# Run migrations in 'offline' mode -------------------------------------------------------------------------------------
+# Run migrations in 'offline' mode
 # Generate migrations as SQL scripts, instead of running them against the database.
 # Docs: https://alembic.sqlalchemy.org/en/latest/offline.html
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 def run_migrations_offline() -> None:
@@ -35,8 +44,9 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-# Run migrations in 'online' mode --------------------------------------------------------------------------------------
+# Run migrations in 'online' mode
 # Run migrations against the database.
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 def do_run_migrations(connection: Connection) -> None:
@@ -56,8 +66,14 @@ def run_migrations_online() -> None:
     asyncio.run(run_async_migrations())
 
 
-# Main entry point -----------------------------------------------------------------------------------------------------
+# Main entry point
+# ----------------------------------------------------------------------------------------------------------------------
 
+config = context.config
+target_metadata = Base.metadata
+
+settings = get_settings()
+setup_logging(settings.migration_logger_name)
 if context.is_offline_mode():
     run_migrations_offline()
 else:
