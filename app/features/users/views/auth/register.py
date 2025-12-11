@@ -1,10 +1,13 @@
+from datetime import datetime, timedelta, timezone
 import uuid
 from fastapi import APIRouter, HTTPException
+import jwt
 from pydantic import BaseModel
 from sqlalchemy import select
 from argon2 import PasswordHasher
 
 from app.config.database import DbDep
+from app.config.settings import SettingsDep
 from app.features.users.models import User
 
 
@@ -17,7 +20,6 @@ class RegisterInput(BaseModel):
 
 class RegisterOutput(BaseModel):
     access_token: str
-    refresh_token: str
     user: "RegisterOutputUser"
 
 
@@ -32,7 +34,7 @@ router = APIRouter()
 
 
 @router.post("/register")
-async def register(input: RegisterInput, db: DbDep) -> RegisterOutput:
+async def register(input: RegisterInput, db: DbDep, settings: SettingsDep) -> RegisterOutput:
     stmt = select(User).where(User.username == input.username)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
@@ -52,9 +54,12 @@ async def register(input: RegisterInput, db: DbDep) -> RegisterOutput:
     await db.commit()
     await db.refresh(user)
 
+    jwt_expiration = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expiration_minutes)
+    jwt_payload = {"sub": str(user.id), "exp": jwt_expiration}
+    access_token = jwt.encode(payload=jwt_payload, key=settings.jwt_secret_key, algorithm="HS256")
+
     return RegisterOutput(
-        access_token="dummy_access_token",
-        refresh_token="dummy_refresh_token",
+        access_token=access_token,
         user=RegisterOutputUser(
             id=user.id,
             username=user.username,

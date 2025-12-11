@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     theme_color_primary: str = "#61A60A"
     theme_color_background: str = "#111827"
 
+    jwt_secret_key: str = "local"
+    jwt_expiration_minutes: int = 24 * 60
+
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
 
     model_config = SettingsConfigDict(env_file=".env")
