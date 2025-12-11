@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import openapi
@@ -5,7 +6,11 @@ from app.config.logging import setup_logging
 from app.features.users import urls as user_urls
 
 
-setup_logging()
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    setup_logging()
+    yield
+
 
 app = FastAPI(
     title="Sample API",
@@ -15,6 +20,7 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     docs_url=None,
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 
