@@ -4,13 +4,15 @@ from fastapi import FastAPI
 from app.config import openapi
 from app.config.exceptions import custom_http_exception_handler
 from app.config.logging import setup_logging
+from app.config.settings import get_settings
 from app.features.users import urls as user_urls
 from starlette.exceptions import HTTPException
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    setup_logging()
+    settings = get_settings()
+    setup_logging(settings.server_logger_name)
     yield
 
 

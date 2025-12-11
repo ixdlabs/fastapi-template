@@ -20,6 +20,9 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
 
+    server_logger_name: str = "console"
+    migration_logger_name: str = "console"
+
     model_config = SettingsConfigDict(env_file=".env")
 
 

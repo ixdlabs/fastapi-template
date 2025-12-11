@@ -12,7 +12,8 @@ from app.config.settings import get_settings
 
 from app.features.users.models import User  # noqa: F401
 
-setup_logging()
+settings = get_settings()
+setup_logging(settings.migration_logger_name)
 
 config = context.config
 target_metadata = Base.metadata
@@ -23,7 +24,6 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    settings = get_settings()
     context.configure(
         url=settings.database_url,
         target_metadata=target_metadata,
@@ -46,7 +46,6 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    settings = get_settings()
     connectable = create_async_engine(url=settings.database_url, poolclass=pool.NullPool)
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
