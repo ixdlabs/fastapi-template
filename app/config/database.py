@@ -34,11 +34,11 @@ def create_db_engine(database_url: str):
     return create_async_engine(database_url, echo=True)
 
 
-async def get_db_session_maker(settings: SettingsDep):
+async def get_db_session(settings: SettingsDep):
     engine = create_db_engine(settings.database_url)
     session_maker = async_sessionmaker(engine)
     async with session_maker() as session:
         yield session
 
 
-DbDep = Annotated[AsyncSession, Depends(get_db_session_maker)]
+DbDep = Annotated[AsyncSession, Depends(get_db_session)]

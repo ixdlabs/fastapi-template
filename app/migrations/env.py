@@ -56,7 +56,9 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    connectable = create_async_engine(url=settings.database_url, poolclass=pool.NullPool)
+    connectable = config.attributes.get("connection", None)
+    if connectable is None:
+        connectable = create_async_engine(url=settings.database_url, poolclass=pool.NullPool)
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
