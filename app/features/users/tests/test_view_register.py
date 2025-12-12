@@ -1,0 +1,45 @@
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+import pytest
+
+from app.features.users.models import User
+from app.features.users.tests.fixtures import UserFactory
+from app.main import app
+
+client = TestClient(app)
+
+
+@pytest.mark.asyncio
+async def test_user_can_register_with_valid_data(db_fixture: AsyncSession):
+    user_data = {"username": "newuser", "first_name": "New", "last_name": "User", "password": "newpassword"}
+    response = client.post("/api/v1/auth/register", json=user_data)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["user"]["username"] == user_data["username"]
+    assert data["user"]["first_name"] == user_data["first_name"]
+    assert data["user"]["last_name"] == user_data["last_name"]
+
+    stmt = select(User).where(User.username == user_data["username"])
+    result = await db_fixture.execute(stmt)
+    user = result.scalar_one_or_none()
+    assert user is not None
+    assert user.check_password(user_data["password"])
+
+
+@pytest.mark.asyncio
+async def test_user_cannot_register_with_existing_username(db_fixture: AsyncSession):
+    existing_user: User = UserFactory.build()
+    db_fixture.add(existing_user)
+    await db_fixture.commit()
+    await db_fixture.refresh(existing_user)
+
+    user_data = {
+        "username": existing_user.username,
+        "first_name": "Another",
+        "last_name": "User",
+        "password": "anotherpassword",
+    }
+    response = client.post("/api/v1/auth/register", json=user_data)
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Username already exists"}

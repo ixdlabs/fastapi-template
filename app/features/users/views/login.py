@@ -62,7 +62,7 @@ async def login(input: LoginInput, db: DbDep, settings: SettingsDep) -> LoginOut
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
-    password_valid = user.verify_password(input.password)
+    password_valid = user.check_password(input.password)
     if not password_valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 

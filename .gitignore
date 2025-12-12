@@ -14,3 +14,6 @@ wheels/
 
 # SQLite database file
 sqlite*.db
+
+# Coverage reports
+.coverage

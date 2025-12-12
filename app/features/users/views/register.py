@@ -35,7 +35,7 @@ router = APIRouter()
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@router.post("/register")
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(input: RegisterInput, db: DbDep, settings: SettingsDep) -> RegisterOutput:
     stmt = select(User).where(User.username == input.username)
     result = await db.execute(stmt)
