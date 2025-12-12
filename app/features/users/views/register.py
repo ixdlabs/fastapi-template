@@ -4,7 +4,6 @@ from fastapi import APIRouter, HTTPException, status
 import jwt
 from pydantic import BaseModel
 from sqlalchemy import select
-from argon2 import PasswordHasher
 
 from app.config.database import DbDep
 from app.config.settings import SettingsDep
@@ -44,14 +43,8 @@ async def register(input: RegisterInput, db: DbDep, settings: SettingsDep) -> Re
     if user is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
 
-    password_hasher = PasswordHasher()
-    user = User(
-        id=uuid.uuid4(),
-        username=input.username,
-        first_name=input.first_name,
-        last_name=input.last_name,
-        hashed_password=password_hasher.hash(input.password),
-    )
+    user = User(username=input.username, first_name=input.first_name, last_name=input.last_name)
+    user.set_password(input.password)
 
     db.add(user)
     await db.commit()

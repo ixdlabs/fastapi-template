@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 import uuid
-from argon2 import PasswordHasher
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -63,10 +62,8 @@ async def login(input: LoginInput, db: DbDep, settings: SettingsDep) -> LoginOut
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
-    try:
-        password_hasher = PasswordHasher()
-        password_hasher.verify(user.hashed_password, input.password)
-    except Exception:
+    password_valid = user.verify_password(input.password)
+    if not password_valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
     jwt_expiration = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expiration_minutes)

@@ -48,14 +48,15 @@ def db_engine_fixture(setup: None):
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def transaction_fixture(db_engine_fixture: AsyncEngine):
+async def db_fixture(db_engine_fixture: AsyncEngine):
     async with db_engine_fixture.connect() as connection:
         transaction = await connection.begin()
-        session_maker = async_sessionmaker(bind=connection)
-        async with session_maker() as session:
-            yield session
-        await transaction.rollback()
-        await connection.close()
+        try:
+            session_maker = async_sessionmaker(bind=connection)
+            async with session_maker() as session:
+                yield session
+        finally:
+            await transaction.rollback()
 
 
 # Application settings for tests (this is created with explicit values to ensure reproducibility)
@@ -72,8 +73,8 @@ def settings_fixture():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def override_dependencies(transaction_fixture: AsyncSession, settings_fixture: Settings):
-    app.dependency_overrides[get_db_session] = lambda: transaction_fixture
+def override_dependencies(db_fixture: AsyncSession, settings_fixture: Settings):
+    app.dependency_overrides[get_db_session] = lambda: db_fixture
     app.dependency_overrides[get_settings] = lambda: settings_fixture
 
     yield

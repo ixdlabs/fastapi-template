@@ -18,6 +18,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "factory-boy>=3.3.3",
     "httpx>=0.28.1",
     "mypy>=1.19.0",
     "pre-commit>=4.5.0",

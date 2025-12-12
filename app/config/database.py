@@ -30,12 +30,12 @@ class Base(DeclarativeBase):
 
 
 @lru_cache
-def create_db_engine(database_url: str):
-    return create_async_engine(database_url, echo=True)
+def create_db_engine(database_url: str, debug: bool = False):
+    return create_async_engine(database_url, echo=debug)
 
 
 async def get_db_session(settings: SettingsDep):
-    engine = create_db_engine(settings.database_url)
+    engine = create_db_engine(settings.database_url, debug=settings.debug)
     session_maker = async_sessionmaker(engine)
     async with session_maker() as session:
         yield session
