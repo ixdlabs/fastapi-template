@@ -42,6 +42,7 @@ def setup_logging(handler: str = "console", log_level: int = logging.INFO):
                 "json_formatter": {
                     "()": structlog.stdlib.ProcessorFormatter,
                     "processors": [
+                        structlog.stdlib.add_logger_name,
                         structlog.contextvars.merge_contextvars,
                         structlog.processors.add_log_level,
                         structlog.processors.TimeStamper(fmt="iso"),
