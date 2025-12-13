@@ -99,7 +99,8 @@ async def user_list(db: DbDep, query: Annotated[UserFilterInput, Query()]) -> Pa
         )
 
     order_column = User.created_at if query.order_by == "created_at" else User.updated_at
-    result = await paginate(db, stmt, order_by=order_column, limit=query.limit, offset=query.offset)
+    stmt = stmt.order_by(order_column)
+    result = await paginate(db, stmt, limit=query.limit, offset=query.offset)
     return result.map_to(
         lambda user: UserListOutput(
             id=user.id,
