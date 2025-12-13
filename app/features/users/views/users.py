@@ -70,6 +70,7 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
+        # This is unlikely to happen since the current_user exists (and we checked the IDs match)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return UserDetailOutput(
@@ -98,9 +99,7 @@ async def user_list(db: DbDep, query: Annotated[UserFilterInput, Query()]) -> Pa
         )
 
     order_column = User.created_at if query.order_by == "created_at" else User.updated_at
-    stmt = stmt.order_by(order_column).limit(query.limit).offset(query.offset)
-
-    result = await paginate(db, stmt)
+    result = await paginate(db, stmt, order_by=order_column, limit=query.limit, offset=query.offset)
     return result.map_to(
         lambda user: UserListOutput(
             id=user.id,
@@ -124,6 +123,7 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
+        # This is unlikely to happen since the current_user exists (and we checked the IDs match)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     await db.delete(user)
@@ -145,6 +145,7 @@ async def update_user(
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
+        # This is unlikely to happen since the current_user exists (and we checked the IDs match)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     user.first_name = input.first_name

@@ -1,15 +1,14 @@
-from datetime import datetime, timedelta, timezone
 from typing import Annotated
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import select
-import jwt
 
 from app.config.database import DbDep
 from app.config.settings import SettingsDep
 from app.features.users.models import User
+from app.features.users.helpers import jwt_encode
 
 
 class LoginInput(BaseModel):
@@ -66,10 +65,7 @@ async def login(input: LoginInput, db: DbDep, settings: SettingsDep) -> LoginOut
     if not password_valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
-    jwt_expiration = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expiration_minutes)
-    jwt_payload = {"sub": str(user.id), "exp": jwt_expiration}
-    access_token = jwt.encode(payload=jwt_payload, key=settings.jwt_secret_key, algorithm="HS256")
-
+    access_token = jwt_encode(user, settings)
     return LoginOutput(
         access_token=access_token,
         user=LoginOutputUser(

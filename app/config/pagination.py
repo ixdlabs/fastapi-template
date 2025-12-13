@@ -4,7 +4,7 @@ This module provides pagination utilities for database queries.
 
 from typing import Callable, Tuple
 from pydantic import BaseModel
-from sqlalchemy import Select, func
+from sqlalchemy import Select, func, select
 
 from app.config.database import DbDep
 
@@ -31,10 +31,13 @@ class Page[DataT](BaseModel):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-async def paginate[DataT](db: DbDep, items: Select[Tuple[DataT]]) -> Page[DataT]:
+async def paginate[DataT](
+    db: DbDep, stmt: Select[Tuple[DataT]], order_by: str = "created_at", limit: int = 100, offset: int = 0
+) -> Page[DataT]:
     """Paginates the given SQLAlchemy Select statement."""
-    total_result = await db.execute(items.with_only_columns(func.count()))
-    data_result = await db.execute(items)
+    total_stmt = select(func.count()).select_from(stmt.subquery())
+    total_result = await db.execute(total_stmt)
     total = total_result.scalar_one()
+    data_result = await db.execute(stmt.limit(limit).offset(offset).order_by(order_by))
     data = data_result.scalars().all()
     return Page[DataT](count=total, items=data)
