@@ -3,7 +3,7 @@
 ## Cloning
 
 ```bash
-uv run git clone https://github.com/ixdlabs/sample-backend
+git clone https://github.com/ixdlabs/fastapi-template
 ```
 
 ## Environment Setup
@@ -15,15 +15,7 @@ Requires Python 3.12+ and [uv](https://github.com/astral-sh/uv). uv manages the 
 This project ships a `uv.lock` file for reproducible installs. Sync dependencies:
 
 ```bash
-uv run uv sync
-```
-
-Confirm the app starts with:
-
-```bash
-uv run fastapi dev app/main.py
-# or
-uv run uvicorn app.main:app --reload
+uv sync
 ```
 
 ### Environment Variables Configuration
@@ -35,8 +27,11 @@ Copy `.env.example` to `.env` (create one if missing) and adjust values as neede
 This project uses [pre-commit](https://pre-commit.com/) hooks and [mypy](https://mypy-lang.org/).
 
 ```bash
+# install pre-commit hooks to run format checks on commit
 uv run pre-commit install
+# run formatting pre-commit hooks manually
 uv run pre-commit --all-files
+# run type checker
 uv run mypy .
 ```
 
@@ -64,8 +59,10 @@ DATABASE_URL=postgresql+asyncpg://db_user:password@localhost:5432/sample_backend
 Run migrations after changing models or switching databases:
 
 ```bash
-uv run alembic upgrade head     # apply migrations
-uv run alembic revision --autogenerate -m "describe change"  # create a new migration
+# apply migrations
+uv run alembic upgrade head
+# create a new migration
+uv run alembic revision --autogenerate -m "describe change"
 ```
 
 ## FastAPI Setup
@@ -81,10 +78,11 @@ Interactive docs (RapiDoc) are available at [http://127.0.0.1:8000/api/docs](htt
 ### Packages
 
 - [FastAPI](https://fastapi.tiangolo.com/) for the web framework and dependency injection.
-- [SQLAlchemy 2.x async](https://docs.sqlalchemy.org/en/20/) with Alembic for migrations.
-- [Pydantic v2](https://docs.pydantic.dev/) for request/response models and settings management.
-- [PyJWT](https://pyjwt.readthedocs.io/) + Argon2 for JWT auth and password hashing.
+- [SQLAlchemy async](https://docs.sqlalchemy.org/en/20/) with Alembic for migrations.
+- [Pydantic](https://docs.pydantic.dev/) for request/response models and settings management.
+- [PyJWT](https://pyjwt.readthedocs.io/) for JWT authentication.
 - [structlog](https://www.structlog.org/) for structured logging.
+- [pytest](https://docs.pytest.org/en/stable/) for unit testing.
 
 ## Docker / Deployment
 
