@@ -31,16 +31,14 @@ from opentelemetry.trace import set_tracer_provider
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
-from app.config.database import create_db_engine_from_settings
+from sqlalchemy.ext.asyncio import AsyncEngine
 from app.config.logging import setup_logging
 from app.config.settings import Settings
 
 
-def setup_open_telemetry(app: FastAPI, settings: Settings):
+def setup_open_telemetry(app: FastAPI, db_engine: AsyncEngine, settings: Settings):
     if not settings.otel_enabled:
         return
-
-    engine = create_db_engine_from_settings(settings)
 
     # Integrated Open Telemetry Python Libraries
     # https://opentelemetry-python-contrib.readthedocs.io
@@ -51,7 +49,7 @@ def setup_open_telemetry(app: FastAPI, settings: Settings):
     URLLibInstrumentor().instrument()
     URLLib3Instrumentor().instrument()
     FastAPIInstrumentor.instrument_app(app)
-    SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine, enable_commenter=True)
+    SQLAlchemyInstrumentor().instrument(engine=db_engine.sync_engine, enable_commenter=True)
 
     # Resource
     resource = Resource.create(

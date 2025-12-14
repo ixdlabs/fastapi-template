@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.config import openapi
+from app.config.database import create_db_engine_from_settings
 from app.config.exceptions import register_exception_handlers
 from app.config.logging import setup_logging
 from app.config.otel import setup_open_telemetry
@@ -20,7 +21,8 @@ app = FastAPI(
     redoc_url=None,
 )
 
-setup_open_telemetry(app, settings)
+db_engine = create_db_engine_from_settings(settings)
+setup_open_telemetry(app, db_engine, settings)
 
 app.include_router(openapi.router)
 app.include_router(user_urls.router)
