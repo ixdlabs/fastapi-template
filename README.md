@@ -144,7 +144,22 @@ Interactive docs (RapiDoc) are available at [http://127.0.0.1:8000/api/docs](htt
 
 ## Docker / Deployment
 
-Containerization is not bundled here. To containerize, supply `DATABASE_URL` and other env vars, run `uv run alembic upgrade head`, and start the app with `uv run uvicorn app.main:app`.
+Build the production image (uses the included `Dockerfile` with locked deps via `uv`) and run it with your `.env` file:
+
+```bash
+docker build -t sample-backend .
+docker run --rm -p 8000:8000 --env-file .env sample-backend
+```
+
+Mount a volume or switch `DATABASE_URL` to Postgres for persistence.
+Otherwise, any database related endpoint will not work.
+If you want to test, you can remove the `sqlite.db` file from `.dockerignore` file and use it to copy the database file as well.
+
+You can apply migrations in the container before first run if you use an external DB:
+
+```bash
+docker run --rm --env-file .env sample-backend uv run alembic upgrade head
+```
 
 ## Project Structure
 
