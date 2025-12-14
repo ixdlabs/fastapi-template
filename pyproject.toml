@@ -43,6 +43,8 @@ opentelemetry = [
     "opentelemetry-sdk>=1.39.1",
 ]
 
+[tool.uv]
+default-groups = ["opentelemetry", "dev"]
 
 [tool.ruff]
 line-length = 120
