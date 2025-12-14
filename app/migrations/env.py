@@ -75,7 +75,7 @@ config = context.config
 target_metadata = Base.metadata
 
 settings = get_settings()
-setup_logging(settings.migration_logger_name)
+setup_logging(settings.logger_name)
 if context.is_offline_mode():
     run_migrations_offline()
 else:

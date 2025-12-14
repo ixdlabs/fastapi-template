@@ -1,7 +1,6 @@
 """
 This module sets up logging configuration for the application using structlog and the standard logging library.
-It defines multiple formatters and handlers to support different logging formats such as colored console output,
-plain console output, and JSON format.
+It defines multiple formatters and handlers to support different logging formats.
 
 The `setup_logging` function will be called from various entry points (e.g., server, migrations) to initialize logging.
 
@@ -14,7 +13,7 @@ import logging.config
 import structlog
 
 
-def setup_logging(handler: str = "console", log_level: int = logging.INFO):
+def setup_logging(*handlers: str, log_level: str = "INFO"):
     logging.config.dictConfig(
         {
             "version": 1,
@@ -30,22 +29,14 @@ def setup_logging(handler: str = "console", log_level: int = logging.INFO):
                         structlog.dev.ConsoleRenderer(colors=True),
                     ],
                 },
-                "plain_console": {
-                    "()": structlog.stdlib.ProcessorFormatter,
-                    "processors": [
-                        structlog.contextvars.merge_contextvars,
-                        structlog.processors.add_log_level,
-                        structlog.processors.TimeStamper(fmt="iso"),
-                        structlog.dev.ConsoleRenderer(colors=False),
-                    ],
-                },
-                "json_formatter": {
+                "otel_formatter": {
                     "()": structlog.stdlib.ProcessorFormatter,
                     "processors": [
                         structlog.stdlib.add_logger_name,
                         structlog.contextvars.merge_contextvars,
                         structlog.processors.add_log_level,
                         structlog.processors.TimeStamper(fmt="iso"),
+                        structlog.stdlib.ProcessorFormatter.remove_processors_meta,
                         structlog.processors.JSONRenderer(),
                     ],
                 },
@@ -56,12 +47,8 @@ def setup_logging(handler: str = "console", log_level: int = logging.INFO):
                     "formatter": "colored_console",
                 },
                 "otel": {
-                    "class": "logging.StreamHandler",
-                    "formatter": "plain_console",
-                },
-                "json": {
-                    "class": "logging.StreamHandler",
-                    "formatter": "json_formatter",
+                    "class": "opentelemetry.sdk._logs.LoggingHandler",
+                    "formatter": "otel_formatter",
                 },
                 "null": {
                     "class": "logging.NullHandler",
@@ -69,21 +56,21 @@ def setup_logging(handler: str = "console", log_level: int = logging.INFO):
             },
             "loggers": {
                 "sqlalchemy.engine.Engine": {
-                    "handlers": [handler],
+                    "handlers": handlers,
                     "level": log_level,
                     "propagate": False,
                 },
                 "uvicorn.access": {
-                    "handlers": [handler],
+                    "handlers": handlers,
                     "level": log_level,
                     "propagate": False,
                 },
                 "django_structlog": {
-                    "handlers": [handler],
+                    "handlers": handlers,
                     "level": log_level,
                 },
                 "root": {
-                    "handlers": [handler],
+                    "handlers": handlers,
                     "level": log_level,
                 },
             },

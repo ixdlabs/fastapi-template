@@ -27,6 +27,20 @@ dev = [
     "pytest-cov>=7.0.0",
     "ruff>=0.14.8",
 ]
+opentelemetry = [
+    "opentelemetry-api>=1.39.1",
+    "opentelemetry-exporter-otlp>=1.39.1",
+    "opentelemetry-instrumentation-asyncio>=0.60b1",
+    "opentelemetry-instrumentation-fastapi>=0.60b1",
+    "opentelemetry-instrumentation-logging>=0.60b1",
+    "opentelemetry-instrumentation-sqlalchemy>=0.60b1",
+    "opentelemetry-instrumentation-sqlite3>=0.60b1",
+    "opentelemetry-instrumentation-starlette>=0.60b1",
+    "opentelemetry-instrumentation-threading>=0.60b1",
+    "opentelemetry-instrumentation-urllib>=0.60b1",
+    "opentelemetry-instrumentation-urllib3>=0.60b1",
+    "opentelemetry-sdk>=1.39.1",
+]
 
 
 [tool.ruff]
