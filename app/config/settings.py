@@ -23,12 +23,13 @@ class Settings(BaseSettings):
     theme_color_background: str = "#111827"
 
     debug: bool = False
+    logger_name: str = "console"
+
     jwt_secret_key: str = "local"
     jwt_expiration_minutes: int = 24 * 60
 
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
-
-    logger_name: str = "console"
+    celery_broker_url: str = "sqla+sqlite:///sqlite.celery.db"
 
     otel_enabled: bool = False
     otel_resource_service_name: str = "backend"

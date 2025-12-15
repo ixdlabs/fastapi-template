@@ -13,7 +13,7 @@ wheels/
 .env
 
 # SQLite database file
-sqlite*.db
+sqlite*.db*
 
 # Coverage reports
 .coverage
