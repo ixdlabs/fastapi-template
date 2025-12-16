@@ -20,7 +20,7 @@ from app.features.users.models import User
 # OAuth2 scheme for JWT token extraction
 # ----------------------------------------------------------------------------------------------------------------------
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/oauth2/token", scheme_name="JWT")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/oauth2/token", scheme_name="JWT")
 
 
 # Dependency to get the current authenticated user

@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+import uvicorn
 
 from app.config import openapi
 from app.config.database import create_db_engine_from_settings
@@ -28,3 +29,6 @@ app.include_router(openapi.router)
 app.include_router(user_urls.router)
 
 register_exception_handlers(app)
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
