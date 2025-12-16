@@ -7,7 +7,7 @@ from app.config.exceptions import register_exception_handlers
 from app.config.logging import setup_logging
 from app.config.otel import setup_open_telemetry
 from app.config.settings import get_settings
-from app.features.users import urls as user_urls
+from app.features.users.router import router as user_router
 
 settings = get_settings()
 setup_logging(settings.logger_name)
@@ -26,7 +26,7 @@ db_engine = create_db_engine_from_settings(settings)
 setup_open_telemetry(app, db_engine, settings)
 
 app.include_router(openapi.router)
-app.include_router(user_urls.router)
+app.include_router(user_router)
 
 register_exception_handlers(app)
 
