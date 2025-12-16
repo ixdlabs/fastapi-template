@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     celery_broker_url: str = "sqla+sqlite:///sqlite.celery.db"
     celery_task_always_eager: bool = False
+    celery_timezone: str = "UTC"
 
     otel_enabled: bool = False
     otel_resource_service_name: str = "backend"
