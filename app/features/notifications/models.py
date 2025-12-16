@@ -29,8 +29,11 @@ class NotificationStatus(enum.Enum):
     READ = "read"
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 class Notification(Base):
-    _tablename_ = "notifications"
+    __tablename__ = "notifications"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
@@ -42,7 +45,7 @@ class Notification(Base):
 
 
 class NotificationDelivery(Base):
-    _tablename_ = "notification_delivery"
+    __tablename__ = "notification_delivery"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     notification_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("notifications.id", ondelete="CASCADE"))
