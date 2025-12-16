@@ -29,7 +29,6 @@ class Settings(BaseSettings):
     jwt_expiration_minutes: int = 24 * 60
 
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
-    celery_broker_url: str = "sqla+sqlite:///sqlite.celery.db"
 
     otel_enabled: bool = False
     otel_resource_service_name: str = "backend"
