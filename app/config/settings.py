@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     logger_name: str = "console"
 
-    otel_enabled: bool = False
+    otel_enabled: bool = True
     otel_resource_service_name: str = "backend"
     otel_resource_environment: str = "development"
     otel_exporter_otlp_endpoint: str = ""
