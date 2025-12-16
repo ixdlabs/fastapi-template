@@ -3,6 +3,7 @@ This module defines the Background class and its dependency for managing backgro
 The Background class provides a method to submit tasks to be executed asynchronously.
 """
 
+import abc
 import asyncio
 from functools import lru_cache
 import functools
@@ -17,10 +18,21 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class Background:
+class Background(abc.ABC):
+    @abc.abstractmethod
+    def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> None:
+        """Submit a background task to be executed asynchronously."""
+
+
+class CeleryBackground(Background):
     def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
         task = shared_task(fn)
         task.apply_async(args=args, kwargs=kwargs)
+
+
+class NoOpBackground(Background):
+    def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+        pass
 
 
 # Dependency that provides application background task runner.
