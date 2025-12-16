@@ -57,7 +57,7 @@ def setup_logging(*handlers: str, log_level: str = "INFO"):
             "loggers": {
                 "sqlalchemy.engine.Engine": {
                     "handlers": handlers,
-                    "level": log_level,
+                    "level": logging.DEBUG,
                     "propagate": False,
                 },
                 "uvicorn.access": {

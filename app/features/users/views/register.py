@@ -3,10 +3,12 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.config.background import BackgroundDep
 from app.config.database import DbDep
 from app.config.settings import SettingsDep
 from app.features.users.models import User
 from app.features.users.helpers import jwt_encode
+from app.features.users.tasks import send_welcome_email
 
 
 class RegisterInput(BaseModel):
@@ -35,7 +37,7 @@ router = APIRouter()
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(input: RegisterInput, db: DbDep, settings: SettingsDep) -> RegisterOutput:
+async def register(input: RegisterInput, db: DbDep, settings: SettingsDep, background: BackgroundDep) -> RegisterOutput:
     stmt = select(User).where(User.username == input.username)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
@@ -48,6 +50,8 @@ async def register(input: RegisterInput, db: DbDep, settings: SettingsDep) -> Re
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    background.submit(send_welcome_email, user.id)
 
     access_token = jwt_encode(user, settings)
     return RegisterOutput(

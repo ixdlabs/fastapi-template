@@ -8,6 +8,7 @@ SQLAlchemy Docs: https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html#u
 Fast API Docs: https://fastapi.tiangolo.com/tutorial/sql-databases/
 """
 
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Annotated
 from fastapi import Depends
@@ -42,6 +43,12 @@ async def get_db_session(settings: SettingsDep):
     engine = create_db_engine_from_settings(settings)
     session_maker = async_sessionmaker(engine)
     async with session_maker() as session:
+        yield session
+
+
+@asynccontextmanager
+async def get_db(settings: SettingsDep):
+    async for session in get_db_session(settings):
         yield session
 
 

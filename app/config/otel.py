@@ -9,6 +9,7 @@ Calling this from lifespan events is not recommended as the FastAPI instrumentat
 Open Telemetry Python Docs: https://opentelemetry-python-contrib.readthedocs.io
 """
 
+from celery import Celery
 from fastapi import FastAPI
 from opentelemetry._logs import set_logger_provider
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
@@ -19,6 +20,7 @@ from opentelemetry.instrumentation.urllib import URLLibInstrumentor
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.instrumentation.urllib3 import URLLib3Instrumentor
+from opentelemetry.instrumentation.celery import CeleryInstrumentor
 from opentelemetry.metrics import set_meter_provider
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
@@ -36,7 +38,7 @@ from app.config.logging import setup_logging
 from app.config.settings import Settings
 
 
-def setup_open_telemetry(app: FastAPI, db_engine: AsyncEngine, settings: Settings):
+def setup_open_telemetry(app: FastAPI | Celery, db_engine: AsyncEngine, settings: Settings):
     if not settings.otel_enabled:
         return
 
@@ -49,7 +51,11 @@ def setup_open_telemetry(app: FastAPI, db_engine: AsyncEngine, settings: Setting
     URLLibInstrumentor().instrument()
     URLLib3Instrumentor().instrument()
     SQLAlchemyInstrumentor().instrument(engine=db_engine.sync_engine, enable_commenter=True)
-    FastAPIInstrumentor.instrument_app(app)
+
+    if isinstance(app, FastAPI):
+        FastAPIInstrumentor.instrument_app(app)
+    elif isinstance(app, Celery):
+        CeleryInstrumentor().instrument()
 
     # Resource
     resource = Resource.create(
