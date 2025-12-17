@@ -9,22 +9,37 @@ import logging
 import logging.config
 
 
+def ignore_fastapi_cli_output_filter(record: logging.LogRecord) -> bool:
+    return record.name != "uvicorn.error" and record.name != "watchfiles.main"
+
+
 def setup_logging(*handlers: str, log_level: str = "INFO"):
     logging.config.dictConfig(
         {
             "version": 1,
             "disable_existing_loggers": False,
             "formatters": {
-                "otel_formatter": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"},
+                "json": {
+                    "class": "pythonjsonlogger.json.JsonFormatter",
+                    "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+                    "rename_fields": {"asctime": "timestamp", "levelname": "severity", "name": "logger"},
+                }
             },
             "handlers": {
                 "console": {
                     "class": "rich.logging.RichHandler",
+                    "filters": [ignore_fastapi_cli_output_filter],
                     "rich_tracebacks": True,
+                },
+                "json": {
+                    "class": "logging.StreamHandler",
+                    "filters": [ignore_fastapi_cli_output_filter],
+                    "formatter": "json",
                 },
                 "otel": {
                     "class": "opentelemetry.sdk._logs.LoggingHandler",
-                    "formatter": "otel_formatter",
+                    "filters": [ignore_fastapi_cli_output_filter],
+                    "formatter": "json",
                 },
                 "null": {
                     "class": "logging.NullHandler",
