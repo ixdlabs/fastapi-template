@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.config.auth import CurrentUserDep
+from app.config.cache import CacheDep, cached_view
 from app.config.database import DbDep
 from app.config.pagination import Page, paginate
 from app.config.rate_limit import RateLimitDep
@@ -89,8 +90,9 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 
 
 @router.get("/")
+@cached_view(30)
 async def user_list(
-    db: DbDep, query: Annotated[UserFilterInput, Query()], rate_limit: RateLimitDep
+    db: DbDep, query: Annotated[UserFilterInput, Query()], rate_limit: RateLimitDep, cache: CacheDep
 ) -> Page[UserListOutput]:
     await rate_limit.limit("10/minute")
 

@@ -17,15 +17,14 @@ logger = logging.getLogger(__name__)
 
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
     if exc.status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR:
-        logger.error(
-            "server error", extra={"status_code": exc.status_code, "path": request.url.path, "detail": exc.detail}
-        )
+        logger.error("server error", extra={"path": request.url.path}, exc_info=exc)
     return await http_exception_handler(request, exc)
 
 
 async def custom_exception_handler(request: Request, exc: Exception):
+    logger.error("server error", extra={"path": request.url.path}, exc_info=exc)
     exc = HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
-    return await custom_http_exception_handler(request, exc)
+    return await http_exception_handler(request, exc)
 
 
 # Register the custom exception handlers with the FastAPI application.
