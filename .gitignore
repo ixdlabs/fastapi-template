@@ -18,3 +18,5 @@ celerybeat-schedule.db
 
 # Coverage reports
 .coverage
+coverage.xml
+pytest.xml

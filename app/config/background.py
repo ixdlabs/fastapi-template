@@ -3,9 +3,7 @@ This module defines the Background class and its dependency for managing backgro
 The Background class provides a method to submit tasks to be executed asynchronously.
 """
 
-import abc
 import asyncio
-from functools import lru_cache
 import functools
 from typing import Annotated, Any, Callable, Coroutine, ParamSpec, TypeVar
 from celery.schedules import crontab
@@ -14,25 +12,15 @@ from celery import shared_task
 
 from fastapi import Depends
 
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class Background(abc.ABC):
-    @abc.abstractmethod
-    def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> None:
-        """Submit a background task to be executed asynchronously."""
-
-
-class CeleryBackground(Background):
+class Background:
     def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
         task = shared_task(fn)
         task.apply_async(args=args, kwargs=kwargs)
-
-
-class NoOpBackground(Background):
-    def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
-        pass
 
 
 # Dependency that provides application background task runner.
@@ -40,7 +28,6 @@ class NoOpBackground(Background):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@lru_cache
 def get_background():
     return Background()
 
@@ -81,4 +68,5 @@ def periodic_task(schedule: crontab | float | int):
     return decorator
 
 
+# Every function decorated with @periodic_task is automatically added to this dictionary.
 beat_schedule: dict[str, crontab | float | int] = {}
