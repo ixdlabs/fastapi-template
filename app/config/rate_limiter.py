@@ -42,7 +42,9 @@ def get_rate_limiter_strategy():
 
 def get_rate_limit(request: Request):
     strategy = get_rate_limiter_strategy()
-    key = f"{request.url.path}:{request.client.host}"
+    url_key = request.url.path
+    ip_key = request.client.host if request.client is not None else "unknown"
+    key = f"{url_key}:{ip_key}"
     return RateLimit(key=key, strategy=strategy)
 
 
