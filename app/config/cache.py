@@ -1,4 +1,5 @@
 from functools import lru_cache, wraps
+from hashlib import md5
 import logging
 from typing import Annotated, Callable
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def cached_view(ttl: int):
+def cached_view(ttl: int, vary_on_auth: bool = False):
     """Decorator to cache the result of a view function."""
 
     def decorator(func: Callable):
@@ -23,6 +24,9 @@ def cached_view(ttl: int):
             if cache is None:
                 raise Exception("Cache dependency not provided, include CacheDep in the endpoint dependencies.")
             assert isinstance(cache, Cache)
+
+            if vary_on_auth:
+                cache.vary_on_auth()
 
             cached_result = await cache.get()
             if cached_result is not None:
@@ -45,10 +49,18 @@ class Cache:
     def __init__(self, backend: BaseCache, request: Request):
         self.backend = backend
         self.request = request
+        self.prefix = "cache"
+
+    def add_prefix(self, prefix: str):
+        self.prefix = f"{self.prefix}:[{prefix}]"
+
+    def vary_on_auth(self):
+        auth_header = self.request.headers.get("Authorization", "")
+        self.add_prefix(f"auth:{md5(auth_header.encode()).hexdigest()}")
 
     def key(self) -> str:
         query_params = str(sorted(self.request.query_params.items()))
-        return f"{self.request.url.path}?{query_params}"
+        return f"{self.prefix}:{self.request.url.path}?{query_params}"
 
     def set(self, value, ttl: int):
         return self.backend.set(self.key(), value, ttl)

@@ -34,6 +34,11 @@ def test_app():
     async def query_param_endpoint(param: str, cache: CacheDep):
         return {"param": param, "message": str(uuid.uuid4())}
 
+    @app.get("/cached-auth-based-endpoint")
+    @cached_view(ttl=60, vary_on_auth=True)
+    async def cached_auth_based_endpoint(cache: CacheDep):
+        return {"message": str(uuid.uuid4())}
+
     return app
 
 
@@ -113,5 +118,32 @@ async def test_cache_keys_include_query_params(test_app: FastAPI):
     assert response1_cached.json()["message"] == message1
 
     response2_cached = client.get("/query-param-endpoint", params={"param": "value2"})
+    assert response2_cached.status_code == 200
+    assert response2_cached.json()["message"] == message2
+
+
+@pytest.mark.asyncio
+async def test_cache_vary_on_auth_header(test_app: FastAPI):
+    client = TestClient(test_app)
+
+    # Request with first auth header
+    headers1 = {"Authorization": "Bearer token1"}
+    response1 = client.get("/cached-auth-based-endpoint", headers=headers1)
+    assert response1.status_code == 200
+    message1 = response1.json()["message"]
+    # Re-fetch with the same auth header to ensure caching works
+    response1_cached = client.get("/cached-auth-based-endpoint", headers=headers1)
+    assert response1_cached.status_code == 200
+    assert response1_cached.json()["message"] == message1
+
+    # Request with second auth header
+    headers2 = {"Authorization": "Bearer token2"}
+    response2 = client.get("/cached-auth-based-endpoint", headers=headers2)
+    assert response2.status_code == 200
+    message2 = response2.json()["message"]
+    # Ensure that different auth headers yield different cached responses
+    assert message1 != message2
+    # Re-fetch with the same second auth header to ensure caching works
+    response2_cached = client.get("/cached-auth-based-endpoint", headers=headers2)
     assert response2_cached.status_code == 200
     assert response2_cached.json()["message"] == message2
