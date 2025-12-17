@@ -17,17 +17,18 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
+# Dependency that provides application background task runner.
+# The background is cached to avoid recreating it on each request.
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 class Background:
     def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
         task = shared_task(fn)
         task.apply_async(args=args, kwargs=kwargs)
 
 
-# Dependency that provides application background task runner.
-# The background is cached to avoid recreating it on each request.
-# ----------------------------------------------------------------------------------------------------------------------
-
-
+@functools.lru_cache
 def get_background():
     return Background()
 
