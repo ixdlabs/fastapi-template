@@ -9,10 +9,6 @@ import logging
 import logging.config
 
 
-def ignore_fastapi_cli_output_filter(record: logging.LogRecord) -> bool:
-    return record.name != "uvicorn.error" and record.name != "watchfiles.main"
-
-
 def setup_logging(*handlers: str, log_level: str = "INFO"):
     logging.config.dictConfig(
         {
@@ -28,17 +24,14 @@ def setup_logging(*handlers: str, log_level: str = "INFO"):
             "handlers": {
                 "console": {
                     "class": "rich.logging.RichHandler",
-                    "filters": [ignore_fastapi_cli_output_filter],
                     "rich_tracebacks": True,
                 },
                 "json": {
                     "class": "logging.StreamHandler",
-                    "filters": [ignore_fastapi_cli_output_filter],
                     "formatter": "json",
                 },
                 "otel": {
                     "class": "opentelemetry.sdk._logs.LoggingHandler",
-                    "filters": [ignore_fastapi_cli_output_filter],
                     "formatter": "json",
                 },
                 "null": {
@@ -48,7 +41,15 @@ def setup_logging(*handlers: str, log_level: str = "INFO"):
             "loggers": {
                 "sqlalchemy.engine.Engine": {
                     "handlers": handlers,
-                    "level": logging.DEBUG,
+                    "level": log_level,
+                    "propagate": False,
+                },
+                "uvicorn.error": {
+                    "handlers": ["null"],
+                    "propagate": False,
+                },
+                "watchfiles.main": {
+                    "handlers": ["null"],
                     "propagate": False,
                 },
                 "uvicorn.access": {
