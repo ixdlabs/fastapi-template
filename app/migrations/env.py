@@ -24,6 +24,7 @@ from app.config.settings import get_settings
 # ----------------------------------------------------------------------------------------------------------------------
 
 from app.features.users.models import User  # noqa: F401
+from app.features.notifications.models import Notification, NotificationDelivery  # noqa: F401
 
 
 # Run migrations in 'offline' mode
