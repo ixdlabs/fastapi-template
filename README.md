@@ -138,7 +138,6 @@ Docs available at: [http://127.0.0.1:8000/api/docs](http://127.0.0.1:8000/api/do
 - [SQLAlchemy async](https://docs.sqlalchemy.org/en/20/) with Alembic for migrations.
 - [Pydantic](https://docs.pydantic.dev/) for request/response models and settings management.
 - [PyJWT](https://pyjwt.readthedocs.io/) for JWT authentication.
-- [structlog](https://www.structlog.org/) for structured logging.
 - [Celery](https://docs.celeryq.dev/) for background tasks.
 - [pytest](https://docs.pytest.org/en/stable/) for unit testing.
 

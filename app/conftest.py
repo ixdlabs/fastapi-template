@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock
 import pytest
@@ -5,7 +6,6 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker, AsyncSession
 
 from alembic import command, config
-import structlog
 
 from app.config.background import Background, get_background
 from app.config.database import get_db_session
@@ -16,7 +16,7 @@ from limits.aio.strategies import MovingWindowRateLimiter, RateLimiter
 from app.config.settings import Settings, get_settings
 from app.main import app
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="session")

@@ -1,7 +1,7 @@
+import logging
 import uuid
 from pydantic import BaseModel
 from sqlalchemy import select
-import structlog
 
 from app.config.background import background_task
 from app.config.database import DbDep, get_db
@@ -9,7 +9,7 @@ from app.config.settings import get_settings
 from app.features.users.models import User
 
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class WelcomeEmailInput(BaseModel):
@@ -21,7 +21,7 @@ async def send_welcome_email(input: WelcomeEmailInput, db: DbDep):
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
-        logger.error("User not found", user_id=input.user_id)
+        logger.error("User not found", extra={"user_id": input.user_id})
         return
 
 

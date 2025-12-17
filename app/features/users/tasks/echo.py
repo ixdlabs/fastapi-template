@@ -1,13 +1,13 @@
-import structlog
+import logging
 
 from app.config.background import periodic_task
 
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 def echo(message: str):
-    logger.info("Echoing message", message=message)
+    logger.info("Echoing message", extra={"message": message})
 
 
 # Task registration

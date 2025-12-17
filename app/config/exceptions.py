@@ -3,13 +3,13 @@ This module defines custom exception handlers for the FastAPI application.
 Currently, it includes a handler for HTTP exceptions that logs server errors.
 """
 
+import logging
 from fastapi import FastAPI, Request, status
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException
-import structlog
 
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 # Custom handlers for HTTP exceptions that logs server errors.
 # ----------------------------------------------------------------------------------------------------------------------
@@ -17,7 +17,9 @@ logger = structlog.get_logger()
 
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
     if exc.status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR:
-        logger.error("server error", status_code=exc.status_code, path=request.url.path, detail=exc.detail)
+        logger.error(
+            "server error", extra={"status_code": exc.status_code, "path": request.url.path, "detail": exc.detail}
+        )
     return await http_exception_handler(request, exc)
 
 
