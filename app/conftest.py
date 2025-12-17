@@ -9,6 +9,9 @@ import structlog
 from app.config.background import Background, get_background
 from app.config.database import get_db_session
 from app.config.logging import setup_logging
+from app.config.rate_limit import get_rate_limit_strategy
+from limits.aio.storage import MemoryStorage
+from limits.aio.strategies import MovingWindowRateLimiter, RateLimiter
 from app.config.settings import Settings, get_settings
 from app.main import app
 
@@ -78,6 +81,17 @@ def background_fixture():
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@pytest.fixture(scope="function")
+def rate_limit_strategy_fixture():
+    backend = MemoryStorage()
+    strategy = MovingWindowRateLimiter(backend)
+    yield strategy
+
+
+# Application settings for tests (this is created with explicit values to ensure reproducibility)
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 @pytest.fixture(scope="session")
 def settings_fixture():
     # Database URL is set to empty string to avoid accidental connections
@@ -89,10 +103,16 @@ def settings_fixture():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def override_dependencies(db_fixture: AsyncSession, settings_fixture: Settings, background_fixture: Background):
+def override_dependencies(
+    db_fixture: AsyncSession,
+    settings_fixture: Settings,
+    background_fixture: Background,
+    rate_limit_strategy_fixture: RateLimiter,
+):
     app.dependency_overrides[get_db_session] = lambda: db_fixture
     app.dependency_overrides[get_settings] = lambda: settings_fixture
     app.dependency_overrides[get_background] = lambda: background_fixture
+    app.dependency_overrides[get_rate_limit_strategy] = lambda: rate_limit_strategy_fixture
 
     yield
     app.dependency_overrides.clear()
