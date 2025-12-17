@@ -25,7 +25,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
-    notifications: Mapped["Notification"] = relationship(back_populates="user", passive_deletes=True)
+    notifications: Mapped[list["Notification"]] = relationship(back_populates="user", passive_deletes=True)
 
     def set_password(self, password: str):
         password_hasher = PasswordHasher()
