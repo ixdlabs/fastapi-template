@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.config.auth import CurrentUserDep
 from app.config.database import DbDep
 from app.config.pagination import Page, paginate
-from app.config.rate_limiter import RateLimitDep
+from app.config.rate_limit import RateLimitDep
 from app.features.users.models import User
 
 
