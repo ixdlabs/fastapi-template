@@ -1,57 +1,58 @@
-# FastAPI Sample Backend
+# 🚀 FastAPI Template
 
-## Cloning
+A robust, production-ready FastAPI backend with structured tooling, OpenTelemetry, Celery, and more.
+
+## 🧬 Cloning the Repository
 
 ```bash
 git clone https://github.com/ixdlabs/fastapi-template
 ```
 
-## Environment Setup
+## ⚙️ Environment Setup
 
 Requires Python 3.12+ and [uv](https://github.com/astral-sh/uv). uv manages the environment - no venv activation needed.
 
-### Install Requirements
+### Install Dependencies
 
-This project ships a `uv.lock` file for reproducible installs. Sync dependencies:
+This project uses a `uv.lock` file for consistent dependency installation.
 
 ```bash
 uv sync
 ```
 
-### Environment Variables Configuration
+### Configure Environment Variables
 
 Copy `.env.example` to `.env` (create one if missing) and adjust values as needed.
 
-## Formatting and Linting
+## 🧹 Code Formatting & Linting
 
 This project uses [pre-commit](https://pre-commit.com/) hooks and [mypy](https://mypy-lang.org/).
 
 ```bash
-# install pre-commit hooks to run format checks on commit
+# Install pre-commit hooks
 uv run pre-commit install
-# run formatting pre-commit hooks manually
+# Run formatting checks
 uv run pre-commit --all-files
-# run type checker
+# Type checking
 uv run mypy .
 ```
 
-## Testing
+## ✅ Running Tests
 
-Run the test suite (pytest) and optional coverage report:
+Run the test suite (pytest):
 
 ```bash
 uv run pytest
-uv run pytest --cov=app --cov-report=term-missing
 ```
 
-## Database Setup
+## 🗄️ Database Configuration
 
 SQLite is the default for development and will create `sqlite.db` automatically. No additional setup is required to start the API.
 
-To use PostgreSQL or another database, set `DATABASE_URL` to an async SQLAlchemy URL, e.g.:
+To switch to PostgreSQL or another DB, set:
 
-```
-DATABASE_URL=postgresql+asyncpg://db_user:password@localhost:5432/sample_backend
+```bash
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dbname
 ```
 
 ### Alembic Migrations
@@ -59,18 +60,16 @@ DATABASE_URL=postgresql+asyncpg://db_user:password@localhost:5432/sample_backend
 Run migrations after changing models or switching databases:
 
 ```bash
-# apply migrations
+# Apply migrations
 uv run alembic upgrade head
-# create a new migration
+# Create new migration
 uv run alembic revision --autogenerate -m "describe change"
 ```
 
-## OpenTelemetry Setup
+## 📈 Observability with OpenTelemetry
 
 This application uses OpenTelemetry (OTel) to export traces, metrics, and logs via OTLP.
 [SigNoz](https://signoz.io/) is the recommended backend, but any OTLP-compatible collector will work.
-
-Reference: https://signoz.io/docs/instrumentation/opentelemetry-fastapi/
 
 ### Environment Configuration
 
@@ -90,7 +89,7 @@ OTEL_EXPORTER_OTLP_INSECURE=false
 OTEL_EXPORTER_OTLP_HEADERS="signoz-ingestion-key=<your-ingestion-key>"
 ```
 
-### Running the Application with OpenTelemetry Enabled
+### Running the Application with OTel Enabled
 
 > Do not use autoreload when running with OpenTelemetry instrumentation.
 
@@ -100,7 +99,7 @@ Start the application using:
 uv run uvicorn app.main:app
 ```
 
-### Installing OpenTelemetry Instrumentations
+### Installing OTel Instrumentations
 
 To discover recommended instrumentations for the environment, run:
 
@@ -123,37 +122,60 @@ The instrumentations should be configured inside the `app/config/otel.py`.
 
 Once configured, traces, metrics, and logs are automatically exported via OTLP and data appears in SigNoz (or your chosen backend).
 
-## FastAPI Setup
+## ⚡ FastAPI Server
 
-Apply migrations, then start the server:
+Run after applying migrations:
 
 ```bash
 uv run fastapi dev app/main.py
 ```
 
-Interactive docs (RapiDoc) are available at [http://127.0.0.1:8000/api/docs](http://127.0.0.1:8000/api/docs).
+Docs available at: [http://127.0.0.1:8000/api/docs](http://127.0.0.1:8000/api/docs)
 
-### Packages
+---
+
+## 🧰 Included Packages
 
 - [FastAPI](https://fastapi.tiangolo.com/) for the web framework and dependency injection.
 - [SQLAlchemy async](https://docs.sqlalchemy.org/en/20/) with Alembic for migrations.
 - [Pydantic](https://docs.pydantic.dev/) for request/response models and settings management.
 - [PyJWT](https://pyjwt.readthedocs.io/) for JWT authentication.
 - [structlog](https://www.structlog.org/) for structured logging.
+- [Celery](https://docs.celeryq.dev/) for background tasks.
 - [pytest](https://docs.pytest.org/en/stable/) for unit testing.
 
-## Docker / Deployment
+## 🎯 Background Tasks with Celery
 
-Build the production image (uses the included `Dockerfile` with locked deps via `uv`) and run it with your `.env` file:
+Celery is configured for async task execution.
+
+### Local Development (Eager Mode)
+
+Run tasks synchronously without a worker:
+
+```bash
+CELERY_TASK_ALWAYS_EAGER=true
+```
+
+### Without Eager Mode
+
+Default queue backend is SQLite. To run worker:
+
+```bash
+uv run celery -A app.worker worker
+```
+
+---
+
+## 🐳 Docker Setup
+
+Build & run the production image:
 
 ```bash
 docker build -t fastapi-template .
 docker run --rm -p 8000:8000 --env-file .env fastapi-template
 ```
 
-Mount a volume or switch `DATABASE_URL` to Postgres for persistence.
-Otherwise, any database related endpoint will not work.
-If you want to test, you can remove the `sqlite.db` file from `.dockerignore` file and use it to copy the database file as well.
+For persistent storage, use a volume or PostgreSQL via `DATABASE_URL`.
 
 You can apply migrations in the container before first run if you use an external DB:
 
@@ -161,32 +183,24 @@ You can apply migrations in the container before first run if you use an externa
 docker run --rm --env-file .env fastapi-template uv run alembic upgrade head
 ```
 
-## Project Structure
+## 🧾 Project Structure
 
 ```
-- app/main.py             - FastAPI app factory and router registration.
-- app/config/             - settings, auth, database, logging, pagination, OpenAPI customization, exception handling.
-- app/features/users/     - user domain (models, views, urls, tests).
-- app/migrations/         - Alembic environment and migration versions.
-- uv.lock,pyproject.toml  - dependency and tool definitions managed by uv.
+app/
+├── main.py                  # App entry point
+├── config/                  # Configuration (env, logging, otel, etc.)
+├── features/users/          # User domain logic
+├── migrations/              # Alembic migrations
+uv.lock, pyproject.toml      # Dependency definitions
 ```
 
-## VS Code
-
-Suggested workspace settings to match this repo’s tooling:
+## 🧠 VS Code Config
 
 ```json
 {
   "python.testing.pytestArgs": ["app"],
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestEnabled": true
+  "python.testing.pytestEnabled": true,
+  "editor.rulers": [120]
 }
-```
-
-## Localization
-
-Not applicable. The API responses are English-only; translations are not included.
-
-```
-
 ```

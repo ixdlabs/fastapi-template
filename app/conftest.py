@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 from alembic import command, config
 import structlog
 
+from app.config.background import NoOpBackground, get_background
 from app.config.database import get_db_session
 from app.config.logging import setup_logging
 from app.config.settings import Settings, get_settings
@@ -66,7 +67,7 @@ async def db_fixture(db_engine_fixture: AsyncEngine):
 @pytest.fixture(scope="session")
 def settings_fixture():
     # Database URL is set to empty string to avoid accidental connections
-    return Settings.model_construct(jwt_secret_key="test", database_url="")
+    return Settings.model_construct(jwt_secret_key="test", database_url="", celery_task_always_eager=True)
 
 
 # Dependency overrides for tests
@@ -77,6 +78,7 @@ def settings_fixture():
 def override_dependencies(db_fixture: AsyncSession, settings_fixture: Settings):
     app.dependency_overrides[get_db_session] = lambda: db_fixture
     app.dependency_overrides[get_settings] = lambda: settings_fixture
+    app.dependency_overrides[get_background] = lambda: NoOpBackground()
 
     yield
     app.dependency_overrides.clear()
