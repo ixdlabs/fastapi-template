@@ -14,7 +14,7 @@ from app.features import task_registry  # noqa: F401
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
-setup_logging(settings.logger_name)
+setup_logging(settings)
 
 app = Celery("tasks", broker=settings.celery_broker_url)
 

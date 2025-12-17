@@ -34,7 +34,6 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExport
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from sqlalchemy.ext.asyncio import AsyncEngine
-from app.config.logging import setup_logging
 from app.config.settings import Settings
 
 
@@ -96,6 +95,3 @@ def setup_open_telemetry(app: FastAPI | Celery, db_engine: AsyncEngine, settings
     logger_provider = LoggerProvider(resource=resource)
     logger_provider.add_log_record_processor(log_processor)
     set_logger_provider(logger_provider)
-
-    # Reconfigure logging to use Open Telemetry handler
-    setup_logging(settings.logger_name, "otel")

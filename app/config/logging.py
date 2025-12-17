@@ -8,8 +8,16 @@ The `setup_logging` function will be called from various entry points (e.g., ser
 import logging
 import logging.config
 
+from app.config.settings import Settings
 
-def setup_logging(*handlers: str, log_level: str = "INFO"):
+
+def setup_logging(settings: Settings):
+    handlers = [settings.logger_name]
+    if settings.otel_enabled:
+        handlers.append("otel")
+
+    log_level = settings.logger_level.upper()
+
     logging.config.dictConfig(
         {
             "version": 1,

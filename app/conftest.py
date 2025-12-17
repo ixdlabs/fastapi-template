@@ -18,11 +18,24 @@ from app.main import app
 
 logger = logging.getLogger(__name__)
 
+# Application settings for tests (this is created with explicit values to ensure reproducibility)
+# ----------------------------------------------------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
-def setup():
-    setup_logging("console")
-    logger.info("Preparing to run tests...")
+def settings_fixture():
+    # Database URL is set to empty string to avoid accidental connections
+    return Settings.model_construct(
+        jwt_secret_key="test",
+        database_url="",
+        celery_task_always_eager=True,
+        logger_name="console",
+    )
+
+
+@pytest.fixture(scope="session")
+def setup_logging_fixture(settings_fixture: Settings):
+    setup_logging(settings_fixture)
     yield
 
 
@@ -33,8 +46,7 @@ def setup():
 
 
 @pytest.fixture(scope="session")
-def db_engine_fixture(setup: None):
-    setup_logging("console")
+def db_engine_fixture(setup_logging_fixture: None):
     Path("sqlite.test.db").unlink(missing_ok=True)
     engine = create_async_engine("sqlite+aiosqlite:///sqlite.test.db", echo=True)
 
@@ -82,16 +94,6 @@ def rate_limit_strategy_fixture():
     backend = MemoryStorage()
     strategy = MovingWindowRateLimiter(backend)
     yield strategy
-
-
-# Application settings for tests (this is created with explicit values to ensure reproducibility)
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def settings_fixture():
-    # Database URL is set to empty string to avoid accidental connections
-    return Settings.model_construct(jwt_secret_key="test", database_url="", celery_task_always_eager=True)
 
 
 # Dependency overrides for tests

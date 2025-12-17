@@ -19,11 +19,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    allowed_hosts: list[str] = ["*"]
+    cors_origins: list[str] = ["*"]
+
     theme_color_primary: str = "#61A60A"
     theme_color_background: str = "#111827"
 
     debug: bool = False
     logger_name: str = "console"
+    logger_level: str = "info"
 
     jwt_secret_key: str = "local"
     jwt_expiration_minutes: int = 24 * 60
