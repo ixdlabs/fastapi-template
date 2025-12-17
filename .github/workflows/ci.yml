@@ -4,6 +4,8 @@ on:
   push:
     branches: [master]
   pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -38,6 +40,7 @@ jobs:
 
       - name: Coverage
         uses: MishaKav/pytest-coverage-comment@v1.2.0
+        if: ${{ github.event_name == 'pull_request' }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pytest-xml-coverage-path: coverage.xml
