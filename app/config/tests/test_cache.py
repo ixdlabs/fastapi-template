@@ -29,6 +29,11 @@ def test_app():
     async def cached_400_endpoint(cache: CacheDep):
         raise HTTPException(status_code=400, detail=str(uuid.uuid4()))
 
+    @app.get("/query-param-endpoint")
+    @cached_view(ttl=60)
+    async def query_param_endpoint(param: str, cache: CacheDep):
+        return {"param": param, "message": str(uuid.uuid4())}
+
     return app
 
 
@@ -86,3 +91,27 @@ async def test_cache_does_not_cache_400_errors(test_app: FastAPI):
         error_detail = response.json()["detail"]
         messages.add(error_detail)
         assert len(messages) == i + 1
+
+
+@pytest.mark.asyncio
+async def test_cache_keys_include_query_params(test_app: FastAPI):
+    client = TestClient(test_app)
+
+    response1 = client.get("/query-param-endpoint", params={"param": "value1"})
+    assert response1.status_code == 200
+    message1 = response1.json()["message"]
+
+    response2 = client.get("/query-param-endpoint", params={"param": "value2"})
+    assert response2.status_code == 200
+    message2 = response2.json()["message"]
+
+    # Ensure that different query params yield different cached responses
+    assert message1 != message2
+    # Re-fetch with the same params to ensure caching works
+    response1_cached = client.get("/query-param-endpoint", params={"param": "value1"})
+    assert response1_cached.status_code == 200
+    assert response1_cached.json()["message"] == message1
+
+    response2_cached = client.get("/query-param-endpoint", params={"param": "value2"})
+    assert response2_cached.status_code == 200
+    assert response2_cached.json()["message"] == message2

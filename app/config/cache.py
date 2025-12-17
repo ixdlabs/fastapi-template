@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def cached_view(ttl: int, prefix: str = "cache"):
+def cached_view(ttl: int):
     """Decorator to cache the result of a view function."""
 
     def decorator(func: Callable):
