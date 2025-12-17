@@ -66,7 +66,7 @@ async def db_fixture(db_engine_fixture: AsyncEngine):
 @pytest.fixture(scope="session")
 def settings_fixture():
     # Database URL is set to empty string to avoid accidental connections
-    return Settings.model_construct(jwt_secret_key="test", database_url="", celery_task_always_eager=True)
+    return Settings.model_construct(jwt_secret_key="test", database_url="", celery_enabled=False)
 
 
 # Dependency overrides for tests

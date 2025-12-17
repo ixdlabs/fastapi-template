@@ -25,7 +25,7 @@ class Background:
 
     def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
         # If Celery is configured to run tasks eagerly, run the function directly in the background task.
-        if self.settings.celery_task_always_eager:
+        if not self.settings.celery_enabled:
             self.background_tasks.add_task(fn, *args, **kwargs)
             return
 

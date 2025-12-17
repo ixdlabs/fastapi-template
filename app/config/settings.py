@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
 
+    celery_enabled: bool = False
     celery_broker_url: str = "sqla+sqlite:///sqlite.celery.db"
     celery_task_always_eager: bool = False
     celery_timezone: str = "UTC"
