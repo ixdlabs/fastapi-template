@@ -3,36 +3,38 @@ This module defines the Background class and its dependency for managing backgro
 The Background class provides a method to submit tasks to be executed asynchronously.
 """
 
-import abc
 import asyncio
-from functools import lru_cache
 import functools
 from typing import Annotated, Any, Callable, Coroutine, ParamSpec, TypeVar
 from celery.schedules import crontab
 
 from celery import shared_task
 
-from fastapi import Depends
+from fastapi import BackgroundTasks, Depends
+
+from app.config.settings import Settings, SettingsDep
 
 P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class Background(abc.ABC):
-    @abc.abstractmethod
-    def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> None:
-        """Submit a background task to be executed asynchronously."""
+class Background:
+    def __init__(self, settings: Settings, background_tasks: BackgroundTasks):
+        self.settings = settings
+        self.background_tasks = background_tasks
 
-
-class CeleryBackground(Background):
     def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+        # If Celery is configured to run tasks eagerly, run the function directly in the background task.
+        if self.settings.celery_task_always_eager:
+            self.background_tasks.add_task(fn, *args, **kwargs)
+            return
+
         task = shared_task(fn)
         task.apply_async(args=args, kwargs=kwargs)
 
-
-class NoOpBackground(Background):
-    def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
-        pass
+    @staticmethod
+    def create(settings: Settings, background_tasks: BackgroundTasks):
+        return Background(settings, background_tasks)
 
 
 # Dependency that provides application background task runner.
@@ -40,9 +42,8 @@ class NoOpBackground(Background):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@lru_cache
-def get_background():
-    return Background()
+def get_background(settings: SettingsDep, background_tasks: BackgroundTasks):
+    return Background(settings, background_tasks)
 
 
 BackgroundDep = Annotated[Background, Depends(get_background)]
@@ -81,4 +82,5 @@ def periodic_task(schedule: crontab | float | int):
     return decorator
 
 
+# Every function decorated with @periodic_task is automatically added to this dictionary.
 beat_schedule: dict[str, crontab | float | int] = {}

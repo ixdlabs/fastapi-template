@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 from alembic import command, config
 import structlog
 
-from app.config.background import NoOpBackground, get_background
 from app.config.database import get_db_session
 from app.config.logging import setup_logging
 from app.config.settings import Settings, get_settings
@@ -78,7 +77,6 @@ def settings_fixture():
 def override_dependencies(db_fixture: AsyncSession, settings_fixture: Settings):
     app.dependency_overrides[get_db_session] = lambda: db_fixture
     app.dependency_overrides[get_settings] = lambda: settings_fixture
-    app.dependency_overrides[get_background] = lambda: NoOpBackground()
 
     yield
     app.dependency_overrides.clear()
