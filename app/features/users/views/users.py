@@ -86,6 +86,7 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 
 
 # User list endpoint
+# This endpoint is cached and rate-limited for demonstration purposes
 # ----------------------------------------------------------------------------------------------------------------------
 
 
