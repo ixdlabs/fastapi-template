@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 from alembic import command, config
 
 from app.config.background import Background, get_background
+from app.config.cache import get_cache_backend
 from app.config.database import get_db_session
 from app.config.logging import setup_logging
 from app.config.rate_limit import get_rate_limit_strategy
@@ -15,6 +16,7 @@ from limits.aio.storage import MemoryStorage
 from limits.aio.strategies import MovingWindowRateLimiter, RateLimiter
 from app.config.settings import Settings, get_settings
 from app.main import app
+from aiocache import SimpleMemoryCache, BaseCache
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +87,7 @@ def background_fixture():
     return MagicMock()
 
 
-# Application settings for tests (this is created with explicit values to ensure reproducibility)
+# Rate limiting strategy for tests using in-memory storage
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -94,6 +96,15 @@ def rate_limit_strategy_fixture():
     backend = MemoryStorage()
     strategy = MovingWindowRateLimiter(backend)
     yield strategy
+
+
+# Cache backend for tests using in-memory cache
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="function")
+def cache_backend_fixture():
+    yield SimpleMemoryCache()
 
 
 # Dependency overrides for tests
@@ -106,11 +117,13 @@ def override_dependencies(
     settings_fixture: Settings,
     background_fixture: Background,
     rate_limit_strategy_fixture: RateLimiter,
+    cache_backend_fixture: BaseCache,
 ):
     app.dependency_overrides[get_db_session] = lambda: db_fixture
     app.dependency_overrides[get_settings] = lambda: settings_fixture
     app.dependency_overrides[get_background] = lambda: background_fixture
     app.dependency_overrides[get_rate_limit_strategy] = lambda: rate_limit_strategy_fixture
+    app.dependency_overrides[get_cache_backend] = lambda: cache_backend_fixture
 
     yield
     app.dependency_overrides.clear()

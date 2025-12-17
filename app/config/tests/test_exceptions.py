@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 from pytest import MonkeyPatch
 
 from app.config.exceptions import register_exception_handlers
@@ -34,9 +34,7 @@ async def test_custom_http_exception_handler_logs_server_error(test_app: FastAPI
 
     assert response.status_code == 500
     assert response.json() == {"detail": "Internal Server Error"}
-    mock_logger.assert_called_once_with(
-        "server error", extra={"status_code": 500, "path": "/server-error", "detail": "Internal Server Error"}
-    )
+    mock_logger.assert_called_once_with("server error", extra={"path": "/server-error"}, exc_info=ANY)
 
 
 @pytest.mark.asyncio
