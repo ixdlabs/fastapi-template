@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.config.auth import CurrentUserDep
 from app.config.database import DbDep
 from app.config.pagination import Page, paginate
+from app.config.rate_limiter import RateLimitDep
 from app.features.users.models import User
 
 
@@ -88,7 +89,11 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 
 
 @router.get("/")
-async def user_list(db: DbDep, query: Annotated[UserFilterInput, Query()]) -> Page[UserListOutput]:
+async def user_list(
+    db: DbDep, query: Annotated[UserFilterInput, Query()], rate_limit: RateLimitDep
+) -> Page[UserListOutput]:
+    await rate_limit.limit("10/minute")
+
     stmt = select(User)
     if query.search:
         search_pattern = f"%{query.search}%"

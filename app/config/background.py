@@ -24,6 +24,7 @@ R = TypeVar("R")
 
 class Background:
     def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+        """Submit a function to be run in the background as a Celery task."""
         task = shared_task(fn)
         task.apply_async(args=args, kwargs=kwargs)
 
