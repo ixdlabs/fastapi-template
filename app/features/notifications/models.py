@@ -5,10 +5,9 @@ import enum
 from app.config.database import Base
 
 from sqlalchemy.types import Enum
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import UUID, String, DateTime, JSON, ForeignKey
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 
 class NotificationType(enum.Enum):
@@ -29,6 +28,7 @@ class NotificationStatus(enum.Enum):
     READ = "read"
 
 
+# System notification
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -37,13 +37,17 @@ class Notification(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    delivery_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("notification_delivery.id"), nullable=True)
-
     type: Mapped[NotificationType] = mapped_column(Enum(NotificationType))
     data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
 
+    deliveries: Mapped[List["NotificationDelivery"]] = relationship(back_populates="notification", cascade="all")
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+# Delivery of a notification via a channel
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class NotificationDelivery(Base):
@@ -57,6 +61,9 @@ class NotificationDelivery(Base):
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     body: Mapped[str] = mapped_column(String)
     status: Mapped[NotificationStatus] = mapped_column(Enum(NotificationStatus), default=NotificationStatus.PENDING)
+
+    notification: Mapped["Notification"] = relationship(back_populates="deliveries")
+
     failure_error_message: Mapped[str | None] = mapped_column(String, nullable=True)
     provider_message_ref: Mapped[str | None] = mapped_column(String, nullable=True)
 
