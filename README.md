@@ -132,8 +132,6 @@ uv run fastapi dev app/main.py
 
 Docs available at: [http://127.0.0.1:8000/api/docs](http://127.0.0.1:8000/api/docs)
 
----
-
 ## 🧰 Included Packages
 
 - [FastAPI](https://fastapi.tiangolo.com/) for the web framework and dependency injection.
@@ -150,21 +148,24 @@ Celery is configured for async task execution.
 
 ### Local Development (Eager Mode)
 
-Run tasks synchronously without a worker:
+Run tasks without a worker:
 
 ```bash
 CELERY_TASK_ALWAYS_EAGER=true
 ```
 
+In eager mode, the tasks will be delegated to the event queue using [FastAPI Background Tasks](https://fastapi.tiangolo.com/tutorial/background-tasks). Periodic tasks will not work in this mode.
+
 ### Without Eager Mode
 
-Default queue backend is SQLite. To run worker:
+Default queue backend is SQLite. Run following commands to start the worker and the beat scheduler.
 
 ```bash
+# Worker - do the actual work
 uv run celery -A app.worker worker
+# Beat Scheduler - schedule periodic tasks
+uv run celery -A app.worker beat
 ```
-
----
 
 ## 🐳 Docker Setup
 
