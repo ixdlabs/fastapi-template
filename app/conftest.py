@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker, AsyncSession
@@ -67,14 +68,9 @@ async def db_fixture(db_engine_fixture: AsyncEngine):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NoOpBackground(Background):
-    def submit(self, fn, *args, **kwargs):
-        logger.info("Task submission ignored in tests.", fn=fn.__name__, args=args, kwargs=kwargs)
-
-
 @pytest.fixture(scope="session")
 def background_fixture():
-    return NoOpBackground()
+    return MagicMock()
 
 
 # Application settings for tests (this is created with explicit values to ensure reproducibility)
