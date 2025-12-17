@@ -1,11 +1,16 @@
 from datetime import datetime
 import uuid
+import typing
 
 from argon2 import PasswordHasher
 from app.config.database import Base
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import relationship
 from sqlalchemy import UUID, String, DateTime
+
+if typing.TYPE_CHECKING:
+    from app.features.notifications.models import Notification
 
 
 class User(Base):
@@ -19,6 +24,8 @@ class User(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    notifications: Mapped["Notification"] = relationship(back_populates="user")
 
     def set_password(self, password: str):
         password_hasher = PasswordHasher()

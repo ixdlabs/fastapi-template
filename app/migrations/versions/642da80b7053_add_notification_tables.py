@@ -1,9 +1,9 @@
 """
 add notification tables
 
-Revision ID: d814ff784106
+Revision ID: 642da80b7053
 Revises: c759d7fb8332
-Create Date: 2025-12-17 15:06:29.885695
+Create Date: 2025-12-17 15:39:11.034789
 """
 
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "d814ff784106"
+revision: str = "642da80b7053"
 down_revision: Union[str, Sequence[str], None] = "c759d7fb8332"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
