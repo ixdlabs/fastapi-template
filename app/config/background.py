@@ -10,31 +10,17 @@ from celery.schedules import crontab
 
 from celery import shared_task
 
-from fastapi import BackgroundTasks, Depends
+from fastapi import Depends
 
-from app.config.settings import Settings, SettingsDep
 
 P = ParamSpec("P")
 R = TypeVar("R")
 
 
 class Background:
-    def __init__(self, settings: Settings, background_tasks: BackgroundTasks):
-        self.settings = settings
-        self.background_tasks = background_tasks
-
     def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
-        # If Celery is configured to run tasks eagerly, run the function directly in the background task.
-        if not self.settings.celery_enabled:
-            self.background_tasks.add_task(fn, *args, **kwargs)
-            return
-
         task = shared_task(fn)
         task.apply_async(args=args, kwargs=kwargs)
-
-    @staticmethod
-    def create(settings: Settings, background_tasks: BackgroundTasks):
-        return Background(settings, background_tasks)
 
 
 # Dependency that provides application background task runner.
@@ -42,8 +28,8 @@ class Background:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def get_background(settings: SettingsDep, background_tasks: BackgroundTasks):
-    return Background(settings, background_tasks)
+def get_background():
+    return Background()
 
 
 BackgroundDep = Annotated[Background, Depends(get_background)]

@@ -46,10 +46,16 @@ async def get_db_session(settings: SettingsDep):
         yield session
 
 
+DbDep = Annotated[AsyncSession, Depends(get_db_session)]
+
+
+# Helper to get a database session within an async context manager.
+# This should only be used in places where FastAPI dependencies cannot be used (eg: tasks).
+# Make sure the functionality is tested properly when using this.
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 @asynccontextmanager
 async def get_db(settings: SettingsDep):
     async for session in get_db_session(settings):
         yield session
-
-
-DbDep = Annotated[AsyncSession, Depends(get_db_session)]

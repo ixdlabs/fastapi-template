@@ -148,13 +148,11 @@ Celery is configured for async task execution.
 
 ### Local Development (Eager Mode)
 
-Run tasks without a celery:
+Run tasks without a worker:
 
 ```bash
-CELERY_ENABLED=false
+CELERY_TASK_ALWAYS_EAGER=true
 ```
-
-In this mode, the tasks will be delegated to the event queue using [FastAPI Background Tasks](https://fastapi.tiangolo.com/tutorial/background-tasks). Periodic tasks will not work in this mode.
 
 ### Without Eager Mode
 

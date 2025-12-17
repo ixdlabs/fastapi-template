@@ -8,7 +8,7 @@ from app.config.database import DbDep
 from app.config.settings import SettingsDep
 from app.features.users.models import User
 from app.features.users.helpers import jwt_encode
-from app.features.users.tasks import send_welcome_email
+from app.features.users.tasks.welcome_email import send_welcome_email_task
 
 
 class RegisterInput(BaseModel):
@@ -51,7 +51,7 @@ async def register(input: RegisterInput, db: DbDep, settings: SettingsDep, backg
     await db.commit()
     await db.refresh(user)
 
-    background.submit(send_welcome_email, user.id)
+    background.submit(send_welcome_email_task, user.id)
 
     access_token = jwt_encode(user, settings)
     return RegisterOutput(

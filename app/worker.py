@@ -33,7 +33,3 @@ def setup_periodic_tasks(sender: Celery, **kwargs):
 def init_celery_tracing(*args, **kwargs):
     db_engine = create_db_engine_from_settings(settings)
     setup_open_telemetry(app, db_engine, settings)
-
-
-if not settings.celery_enabled:
-    raise RuntimeError("Celery is not enabled in the settings. Please enable it to run the worker.")

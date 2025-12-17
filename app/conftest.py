@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 from alembic import command, config
 import structlog
 
+from app.config.background import Background, get_background
 from app.config.database import get_db_session
 from app.config.logging import setup_logging
 from app.config.settings import Settings, get_settings
@@ -59,6 +60,20 @@ async def db_fixture(db_engine_fixture: AsyncEngine):
             await transaction.rollback()
 
 
+# Background task runner for tests that does not actually run tasks
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class NoOpBackground(Background):
+    def submit(self, fn, *args, **kwargs):
+        logger.info("Task submission ignored in tests.", fn=fn.__name__, args=args, kwargs=kwargs)
+
+
+@pytest.fixture(scope="session")
+def background_fixture():
+    return NoOpBackground()
+
+
 # Application settings for tests (this is created with explicit values to ensure reproducibility)
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -66,7 +81,7 @@ async def db_fixture(db_engine_fixture: AsyncEngine):
 @pytest.fixture(scope="session")
 def settings_fixture():
     # Database URL is set to empty string to avoid accidental connections
-    return Settings.model_construct(jwt_secret_key="test", database_url="", celery_enabled=False)
+    return Settings.model_construct(jwt_secret_key="test", database_url="", celery_task_always_eager=True)
 
 
 # Dependency overrides for tests
@@ -74,9 +89,10 @@ def settings_fixture():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def override_dependencies(db_fixture: AsyncSession, settings_fixture: Settings):
+def override_dependencies(db_fixture: AsyncSession, settings_fixture: Settings, background_fixture: Background):
     app.dependency_overrides[get_db_session] = lambda: db_fixture
     app.dependency_overrides[get_settings] = lambda: settings_fixture
+    app.dependency_overrides[get_background] = lambda: background_fixture
 
     yield
     app.dependency_overrides.clear()
