@@ -30,7 +30,7 @@ class RateLimit:
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too Many Requests",
                 # https://www.ietf.org/archive/id/draft-polli-ratelimit-headers-02.html#section-3
-                headers={"X-RateLimit-Reset": str(window_stats.reset_time - time.time())},
+                headers={"X-RateLimit-Reset": str(int(window_stats.reset_time - time.time()))},
             )
 
 
