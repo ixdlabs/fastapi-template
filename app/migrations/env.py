@@ -18,13 +18,7 @@ from app.config.database import Base
 from app.config.logging import setup_logging
 from app.config.settings import get_settings
 
-
-# Import all models here to ensure they are registered with Alembic's metadata.
-# This is required for Alembic to detect schema changes.
-# ----------------------------------------------------------------------------------------------------------------------
-
-from app.features.users.models import User  # noqa: F401
-from app.features.notifications.models import Notification, NotificationDelivery  # noqa: F401
+from app.features import model_registry  # noqa: F401
 
 
 # Run migrations in 'offline' mode

@@ -3,8 +3,10 @@ from fastapi import APIRouter
 from app.features.users.views import login, register, users
 
 
-router = APIRouter(tags=["users"], prefix="/api/v1")
+user_router = APIRouter()
+user_router.include_router(users.router)
 
-router.include_router(login.router, prefix="/auth")
-router.include_router(register.router, prefix="/auth")
-router.include_router(users.router, prefix="/users")
+
+auth_router = APIRouter()
+auth_router.include_router(login.router)
+auth_router.include_router(register.router)

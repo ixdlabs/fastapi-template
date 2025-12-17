@@ -8,7 +8,8 @@ from app.config.otel import setup_open_telemetry
 from app.config.settings import get_settings
 from app.config.background import beat_schedule
 
-from app.features.users import tasks as _  # noqa: F401
+from app.features import model_registry  # noqa: F401
+from app.features import task_registry  # noqa: F401
 
 logger = structlog.get_logger()
 

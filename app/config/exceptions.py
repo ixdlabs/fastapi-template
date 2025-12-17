@@ -21,9 +21,15 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
     return await http_exception_handler(request, exc)
 
 
+async def custom_exception_handler(request: Request, exc: Exception):
+    exc = HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+    return await custom_http_exception_handler(request, exc)
+
+
 # Register the custom exception handlers with the FastAPI application.
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 def register_exception_handlers(app: FastAPI):
     app.exception_handler(HTTPException)(custom_http_exception_handler)
+    app.exception_handler(Exception)(custom_exception_handler)
