@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.config.auth import CurrentUserDep
-from app.config.cache import CacheDep, cached_view
+from app.config.cache import CacheDep
 from app.config.database import DbDep
 from app.config.pagination import Page, paginate
 from app.config.rate_limit import RateLimitDep
@@ -49,6 +49,7 @@ router = APIRouter()
 
 @router.get("/me")
 async def me(current_user: CurrentUserDep) -> UserDetailOutput:
+    """Get details of the current authenticated user."""
     return UserDetailOutput(
         id=current_user.id,
         username=current_user.username,
@@ -64,7 +65,12 @@ async def me(current_user: CurrentUserDep) -> UserDetailOutput:
 
 
 @router.get("/{user_id}")
-async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep) -> UserDetailOutput:
+async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep, cache: CacheDep) -> UserDetailOutput:
+    """Get detailed information about a specific user."""
+    cache.vary_on_path().vary_on_auth()
+    if cache_result := await cache.get():
+        return cache_result
+
     if current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this user")
 
@@ -75,7 +81,7 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
         # This is unlikely to happen since the current_user exists (and we checked the IDs match)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return UserDetailOutput(
+    response = UserDetailOutput(
         id=user.id,
         username=user.username,
         first_name=user.first_name,
@@ -84,6 +90,9 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
         updated_at=user.updated_at,
     )
 
+    await cache.set(response, ttl=60)
+    return response
+
 
 # User list endpoint
 # This endpoint is cached and rate-limited for demonstration purposes
@@ -91,10 +100,14 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 
 
 @router.get("/")
-@cached_view(30)
 async def user_list(
     db: DbDep, query: Annotated[UserFilterInput, Query()], rate_limit: RateLimitDep, cache: CacheDep
 ) -> Page[UserListOutput]:
+    """List users with optional filtering, caching, and rate limiting."""
+    cache.vary_on_path().vary_on_query()
+    if cache_result := await cache.get():
+        return cache_result
+
     await rate_limit.limit("10/minute")
 
     stmt = select(User)
@@ -109,7 +122,7 @@ async def user_list(
     order_column = User.created_at if query.order_by == "created_at" else User.updated_at
     stmt = stmt.order_by(order_column)
     result = await paginate(db, stmt, limit=query.limit, offset=query.offset)
-    return result.map_to(
+    response = result.map_to(
         lambda user: UserListOutput(
             id=user.id,
             username=user.username,
@@ -118,6 +131,8 @@ async def user_list(
         )
     )
 
+    return await cache.set(response, ttl=60)
+
 
 # Delete user endpoint
 # ----------------------------------------------------------------------------------------------------------------------
@@ -125,6 +140,7 @@ async def user_list(
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep) -> None:
+    """Delete a user by ID."""
     if current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this user")
 
@@ -147,6 +163,7 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 async def update_user(
     user_id: uuid.UUID, input: UserUpdateInput, db: DbDep, current_user: CurrentUserDep
 ) -> UserDetailOutput:
+    """Update a user's first and last name."""
     if current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this user")
 

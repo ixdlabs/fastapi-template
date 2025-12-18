@@ -1,45 +1,13 @@
-from functools import lru_cache, wraps
+from functools import lru_cache
 from hashlib import md5
 import logging
-from typing import Annotated, Callable
+from typing import Annotated
 
 from fastapi import Depends, Request
 from aiocache import SimpleMemoryCache, BaseCache
 
 
 logger = logging.getLogger(__name__)
-
-# Decorator to cache the result of a view function.
-# To use, add the `CacheDep` dependency to the endpoint and decorate the function with `@cached_view`.
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-def cached_view(ttl: int, vary_on_auth: bool = False):
-    """Decorator to cache the result of a view function."""
-
-    def decorator(func: Callable):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            cache = kwargs.get("cache")
-            if cache is None:
-                raise Exception("Cache dependency not provided, include CacheDep in the endpoint dependencies.")
-            assert isinstance(cache, Cache)
-
-            if vary_on_auth:
-                cache.vary_on_auth()
-
-            cached_result = await cache.get()
-            if cached_result is not None:
-                return cached_result
-
-            result = await func(*args, **kwargs)
-            await cache.set(result, ttl)
-            return result
-
-        return wrapper
-
-    return decorator
-
 
 # Cache class that provides get and set methods for caching.
 # ----------------------------------------------------------------------------------------------------------------------
@@ -49,24 +17,35 @@ class Cache:
     def __init__(self, backend: BaseCache, request: Request):
         self.backend = backend
         self.request = request
-        self.prefix = "cache"
+        self.key = "cache"
 
-    def add_prefix(self, prefix: str):
-        self.prefix = f"{self.prefix}:[{prefix}]"
+    def vary(self, method: str, value: str) -> "Cache":
+        """Modify the cache key to vary based on a custom method and value."""
+        self.key = f"{self.key}:[{method}:{md5(value.encode()).hexdigest()}]"
+        return self
 
-    def vary_on_auth(self):
+    def vary_on_path(self) -> "Cache":
+        """Modify the cache key to vary based on the request path."""
+        return self.vary("path", self.request.url.path)
+
+    def vary_on_auth(self) -> "Cache":
+        """Modify the cache key to vary based on the Authorization header."""
         auth_header = self.request.headers.get("Authorization", "")
-        self.add_prefix(f"auth:{md5(auth_header.encode()).hexdigest()}")
+        return self.vary("auth", auth_header)
 
-    def key(self) -> str:
+    def vary_on_query(self) -> "Cache":
+        """Modify the cache key to vary based on the query parameters."""
         query_params = str(sorted(self.request.query_params.items()))
-        return f"{self.prefix}:{self.request.url.path}?{query_params}"
+        return self.vary("query", query_params)
 
-    def set(self, value, ttl: int):
-        return self.backend.set(self.key(), value, ttl)
+    async def set[T](self, value: T, ttl: int) -> T:
+        """Set a value in the cache with the specified TTL."""
+        await self.backend.set(self.key, value, ttl)
+        return value
 
-    def get(self):
-        return self.backend.get(self.key())
+    async def get(self):
+        """Get a value from the cache."""
+        return await self.backend.get(self.key)
 
 
 # Cache Backend used for caching.
