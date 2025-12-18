@@ -204,7 +204,7 @@ async def unread_notification(db: DbDep, current_user: CurrentUserDep, notificat
     stmt = (
         select(NotificationDelivery)
         .join(Notification)
-        .where(NotificationDelivery.id32 == notification_id, Notification.user_id == current_user.id)
+        .where(NotificationDelivery.id == notification_id, Notification.user_id == current_user.id)
     )
 
     result = await db.execute(stmt)
