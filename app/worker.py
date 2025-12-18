@@ -1,29 +1,27 @@
 import logging
-from celery import Celery
 
 from celery.signals import worker_process_init
 from app.config.database import create_db_engine_from_settings
 from app.config.logging import setup_logging
 from app.config.otel import setup_open_telemetry
+from app.config.celery_app import get_celery_app
 from app.config.settings import get_settings
 from app.config.background import beat_schedule
 
-from app.features import model_registry  # noqa: F401
-from app.features import task_registry  # noqa: F401
+# Ensure models/tasks are imported for side effects (task registration, model registration).
+from app.features import model_registry  # noqa: F401,E402
+from app.features import task_registry  # noqa: F401,E402
 
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
 setup_logging(settings)
 
-app = Celery("tasks", broker=settings.celery_broker_url)
-
-app.conf.task_always_eager = settings.celery_task_always_eager
-app.conf.timezone = settings.celery_timezone
+app = get_celery_app()
 
 
 @app.on_after_configure.connect
-def setup_periodic_tasks(sender: Celery, **kwargs):
+def setup_periodic_tasks(sender, **kwargs):
     if settings.celery_task_always_eager and beat_schedule:
         logger.warning("Celery is running in eager mode. Periodic tasks cannot be scheduled.")
     for task_name, schedule in beat_schedule.items():

@@ -8,9 +8,11 @@ import functools
 from typing import Annotated, Any, Callable, Coroutine, ParamSpec, TypeVar
 from celery.schedules import crontab
 
-from celery import shared_task
+from celery.app.task import Task as CeleryTask
 
 from fastapi import Depends
+
+from app.config.celery_app import get_celery_app
 
 
 P = ParamSpec("P")
@@ -25,7 +27,12 @@ R = TypeVar("R")
 class Background:
     def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
         """Submit a function to be run in the background as a Celery task."""
-        task = shared_task(fn)
+        if isinstance(fn, CeleryTask) or callable(getattr(fn, "apply_async", None)):
+            fn.apply_async(args=args, kwargs=kwargs)
+            return
+
+        celery_app = get_celery_app()
+        task = celery_app.task(fn)
         task.apply_async(args=args, kwargs=kwargs)
 
 
@@ -47,7 +54,8 @@ def background_task(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return asyncio.run(func(*args, **kwargs))
 
-    return shared_task(wrapper)
+    celery_app = get_celery_app()
+    return celery_app.task(wrapper)
 
 
 # Decorator to create a periodic Celery task.
@@ -63,7 +71,8 @@ def periodic_task(schedule: crontab | float | int):
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             return asyncio.run(func(*args, **kwargs))
 
-        task = shared_task(wrapper)
+        celery_app = get_celery_app()
+        task = celery_app.task(wrapper)
         beat_schedule[task.name] = schedule
         return task
 
