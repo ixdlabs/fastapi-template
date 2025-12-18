@@ -12,7 +12,9 @@ from app.config.otel import setup_open_telemetry
 from app.config.settings import get_settings
 
 from app.features import model_registry  # noqa: F401
+from app.features import task_registry  # noqa: F401
 from app.features import router_registry
+from app.worker import app as celery_app  # noqa: F401
 
 settings = get_settings()
 setup_logging(settings)
