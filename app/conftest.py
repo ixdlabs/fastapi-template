@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from unittest.mock import MagicMock
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker, AsyncSession
@@ -82,9 +81,14 @@ async def db_fixture(db_engine_fixture: AsyncEngine):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class NoOpBackground(Background):
+    async def submit(self, fn, *args, **kwargs):
+        pass
+
+
 @pytest.fixture(scope="session")
-def background_fixture():
-    return MagicMock()
+def background_fixture(settings_fixture: Settings):
+    return NoOpBackground(settings_fixture)
 
 
 # Rate limiting strategy for tests using in-memory storage

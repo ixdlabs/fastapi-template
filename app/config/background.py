@@ -5,7 +5,7 @@ The Background class provides a method to submit tasks to be executed asynchrono
 
 import asyncio
 import functools
-from typing import Annotated, Any, Callable, Coroutine, ParamSpec, TypeVar
+from typing import Annotated, Any, Awaitable, Callable, Coroutine, ParamSpec, TypeVar
 from celery.schedules import crontab
 
 from celery.app.task import Task as CeleryTask
@@ -13,6 +13,7 @@ from celery.app.task import Task as CeleryTask
 from fastapi import Depends
 
 from app.config.celery_app import get_celery_app
+from app.config.settings import Settings, SettingsDep
 
 
 P = ParamSpec("P")
@@ -25,20 +26,23 @@ R = TypeVar("R")
 
 
 class Background:
-    def submit(self, fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+    def __init__(self, settings: Settings):
+        self.settings = settings
+
+    async def submit(self, fn: Callable[P, Awaitable[R]], *args: P.args, **kwargs: P.kwargs):
         """Submit a function to be run in the background as a Celery task."""
-        if isinstance(fn, CeleryTask) or callable(getattr(fn, "apply_async", None)):
-            fn.apply_async(args=args, kwargs=kwargs)
+        if self.settings.celery_task_always_eager:
+            # If tasks are set to always eager, run the function directly.
+            await fn(*args, **kwargs)
             return
 
-        celery_app = get_celery_app()
-        task = celery_app.task(fn)
-        task.apply_async(args=args, kwargs=kwargs)
+        if not isinstance(fn, CeleryTask):
+            raise ValueError("Function must be a Celery task wrapped with @background_task")
+        fn.apply_async(args=args, kwargs=kwargs)
 
 
-@functools.lru_cache
-def get_background():
-    return Background()
+def get_background(settings: SettingsDep):
+    return Background(settings)
 
 
 BackgroundDep = Annotated[Background, Depends(get_background)]
