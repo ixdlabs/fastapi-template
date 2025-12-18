@@ -74,6 +74,7 @@ async def test_limit_blocks_when_exceeded():
         exception = exc.value
         assert exception.status_code == 429
         assert exception.detail == "Too Many Requests"
+        assert exception.headers is not None
         assert "X-RateLimit-Reset" in exception.headers
 
 
@@ -107,5 +108,7 @@ async def test_rate_limit_reset_header_is_correct():
         with pytest.raises(HTTPException) as exc:
             await rate_limit.limit("1/minute")
 
+        assert exc.value.headers is not None
+        assert "X-RateLimit-Reset" in exc.value.headers
         reset = int(exc.value.headers["X-RateLimit-Reset"])
         assert 0 < reset <= 60
