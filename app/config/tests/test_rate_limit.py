@@ -1,59 +1,111 @@
-from datetime import datetime, timedelta
-from fastapi import FastAPI
+from fastapi import HTTPException, Request
 import pytest
 
-from app.config.rate_limit import RateLimitDep
-from fastapi.testclient import TestClient
+from app.config.rate_limit import RateLimit, get_rate_limit_strategy
 import time_machine
 
 
-@pytest.fixture
-def test_app():
-    app = FastAPI()
+def make_request(path: str = "/test", client_host: str | None = "127.0.0.1") -> Request:
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": path,
+            "raw_path": path.encode(),
+            "headers": [],
+            "query_string": b"",
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": (client_host, 12345) if client_host else None,
+        }
+    )
 
-    @app.get("/endpoint")
-    async def endpoint():
-        return {"message": "Success"}
 
-    @app.get("/ratelimit-endpoint")
-    async def ratelimit_endpoint(rate_limit: RateLimitDep):
-        await rate_limit.limit("5/minute")
-        return {"message": "Success"}
+# Key generation
+# ----------------------------------------------------------------------------------------------------------------------
 
-    return app
+
+def test_key_generation_with_client_ip():
+    request = make_request("/api/resource", "10.0.0.1")
+    strategy = get_rate_limit_strategy()
+
+    rate_limit = RateLimit(strategy=strategy, request=request)
+
+    assert rate_limit.key() == "/api/resource:10.0.0.1"
+
+
+def test_key_generation_without_client():
+    request = make_request("/api/resource", None)
+    strategy = get_rate_limit_strategy()
+
+    rate_limit = RateLimit(strategy=strategy, request=request)
+
+    assert rate_limit.key() == "/api/resource:unknown"
+
+
+# Rate limiting with time_machine
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_rate_limiting(test_app: FastAPI):
-    current_time = datetime.now()
-    with time_machine.travel(current_time):
-        client = TestClient(test_app)
+async def test_limit_allows_first_request():
+    with time_machine.travel("2025-01-01 00:00:00"):
+        request = make_request()
+        strategy = get_rate_limit_strategy()
+        rate_limit = RateLimit(strategy=strategy, request=request)
 
-        # Make 5 allowed requests - 6th request should be rate limited
-        for _ in range(5):
-            response = client.get("/ratelimit-endpoint")
-            assert response.status_code == 200
-            assert response.json() == {"message": "Success"}
-
-        response = client.get("/ratelimit-endpoint")
-        assert response.status_code == 429
-        assert response.json()["detail"] == "Too Many Requests"
-        assert "X-RateLimit-Reset" in response.headers
-        reset_time = int(response.headers["X-RateLimit-Reset"])
-        assert reset_time > 0
-
-    # Wait for more than a minute to reset the rate limit
-    with time_machine.travel(current_time + timedelta(minutes=1, seconds=1)):
-        response = client.get("/ratelimit-endpoint")
-        assert response.status_code == 200
-        assert response.json() == {"message": "Success"}
+        # Should not raise
+        await rate_limit.limit("1/minute")
 
 
 @pytest.mark.asyncio
-async def test_no_rate_limiting_on_unprotected_endpoint(test_app: FastAPI):
-    client = TestClient(test_app)
+async def test_limit_blocks_when_exceeded():
+    with time_machine.travel("2025-01-01 00:00:00"):
+        request = make_request()
+        strategy = get_rate_limit_strategy()
+        rate_limit = RateLimit(strategy=strategy, request=request)
 
-    for _ in range(10):
-        response = client.get("/endpoint")
-        assert response.status_code == 200
-        assert response.json() == {"message": "Success"}
+        # First hit is allowed
+        await rate_limit.limit("1/minute")
+        # Second hit in same window should fail
+        with pytest.raises(HTTPException) as exc:
+            await rate_limit.limit("1/minute")
+
+        exception = exc.value
+        assert exception.status_code == 429
+        assert exception.detail == "Too Many Requests"
+        assert "X-RateLimit-Reset" in exception.headers
+
+
+@pytest.mark.asyncio
+async def test_limit_resets_after_window():
+    with time_machine.travel("2025-01-01 00:00:00"):
+        request = make_request()
+        strategy = get_rate_limit_strategy()
+        rate_limit = RateLimit(strategy=strategy, request=request)
+
+        # First request
+        await rate_limit.limit("1/minute")
+        # Second request blocked
+        with pytest.raises(HTTPException):
+            await rate_limit.limit("1/minute")
+
+    with time_machine.travel("2025-01-01 00:01:01"):
+        # Should be allowed again after window
+        await rate_limit.limit("1/minute")
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_reset_header_is_correct():
+    with time_machine.travel("2025-01-01 00:00:00"):
+        request = make_request()
+        strategy = get_rate_limit_strategy()
+        rate_limit = RateLimit(strategy=strategy, request=request)
+
+        await rate_limit.limit("1/minute")
+
+        with pytest.raises(HTTPException) as exc:
+            await rate_limit.limit("1/minute")
+
+        reset = int(exc.value.headers["X-RateLimit-Reset"])
+        assert 0 < reset <= 60
