@@ -51,7 +51,7 @@ async def register(input: RegisterInput, db: DbDep, settings: SettingsDep, backg
     await db.commit()
     await db.refresh(user)
 
-    background.submit(send_welcome_email_task, user.id)
+    await background.submit(send_welcome_email_task, user.id)
 
     access_token = jwt_encode(user, settings)
     return RegisterOutput(
