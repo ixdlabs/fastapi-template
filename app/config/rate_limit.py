@@ -39,6 +39,7 @@ class RateLimit:
             )
 
     def key(self) -> str:
+        """Generates a unique key for the request based on URL and client IP."""
         url_key = self.request.url.path
         ip_key = self.request.client.host if self.request.client is not None else "unknown"
         return f"{url_key}:{ip_key}"
