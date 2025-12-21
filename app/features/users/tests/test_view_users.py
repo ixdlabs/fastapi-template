@@ -11,20 +11,8 @@ from app.main import app
 client = TestClient(app)
 
 
-@pytest.mark.asyncio
-async def test_logged_in_user_can_access_me_endpoint(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
-    user: User = UserFactory.build(password__raw="testpassword")
-    db_fixture.add(user)
-    await db_fixture.commit()
-    await db_fixture.refresh(user)
-
-    token, _ = authenticator_fixture.encode(user)
-    response = client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == str(user.id)
-    assert data["username"] == user.username
+# User detail endpoint
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -73,6 +61,10 @@ async def test_user_can_not_access_nonexistent_user(db_fixture: AsyncSession, au
     assert response.json() == {"detail": "Not authorized to access this user"}
 
 
+# User list endpoint
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 @pytest.mark.asyncio
 async def test_user_list_pagination_and_search(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
     users = [
@@ -100,6 +92,10 @@ async def test_user_list_pagination_and_search(db_fixture: AsyncSession, authent
     data = response.json()
     assert data["count"] == 1
     assert data["items"][0]["username"] == "bob"
+
+
+# User delete endpoint
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -135,6 +131,10 @@ async def test_user_cannot_delete_other_user_account(db_fixture: AsyncSession, a
 
     assert response.status_code == 403
     assert response.json() == {"detail": "Not authorized to delete this user"}
+
+
+# User update endpoint
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio

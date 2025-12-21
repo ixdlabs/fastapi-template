@@ -54,6 +54,7 @@ async def oauth2(
 
 @router.post("/login")
 async def login(form: LoginInput, db: DbDep, authenticator: AuthenticatorDep) -> LoginOutput:
+    """Login user."""
     stmt = select(User).where(User.username == form.username)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()

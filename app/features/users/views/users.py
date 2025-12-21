@@ -43,28 +43,6 @@ class UserUpdateInput(BaseModel):
 
 router = APIRouter()
 
-# Me endpoint (Current user detail)
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@router.get("/me")
-async def me(current_user: CurrentUserDep, db: DbDep) -> UserDetailOutput:
-    """Get details of the current authenticated user."""
-    stmt = select(User).where(User.id == current_user.id)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-    assert user is not None, "User not found - Sanity check failed"
-
-    return UserDetailOutput(
-        id=user.id,
-        username=user.username,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-    )
-
-
 # User detail endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 

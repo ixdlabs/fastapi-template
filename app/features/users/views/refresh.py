@@ -31,12 +31,13 @@ class RefreshOutputUser(BaseModel):
 router = APIRouter()
 
 
-# Login endpoint
+# Refresh endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 @router.post("/refresh")
 async def refresh(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep) -> RefreshOutput:
+    """Refresh the user's tokens using refresh token."""
     try:
         user_id = authenticator.sub(form.refresh_token)
     except AuthException as e:

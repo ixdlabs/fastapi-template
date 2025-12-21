@@ -40,6 +40,7 @@ router = APIRouter()
 async def register(
     form: RegisterInput, db: DbDep, authenticator: AuthenticatorDep, background: BackgroundDep
 ) -> RegisterOutput:
+    """Register a new user."""
     stmt = select(User).where(User.username == form.username)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
