@@ -53,6 +53,7 @@ async def me(current_user: CurrentUserDep, db: DbDep) -> UserDetailOutput:
     stmt = select(User).where(User.id == current_user.id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
+    assert user is not None, "User not found - Sanity check failed"
 
     return UserDetailOutput(
         id=user.id,
@@ -81,9 +82,7 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    if user is None:
-        # This is unlikely to happen since the current_user exists (and we checked the IDs match)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    assert user is not None, "User not found - Sanity check failed"
 
     response = UserDetailOutput(
         id=user.id,
@@ -151,9 +150,7 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    if user is None:
-        # This is unlikely to happen since the current_user exists (and we checked the IDs match)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    assert user is not None, "User not found - Sanity check failed"
 
     await db.delete(user)
     await db.commit()
@@ -174,9 +171,7 @@ async def update_user(
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    if user is None:
-        # This is unlikely to happen since the current_user exists (and we checked the IDs match)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    assert user is not None, "User not found - Sanity check failed"
 
     user.first_name = input.first_name
     user.last_name = input.last_name

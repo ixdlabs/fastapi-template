@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta, timezone
 import uuid
-from fastapi import HTTPException
 import jwt
 import pytest
 import pytest_asyncio
 
-from app.config.auth import AuthUser
+from app.config.auth import AuthUser, AuthException
 from app.config.auth import Authenticator
 from app.config.settings import Settings
 
@@ -51,14 +50,12 @@ def test_sub_extracts_user_id(authenticator_fixture: Authenticator, user_fixture
 
 
 def test_user_invalid_token_raises_401(authenticator_fixture: Authenticator):
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(AuthException):
         authenticator_fixture.user("invalid.token.value")
-
-    assert exc.value.status_code == 401
 
 
 def test_sub_invalid_token_raises_401(authenticator_fixture: Authenticator):
-    with pytest.raises(HTTPException):
+    with pytest.raises(AuthException):
         authenticator_fixture.sub("invalid.token.value")
 
 
@@ -66,7 +63,7 @@ def test_user_missing_user_payload_raises_401(authenticator_fixture: Authenticat
     payload = {"sub": str(uuid.uuid4()), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
-    with pytest.raises(HTTPException):
+    with pytest.raises(AuthException):
         authenticator_fixture.user(token)
 
 
@@ -78,7 +75,7 @@ def test_user_invalid_user_payload_raises_401(authenticator_fixture: Authenticat
     }
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
-    with pytest.raises(HTTPException):
+    with pytest.raises(AuthException):
         authenticator_fixture.user(token)
 
 
@@ -86,7 +83,7 @@ def test_sub_missing_sub_claim_raises_401(authenticator_fixture: Authenticator, 
     payload = {"exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
-    with pytest.raises(HTTPException):
+    with pytest.raises(AuthException):
         authenticator_fixture.sub(token)
 
 
@@ -94,7 +91,7 @@ def test_sub_invalid_uuid_raises_401(authenticator_fixture: Authenticator, setti
     payload = {"sub": "not-a-uuid", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
-    with pytest.raises(HTTPException):
+    with pytest.raises(AuthException):
         authenticator_fixture.sub(token)
 
 
@@ -111,5 +108,5 @@ def test_expired_token_raises_401(authenticator_fixture: Authenticator, settings
     }
     expired_token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
-    with pytest.raises(HTTPException):
+    with pytest.raises(AuthException):
         authenticator_fixture.user(expired_token)
