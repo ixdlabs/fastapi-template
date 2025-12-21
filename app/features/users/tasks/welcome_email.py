@@ -29,7 +29,7 @@ async def send_welcome_email(input: WelcomeEmailInput, db: DbDep):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@shared_async_task
+@shared_async_task("send_welcome_email")
 async def send_welcome_email_task(user_id: uuid.UUID):
     settings = get_settings()
     async with get_db(settings) as db:

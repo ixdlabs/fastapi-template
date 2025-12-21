@@ -50,33 +50,34 @@ BackgroundDep = Annotated[Background, Depends(get_background)]
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def shared_async_task(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]:
+def shared_async_task(name: str) -> Callable[P, R]:
     """Convert an async function into a Celery task."""
 
-    @functools.wraps(func)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(func(*args, **kwargs))
-
-        result_container: dict[str, R] = {}
-        error_container: dict[str, BaseException] = {}
-
-        def runner():
+    def decorator(func: Callable[P, Coroutine[R, Any, Any]]):
+        @functools.wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             try:
-                result_container["result"] = asyncio.run(func(*args, **kwargs))
-            except BaseException as exc:
-                error_container["error"] = exc
+                asyncio.get_running_loop()
+            except RuntimeError:
+                return asyncio.run(func(*args, **kwargs))
 
-        thread = threading.Thread(target=runner, daemon=True)
-        thread.start()
-        thread.join()
+            result_container: dict[str, R] = {}
+            error_container: dict[str, BaseException] = {}
 
-        if "error" in error_container:
-            raise error_container["error"]
-        return result_container["result"]
+            def runner():
+                try:
+                    result_container["result"] = asyncio.run(func(*args, **kwargs))
+                except BaseException as exc:
+                    error_container["error"] = exc
 
-    # Use the qualified name to avoid Celery reusing a prior task with the same simple name.
-    task_name = f"{func.__module__}.{func.__qualname__}"
-    return shared_task(name=task_name)(wrapper)
+            thread = threading.Thread(target=runner, daemon=True)
+            thread.start()
+            thread.join()
+
+            if "error" in error_container:
+                raise error_container["error"]
+            return result_container["result"]
+
+        return shared_task(name=name)(wrapper)
+
+    return decorator

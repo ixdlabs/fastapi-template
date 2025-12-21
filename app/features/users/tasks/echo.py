@@ -14,6 +14,6 @@ def echo(message: str):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@shared_async_task
+@shared_async_task("echo_task")
 async def echo_task(message: str):
     echo(message)
