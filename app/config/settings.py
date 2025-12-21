@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     logger_level: str = "info"
 
     jwt_secret_key: str = "local"
-    jwt_expiration_minutes: int = 24 * 60
+    jwt_access_expiration_minutes: int = 5
+    jwt_refresh_expiration_minutes: int = 24 * 60
 
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
 

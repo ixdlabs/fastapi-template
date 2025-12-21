@@ -5,10 +5,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.config.auth import AuthenticatorDep
 from app.config.database import DbDep
-from app.config.settings import SettingsDep
 from app.features.users.models import User
-from app.features.users.helpers import jwt_encode
 
 
 class LoginInput(BaseModel):
@@ -18,6 +17,7 @@ class LoginInput(BaseModel):
 
 class LoginOutput(BaseModel):
     access_token: str
+    refresh_token: str
     user: "LoginOutputUser"
 
 
@@ -42,10 +42,10 @@ router = APIRouter()
 
 @router.post("/oauth2/token")
 async def login_form(
-    form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DbDep, settings: SettingsDep
+    form: Annotated[OAuth2PasswordRequestForm, Depends()], db: DbDep, authenticator: AuthenticatorDep
 ) -> OAuth2TokenResponse:
     input = LoginInput(username=form.username, password=form.password)
-    result = await login(input, db, settings)
+    result = await login(input, db, authenticator)
     return OAuth2TokenResponse(access_token=result.access_token, token_type="bearer")
 
 
@@ -54,7 +54,7 @@ async def login_form(
 
 
 @router.post("/login")
-async def login(input: LoginInput, db: DbDep, settings: SettingsDep) -> LoginOutput:
+async def login(input: LoginInput, db: DbDep, authenticator: AuthenticatorDep) -> LoginOutput:
     stmt = select(User).where(User.username == input.username)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
@@ -65,9 +65,10 @@ async def login(input: LoginInput, db: DbDep, settings: SettingsDep) -> LoginOut
     if not password_valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
-    access_token = jwt_encode(user, settings)
+    access_token, refresh_token = authenticator.encode(user)
     return LoginOutput(
         access_token=access_token,
+        refresh_token=refresh_token,
         user=LoginOutputUser(
             id=user.id,
             username=user.username,

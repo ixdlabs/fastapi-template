@@ -48,15 +48,19 @@ router = APIRouter()
 
 
 @router.get("/me")
-async def me(current_user: CurrentUserDep) -> UserDetailOutput:
+async def me(current_user: CurrentUserDep, db: DbDep) -> UserDetailOutput:
     """Get details of the current authenticated user."""
+    stmt = select(User).where(User.id == current_user.id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
     return UserDetailOutput(
-        id=current_user.id,
-        username=current_user.username,
-        first_name=current_user.first_name,
-        last_name=current_user.last_name,
-        created_at=current_user.created_at,
-        updated_at=current_user.updated_at,
+        id=user.id,
+        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
     )
 
 
