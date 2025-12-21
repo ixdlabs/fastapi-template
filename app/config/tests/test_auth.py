@@ -3,8 +3,9 @@ import uuid
 import jwt
 import pytest
 import pytest_asyncio
+from fastapi import HTTPException
 
-from app.config.auth import AuthUser, AuthException
+from app.config.auth import AuthUser, AuthException, get_current_user, get_authenticator
 from app.config.auth import Authenticator
 from app.config.settings import Settings
 
@@ -16,11 +17,16 @@ from app.features.users.tests.fixtures import UserFactory
 
 @pytest_asyncio.fixture
 async def user_fixture(db_fixture: AsyncSession):
-    user: User = UserFactory.build(password__raw="correctpassword")
+    user: User = UserFactory.build(password__raw="correct_password")
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
     return user
+
+
+def test_get_authenticator_returns_authenticator_instance(settings_fixture: Settings):
+    authenticator = get_authenticator(settings_fixture)
+    assert isinstance(authenticator, Authenticator)
 
 
 def test_encode_returns_access_and_refresh_tokens(authenticator_fixture: Authenticator, user_fixture: User):
@@ -49,17 +55,19 @@ def test_sub_extracts_user_id(authenticator_fixture: Authenticator, user_fixture
     assert user_id == user_fixture.id
 
 
-def test_user_invalid_token_raises_401(authenticator_fixture: Authenticator):
+def test_user_invalid_token_raises_auth_exception(authenticator_fixture: Authenticator):
     with pytest.raises(AuthException):
         authenticator_fixture.user("invalid.token.value")
 
 
-def test_sub_invalid_token_raises_401(authenticator_fixture: Authenticator):
+def test_sub_invalid_token_raises_auth_exception(authenticator_fixture: Authenticator):
     with pytest.raises(AuthException):
         authenticator_fixture.sub("invalid.token.value")
 
 
-def test_user_missing_user_payload_raises_401(authenticator_fixture: Authenticator, settings_fixture: Settings):
+def test_user_missing_user_payload_raises_auth_exception(
+    authenticator_fixture: Authenticator, settings_fixture: Settings
+):
     payload = {"sub": str(uuid.uuid4()), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
@@ -67,7 +75,9 @@ def test_user_missing_user_payload_raises_401(authenticator_fixture: Authenticat
         authenticator_fixture.user(token)
 
 
-def test_user_invalid_user_payload_raises_401(authenticator_fixture: Authenticator, settings_fixture: Settings):
+def test_user_invalid_user_payload_raises_auth_exception(
+    authenticator_fixture: Authenticator, settings_fixture: Settings
+):
     payload = {
         "sub": str(uuid.uuid4()),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
@@ -79,7 +89,7 @@ def test_user_invalid_user_payload_raises_401(authenticator_fixture: Authenticat
         authenticator_fixture.user(token)
 
 
-def test_sub_missing_sub_claim_raises_401(authenticator_fixture: Authenticator, settings_fixture: Settings):
+def test_sub_missing_sub_claim_raises_auth_exception(authenticator_fixture: Authenticator, settings_fixture: Settings):
     payload = {"exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
@@ -87,7 +97,7 @@ def test_sub_missing_sub_claim_raises_401(authenticator_fixture: Authenticator, 
         authenticator_fixture.sub(token)
 
 
-def test_sub_invalid_uuid_raises_401(authenticator_fixture: Authenticator, settings_fixture: Settings):
+def test_sub_invalid_uuid_raises_auth_exception(authenticator_fixture: Authenticator, settings_fixture: Settings):
     payload = {"sub": "not-a-uuid", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
@@ -95,7 +105,9 @@ def test_sub_invalid_uuid_raises_401(authenticator_fixture: Authenticator, setti
         authenticator_fixture.sub(token)
 
 
-def test_expired_token_raises_401(authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User):
+def test_expired_token_raises_auth_exception(
+    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+):
     payload = {
         "sub": str(user_fixture.id),
         "exp": datetime.now(timezone.utc) - timedelta(minutes=1),
@@ -110,3 +122,18 @@ def test_expired_token_raises_401(authenticator_fixture: Authenticator, settings
 
     with pytest.raises(AuthException):
         authenticator_fixture.user(expired_token)
+
+
+def test_get_current_user_raises_401(authenticator_fixture: Authenticator):
+    with pytest.raises(HTTPException):
+        get_current_user("invalid.token.value", authenticator_fixture)
+
+
+def test_get_current_user_returns_for_valid_access_token(authenticator_fixture: Authenticator, user_fixture: User):
+    access_token, refresh_token = authenticator_fixture.encode(user_fixture)
+    user = get_current_user(access_token, authenticator_fixture)
+
+    assert user.id == user_fixture.id
+    assert user.username == user_fixture.username
+    assert user.first_name == user_fixture.first_name
+    assert user.last_name == user_fixture.last_name
