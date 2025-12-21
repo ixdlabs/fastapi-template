@@ -77,4 +77,6 @@ def shared_async_task(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, 
             raise error_container["error"]
         return result_container["result"]
 
-    return shared_task(wrapper)
+    # Use the qualified name to avoid Celery reusing a prior task with the same simple name.
+    task_name = f"{func.__module__}.{func.__qualname__}"
+    return shared_task(name=task_name)(wrapper)
