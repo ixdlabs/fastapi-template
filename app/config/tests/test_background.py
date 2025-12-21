@@ -1,10 +1,19 @@
 import asyncio
 from unittest.mock import MagicMock
 import pytest
-from app.config.background import Background, shared_async_task
+from app.config.background import Background, shared_async_task, get_background
 from app.config.settings import Settings
 from celery import Task as CeleryTask
 from pytest import MonkeyPatch
+
+
+# Tests for Background
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def test_get_background_returns_background_instance(settings_fixture: Settings):
+    background = get_background(settings_fixture)
+    assert isinstance(background, Background)
 
 
 @pytest.mark.asyncio
@@ -14,6 +23,7 @@ async def test_submit_rejects_non_celery_task(settings_fixture: Settings):
     async def not_a_task():
         return 42
 
+    assert await not_a_task() == 42
     with pytest.raises(ValueError, match="Function must be a Celery task"):
         await bg.submit(not_a_task)
 
@@ -25,12 +35,17 @@ async def test_submit_calls_apply_async(settings_fixture: Settings, monkeypatch:
     task = MagicMock(spec=CeleryTask)
     task.apply_async = MagicMock()
 
+    # noinspection PyTypeChecker
     await bg.submit(task, 1, 2, foo="bar")
 
     task.apply_async.assert_called_once_with(
         args=(1, 2),
         kwargs={"foo": "bar"},
     )
+
+
+# Tests for shared_async_task
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 def test_shared_async_task_no_event_loop():
@@ -78,3 +93,4 @@ def test_shared_async_task_returns_celery_task():
 
     task = shared_async_task("fn5")(async_fn)
     assert isinstance(task, CeleryTask)
+    assert task() == 123

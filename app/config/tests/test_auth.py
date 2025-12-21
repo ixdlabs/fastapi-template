@@ -24,6 +24,10 @@ async def user_fixture(db_fixture: AsyncSession):
     return user
 
 
+# Tests for Authenticator
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 def test_get_authenticator_returns_authenticator_instance(settings_fixture: Settings):
     authenticator = get_authenticator(settings_fixture)
     assert isinstance(authenticator, Authenticator)
@@ -122,6 +126,10 @@ def test_expired_token_raises_auth_exception(
 
     with pytest.raises(AuthException):
         authenticator_fixture.user(expired_token)
+
+
+# Tests for get_current_user
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 def test_get_current_user_raises_401(authenticator_fixture: Authenticator):

@@ -50,10 +50,10 @@ BackgroundDep = Annotated[Background, Depends(get_background)]
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def shared_async_task(name: str) -> Callable[P, R]:
+def shared_async_task(name: str):
     """Convert an async function into a Celery task."""
 
-    def decorator(func: Callable[P, Coroutine[R, Any, Any]]):
+    def decorator(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]:
         @functools.wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             try:
