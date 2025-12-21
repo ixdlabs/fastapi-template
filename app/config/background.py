@@ -7,19 +7,19 @@ import asyncio
 import functools
 import threading
 from typing import Annotated, Any, Awaitable, Callable, Coroutine, ParamSpec, TypeVar
-from celery.schedules import crontab
+
+
+from celery import shared_task
 
 from celery.app.task import Task as CeleryTask
 
 from fastapi import Depends
 
-from app.config.celery_app import get_celery_app
 from app.config.settings import Settings, SettingsDep
 
 
 P = ParamSpec("P")
 R = TypeVar("R")
-
 
 # Dependency that provides application background task runner.
 # The background is cached to avoid recreating it on each request.
@@ -43,76 +43,38 @@ def get_background(settings: SettingsDep):
 
 BackgroundDep = Annotated[Background, Depends(get_background)]
 
-# Decorator to convert an async function into a Celery task.
+
+# Utility to create shared async Celery tasks.
+# Normally, Celery tasks are synchronous functions. This utility allows defining async functions as Celery tasks.
+# Internally, it runs the async function in an event loop, either in the current thread or in a separate thread.
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def background_task(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]:
+def shared_async_task(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]:
     """Convert an async function into a Celery task."""
 
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        return _run_async_sync(func, *args, **kwargs)
-
-    celery_app = get_celery_app()
-    return celery_app.task(wrapper)
-
-
-# Decorator to create a periodic Celery task.
-# All periodic tasks created with this decorator are automatically added to the beat_schedule variable.
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-def periodic_task(schedule: crontab | float | int):
-    """Decorator to create a periodic Celery task."""
-
-    def decorator(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]:
-        @functools.wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            return _run_async_sync(func, *args, **kwargs)
-
-        celery_app = get_celery_app()
-        task = celery_app.task(wrapper)
-        beat_schedule[task.name] = schedule
-        return task
-
-    return decorator
-
-
-# Every function decorated with @periodic_task is automatically added to this dictionary.
-beat_schedule: dict[str, crontab | float | int] = {}
-
-# Run a coroutine from synchronous code.
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-def _run_async_sync(async_func: Callable[P, Coroutine[Any, Any, R]], *args: P.args, **kwargs: P.kwargs) -> R:
-    """
-    Run a coroutine from synchronous code.
-
-    Celery tasks are synchronous callables, but some of our task implementations are async.
-    In eager mode (often used in development/tests), Celery may execute the task inline while
-    FastAPI's event loop is already running, so `asyncio.run()` would crash.
-    """
-
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(async_func(*args, **kwargs))
-
-    result_container: dict[str, R] = {}
-    error_container: dict[str, BaseException] = {}
-
-    def runner():
         try:
-            result_container["result"] = asyncio.run(async_func(*args, **kwargs))
-        except BaseException as exc:
-            error_container["error"] = exc
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(func(*args, **kwargs))
 
-    thread = threading.Thread(target=runner, daemon=True)
-    thread.start()
-    thread.join()
+        result_container: dict[str, R] = {}
+        error_container: dict[str, BaseException] = {}
 
-    if "error" in error_container:
-        raise error_container["error"]
-    return result_container["result"]
+        def runner():
+            try:
+                result_container["result"] = asyncio.run(func(*args, **kwargs))
+            except BaseException as exc:
+                error_container["error"] = exc
+
+        thread = threading.Thread(target=runner, daemon=True)
+        thread.start()
+        thread.join()
+
+        if "error" in error_container:
+            raise error_container["error"]
+        return result_container["result"]
+
+    return shared_task(wrapper)

@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 import asyncio
 import pytest
 from app.config import background
-from app.config.background import background_task, periodic_task
+from app.config.background import shared_async_task, periodic_task
 from pytest import MonkeyPatch
 
 from app.config.settings import Settings
@@ -11,7 +11,7 @@ from app.worker import setup_periodic_tasks
 
 
 def test_background_task_runs_async_function(monkeypatch: MonkeyPatch):
-    @background_task
+    @shared_async_task
     async def sample(a: int, b: int) -> int:
         return a + b
 
@@ -24,7 +24,7 @@ async def test_background_task_eager_can_run_inside_running_event_loop(monkeypat
     monkeypatch.setattr("app.config.celery_app.get_settings", lambda: Settings(celery_task_always_eager=True))
     get_celery_app.cache_clear()
 
-    @background_task
+    @shared_async_task
     async def sample(a: int, b: int) -> int:
         await asyncio.sleep(0)
         return a + b
