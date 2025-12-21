@@ -162,7 +162,7 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 
 @router.put("/{user_id}")
 async def update_user(
-    user_id: uuid.UUID, input: UserUpdateInput, db: DbDep, current_user: CurrentUserDep
+    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_user: CurrentUserDep
 ) -> UserDetailOutput:
     """Update a user's first and last name."""
     if current_user.id != user_id:
@@ -173,8 +173,8 @@ async def update_user(
     user = result.scalar_one_or_none()
     assert user is not None, "User not found - Sanity check failed"
 
-    user.first_name = input.first_name
-    user.last_name = input.last_name
+    user.first_name = form.first_name
+    user.last_name = form.last_name
     await db.commit()
     await db.refresh(user)
 

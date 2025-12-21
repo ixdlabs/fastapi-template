@@ -102,7 +102,11 @@ AuthenticatorDep = Annotated[Authenticator, Depends(get_authenticator)]
 # Dependency to get the current authenticated user
 # ----------------------------------------------------------------------------------------------------------------------
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/oauth2/token", scheme_name="JWT")
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/auth/oauth2/token",
+    refreshUrl="/api/auth/refresh",
+    scheme_name="JWT",
+)
 
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], authenticator: AuthenticatorDep) -> AuthUser:

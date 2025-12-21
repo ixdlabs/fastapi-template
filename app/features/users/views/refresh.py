@@ -2,10 +2,13 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
+import logging
 
-from app.config.auth import AuthenticatorDep
+from app.config.auth import AuthenticatorDep, AuthException
 from app.config.database import DbDep
 from app.features.users.models import User
+
+logger = logging.getLogger(__name__)
 
 
 class RefreshInput(BaseModel):
@@ -33,8 +36,13 @@ router = APIRouter()
 
 
 @router.post("/refresh")
-async def refresh(input: RefreshInput, db: DbDep, authenticator: AuthenticatorDep) -> RefreshOutput:
-    user_id = authenticator.sub(input.refresh_token)
+async def refresh(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep) -> RefreshOutput:
+    try:
+        user_id = authenticator.sub(form.refresh_token)
+    except AuthException as e:
+        logger.warning("token validation failed", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials") from e
+
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()

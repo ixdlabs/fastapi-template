@@ -38,16 +38,16 @@ router = APIRouter()
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
-    input: RegisterInput, db: DbDep, authenticator: AuthenticatorDep, background: BackgroundDep
+    form: RegisterInput, db: DbDep, authenticator: AuthenticatorDep, background: BackgroundDep
 ) -> RegisterOutput:
-    stmt = select(User).where(User.username == input.username)
+    stmt = select(User).where(User.username == form.username)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
 
-    user = User(username=input.username, first_name=input.first_name, last_name=input.last_name)
-    user.set_password(input.password)
+    user = User(username=form.username, first_name=form.first_name, last_name=form.last_name)
+    user.set_password(form.password)
 
     db.add(user)
     await db.commit()
