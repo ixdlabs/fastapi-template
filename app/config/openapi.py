@@ -32,7 +32,7 @@ async def scalar(request: Request):
     <script>
       Scalar.createApiReference("#app", {
         url: "%s",
-        "theme": "solarized",
+        "theme": "bluePlanet",
         persistAuth: true,
       })
     </script>
