@@ -1,15 +1,20 @@
 import enum
-
-from typing import Any
-from datetime import datetime
-
-from sqlalchemy import Column, String, DateTime, JSON, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
-from sqlalchemy.orm import Mapped, mapped_column
-
 import uuid
-from app.db.base import Base
+import typing
+from datetime import datetime
+from typing import Any
+
+
+from sqlalchemy import Column, String, DateTime, JSON, ForeignKey, UUID
+from sqlalchemy.sql import func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import Enum
+
+
+from app.config.database import Base
+
+if typing.TYPE_CHECKING:
+    from app.features.users.models import User
 
 
 class ActorType(enum.Enum):
@@ -22,7 +27,7 @@ class AuditLog(Base):
 
     id: Mapped[uuid.UUID] = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    actor_type: Mapped[str] = Column(enum.Enum("USER"), nullable=False)
+    actor_type: Mapped[str] = Column(Enum("ActorType"), nullable=False)
     action: Mapped[str] = Column(String, nullable=False)
     resource_type: Mapped[str] = Column(String, nullable=False)
     resource: Mapped[str] = Column(String, nullable=False)
@@ -37,6 +42,4 @@ class AuditLog(Base):
     request_url: Mapped[str] = Column(String, nullable=True)
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), server_default=func.now())
     modified_at: Mapped[datetime] = Column(DateTime(timezone=True), onupdate=func.now())
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    user: Mapped["User"] = relationship(back_populates="audit_logs")

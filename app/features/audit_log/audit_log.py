@@ -32,7 +32,7 @@ def create_audit_log(
         request_ip_address=request_meta.get("ip"),
         request_user_agent=request_meta.get("user_agent"),
         request_method=request_meta.get("method"),
-        request_endpoint=request_meta.get("endpoint"),
+        request_url=request_meta.get("endpoint"),
     )
 
     db.add(log)
