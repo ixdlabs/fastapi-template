@@ -34,7 +34,7 @@ class AuditLog(Base):
     request_ip_address: Mapped[str] = Column(String, nullable=True)
     request_user_agent: Mapped[str] = Column(String, nullable=True)
     request_method: Mapped[str] = Column(String, nullable=True)
-    request_endpoint: Mapped[str] = Column(String, nullable=True)
+    request_url: Mapped[str] = Column(String, nullable=True)
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), server_default=func.now())
     modified_at: Mapped[datetime] = Column(DateTime(timezone=True), onupdate=func.now())
 
