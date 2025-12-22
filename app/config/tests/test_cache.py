@@ -77,7 +77,7 @@ def test_chained_vary_calls(cache_fixture: CacheDep, request_fixture: Request):
 
     cache_fixture.vary_on_path().vary_on_auth()
 
-    assert cache_fixture.key == (f"cache:[path:{path_hash}]:[auth:{auth_hash}]")
+    assert cache_fixture.key == f"cache:[path:{path_hash}]:[auth:{auth_hash}]"
 
 
 # Cache get / set behavior

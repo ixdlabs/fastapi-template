@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 
 from alembic import command, config
 
+from app.config.auth import Authenticator, get_authenticator
 from app.config.background import Background, get_background
 from app.config.cache import get_cache_backend
 from app.config.database import get_db_session
@@ -77,6 +78,15 @@ async def db_fixture(db_engine_fixture: AsyncEngine):
             await transaction.rollback()
 
 
+# Authenticator for tests
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="function")
+def authenticator_fixture(settings_fixture: Settings):
+    return Authenticator(settings_fixture)
+
+
 # Background task runner for tests that does not actually run tasks
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -122,12 +132,14 @@ def override_dependencies(
     background_fixture: Background,
     rate_limit_strategy_fixture: RateLimiter,
     cache_backend_fixture: BaseCache,
+    authenticator_fixture: Authenticator,
 ):
     app.dependency_overrides[get_db_session] = lambda: db_fixture
     app.dependency_overrides[get_settings] = lambda: settings_fixture
     app.dependency_overrides[get_background] = lambda: background_fixture
     app.dependency_overrides[get_rate_limit_strategy] = lambda: rate_limit_strategy_fixture
     app.dependency_overrides[get_cache_backend] = lambda: cache_backend_fixture
+    app.dependency_overrides[get_authenticator] = lambda: authenticator_fixture
 
     yield
     app.dependency_overrides.clear()

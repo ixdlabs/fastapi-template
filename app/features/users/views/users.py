@@ -43,23 +43,6 @@ class UserUpdateInput(BaseModel):
 
 router = APIRouter()
 
-# Me endpoint (Current user detail)
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@router.get("/me")
-async def me(current_user: CurrentUserDep) -> UserDetailOutput:
-    """Get details of the current authenticated user."""
-    return UserDetailOutput(
-        id=current_user.id,
-        username=current_user.username,
-        first_name=current_user.first_name,
-        last_name=current_user.last_name,
-        created_at=current_user.created_at,
-        updated_at=current_user.updated_at,
-    )
-
-
 # User detail endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -77,9 +60,7 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    if user is None:
-        # This is unlikely to happen since the current_user exists (and we checked the IDs match)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    assert user is not None, "User not found - Sanity check failed"
 
     response = UserDetailOutput(
         id=user.id,
@@ -147,9 +128,7 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    if user is None:
-        # This is unlikely to happen since the current_user exists (and we checked the IDs match)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    assert user is not None, "User not found - Sanity check failed"
 
     await db.delete(user)
     await db.commit()
@@ -161,7 +140,7 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 
 @router.put("/{user_id}")
 async def update_user(
-    user_id: uuid.UUID, input: UserUpdateInput, db: DbDep, current_user: CurrentUserDep
+    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_user: CurrentUserDep
 ) -> UserDetailOutput:
     """Update a user's first and last name."""
     if current_user.id != user_id:
@@ -170,12 +149,10 @@ async def update_user(
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    if user is None:
-        # This is unlikely to happen since the current_user exists (and we checked the IDs match)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    assert user is not None, "User not found - Sanity check failed"
 
-    user.first_name = input.first_name
-    user.last_name = input.last_name
+    user.first_name = form.first_name
+    user.last_name = form.last_name
     await db.commit()
     await db.refresh(user)
 

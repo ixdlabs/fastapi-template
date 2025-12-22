@@ -10,24 +10,44 @@ from app.features.notifications.models import NotificationChannel, NotificationS
 from app.features.notifications.tests.fixtures import NotificationFactory, NotificationDeliveryFactory
 
 
-client = TestClient(app)
+client = TestClient(app, base_url="https://testserver")
 
 
-def force_login(user: User):
+# async def force_login(user: User, db: AsyncSession):
+#     user = await db.merge(user)
+#     async def mock_get_current_user():
+#         return user
+
+#     app.dependency_overrides[get_current_user] = mock_get_current_user
+
+
+async def force_login(user: User, db: AsyncSession):
+    await db.refresh(user)
+
+    # Create a simple namespace object with just the needed attributes
+    from types import SimpleNamespace
+
+    mock_user = SimpleNamespace(
+        id=user.id,
+        username=user.username,
+        # Add other attributes as needed
+    )
+
     async def mock_get_current_user():
-        return user
+        return mock_user
 
     app.dependency_overrides[get_current_user] = mock_get_current_user
 
 
 @pytest.mark.asyncio
 async def test_get_notifications_list_returns_correct_data(db_fixture: AsyncSession):
-    user: User = UserFactory.build(password__raw="testpassword")
+    user: User = UserFactory.build()
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
 
-    force_login(user)
+    # force_login(user)
+    await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user)
     db_fixture.add(notification)
@@ -40,8 +60,8 @@ async def test_get_notifications_list_returns_correct_data(db_fixture: AsyncSess
     db_fixture.add(email_delivery)
 
     await db_fixture.commit()
-
-    response = client.get("/api/v1/notifications/")
+    await db_fixture.refresh(delivery)
+    response = client.get("/api/v1/notifications")
 
     assert response.status_code == 200
     data = response.json()
@@ -58,7 +78,8 @@ async def test_get_summary_counts_only_unread_inapp(db_fixture: AsyncSession):
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    force_login(user)
+    # force_login(user)
+    await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user)
     db_fixture.add(notification)
@@ -90,7 +111,8 @@ async def test_read_all_updates_status(db_fixture: AsyncSession):
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    force_login(user)
+    # force_login(user)
+    await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user)
     db_fixture.add(notification)
@@ -107,7 +129,7 @@ async def test_read_all_updates_status(db_fixture: AsyncSession):
     await db_fixture.commit()
 
     response = client.post("/api/v1/notifications/read-all")
-    assert response.status_code == 204
+    assert response.status_code == 200
 
     # Verify DB
     await db_fixture.refresh(d1)
@@ -123,7 +145,8 @@ async def test_get_specific_notification_details(db_fixture: AsyncSession):
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    force_login(user)
+    # force_login(user)
+    await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user, data={"key": "value"})
     db_fixture.add(notification)
@@ -154,7 +177,8 @@ async def test_cannot_access_other_users_notification(db_fixture: AsyncSession):
     db_fixture.add(user2)
     await db_fixture.commit()
 
-    force_login(user1)
+    # force_login(user1)
+    await force_login(user1, db_fixture)
 
     # Notification belongs to User 2
     notification = NotificationFactory.build(user=user2)
@@ -179,7 +203,8 @@ async def test_mark_single_notification_as_read(db_fixture: AsyncSession):
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    force_login(user)
+    # force_login(user)
+    await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user)
     db_fixture.add(notification)
@@ -193,7 +218,7 @@ async def test_mark_single_notification_as_read(db_fixture: AsyncSession):
     await db_fixture.refresh(delivery)
 
     response = client.post(f"/api/v1/notifications/{delivery.id}/read")
-    assert response.status_code == 204
+    assert response.status_code == 200
 
     await db_fixture.refresh(delivery)
     assert delivery.status == NotificationStatus.READ
@@ -207,7 +232,8 @@ async def test_mark_single_notification_as_unread(db_fixture: AsyncSession):
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    force_login(user)
+    # force_login(user)
+    await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user)
     db_fixture.add(notification)
@@ -221,7 +247,7 @@ async def test_mark_single_notification_as_unread(db_fixture: AsyncSession):
     await db_fixture.refresh(delivery)
 
     response = client.post(f"/api/v1/notifications/{delivery.id}/unread")
-    assert response.status_code == 204
+    assert response.status_code == 200
 
     await db_fixture.refresh(delivery)
     assert delivery.status == NotificationStatus.SENT

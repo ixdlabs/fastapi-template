@@ -8,7 +8,7 @@ from sqlalchemy import select, update, func
 
 from app.config.auth import CurrentUserDep
 from app.config.database import DbDep
-from app.config.pagination import Page, paginate
+from app.config.pagination import Page
 from app.features.notifications.models import (
     Notification,
     NotificationDelivery,
@@ -41,8 +41,8 @@ class NotificationOutput(BaseModel):
     body: str
     status: NotificationStatus
 
-    sent_at: datetime
-    read_at: datetime
+    sent_at: datetime | None
+    read_at: datetime | None
 
     created_at: datetime
     updated_at: datetime
@@ -62,26 +62,52 @@ router = APIRouter()
 async def get_notifications(
     db: DbDep, current_user: CurrentUserDep, query: Annotated[NotificationListInput, Query()]
 ) -> Page[NotificationListOutput]:
-    stmt = (
-        select(NotificationDelivery, Notification.data)
+    # Count query
+    count_stmt = (
+        select(func.count())
+        .select_from(NotificationDelivery)
         .join(Notification)
         .where(Notification.user_id == current_user.id, NotificationDelivery.channel == NotificationChannel.INAPP)
     )
+    total_count = await db.scalar(count_stmt) or 0
+
+    # Data query - select specific columns
     order_column = (
         NotificationDelivery.created_at if query.order_by == "created_at" else NotificationDelivery.updated_at
     )
-    stmt = stmt.order_by(order_column.desc())
-    result = await paginate(db, stmt, query.limit, query.offset)
-    return result.map_to(
-        lambda row: NotificationListOutput(
-            id=row.NotificationDelivery.id,
-            title=row.NotificationDelivery.title,
-            data=row.data,
-            body=row.NotificationDelivery.body,
-            status=row.NotificationDelivery.status,
-            created_at=row.NotificationDelivery.created_at,
+
+    stmt = (
+        select(
+            NotificationDelivery.id,
+            NotificationDelivery.title,
+            NotificationDelivery.body,
+            NotificationDelivery.status,
+            NotificationDelivery.created_at,
+            Notification.data,
         )
+        .join(Notification)
+        .where(Notification.user_id == current_user.id, NotificationDelivery.channel == NotificationChannel.INAPP)
+        .order_by(order_column.desc())
+        .limit(query.limit)
+        .offset(query.offset)
     )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    items = [
+        NotificationListOutput(
+            id=row[0],
+            title=row[1],
+            body=row[2],
+            status=row[3],
+            created_at=row[4],
+            data=row[5],
+        )
+        for row in rows
+    ]
+
+    return Page(count=total_count, items=items)
 
 
 # Notifications Summary GET endpoint (Return the count of unread In-App notifications)
@@ -93,7 +119,7 @@ async def count_unread_notifications(db: DbDep, current_user: CurrentUserDep) ->
     stmt = (
         select(func.count())
         .select_from(NotificationDelivery)
-        .join(NotificationDelivery)
+        .join(Notification)
         .where(
             Notification.user_id == current_user.id,
             NotificationDelivery.channel == NotificationChannel.INAPP,

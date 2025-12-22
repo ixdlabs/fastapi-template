@@ -3,6 +3,8 @@ import uuid
 import typing
 
 from argon2 import PasswordHasher
+from argon2.exceptions import Argon2Error
+
 from app.config.database import Base
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
@@ -35,5 +37,5 @@ class User(Base):
         password_hasher = PasswordHasher()
         try:
             return password_hasher.verify(self.hashed_password, password)
-        except Exception:
+        except Argon2Error:
             return False
