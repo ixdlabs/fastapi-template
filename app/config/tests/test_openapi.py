@@ -14,6 +14,6 @@ async def test_openapi_schema_endpoint_returns_200():
 
 
 @pytest.mark.asyncio
-async def test_rapidoc_endpoint_returns_200():
+async def test_apidoc_endpoint_returns_200():
     response = client.get("/api/docs")
     assert response.status_code == 200

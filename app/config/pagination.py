@@ -19,11 +19,11 @@ class Page[DataT](BaseModel):
     count: int
     items: list[DataT]
 
-    def map_to[DataU](self, func: Callable[[DataT], DataU]) -> "Page[DataU]":
+    def map_to[DataU](self, function: Callable[[DataT], DataU]) -> "Page[DataU]":
         """Maps the items of the page to another type using the provided function."""
-        return Page[DataU](
+        return Page(
             count=self.count,
-            items=[func(item) for item in self.items],
+            items=[function(item) for item in self.items],
         )
 
 
@@ -37,5 +37,5 @@ async def paginate[DataT](db: DbDep, stmt: Select[Tuple[DataT]], limit: int = 10
     total_result = await db.execute(total_stmt)
     total = total_result.scalar_one()
     data_result = await db.execute(stmt.limit(limit).offset(offset))
-    data = data_result.scalars().all()
-    return Page[DataT](count=total, items=data)
+    data = list(data_result.scalars().all())
+    return Page(count=total, items=data)

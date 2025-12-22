@@ -21,6 +21,10 @@ def test_app():
     async def raise_client_error():
         raise HTTPException(status_code=404, detail="Not Found")
 
+    @app.get("/unexpected-error")
+    async def raise_unexpected_error():
+        _ = 1 / 0
+
     return app
 
 
@@ -44,3 +48,15 @@ async def test_custom_http_exception_handler_ignores_client_error_logging(test_a
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not Found"}
+
+
+@pytest.mark.asyncio
+async def test_custom_exception_handler_logs_unexpected_error(test_app: FastAPI, monkeypatch: MonkeyPatch):
+    mock_logger = MagicMock()
+    monkeypatch.setattr("app.config.exceptions.logger.error", mock_logger)
+
+    client = TestClient(test_app)
+    with pytest.raises(ZeroDivisionError):
+        client.get("/unexpected-error")
+
+    mock_logger.assert_called_once_with("server error", extra={"path": "/unexpected-error"}, exc_info=ANY)

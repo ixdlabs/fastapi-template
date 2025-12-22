@@ -22,15 +22,13 @@ class Settings(BaseSettings):
     allowed_hosts: list[str] = ["*"]
     cors_origins: list[str] = ["*"]
 
-    theme_color_primary: str = "#61A60A"
-    theme_color_background: str = "#111827"
-
     debug: bool = False
     logger_name: str = "console"
     logger_level: str = "info"
 
     jwt_secret_key: str = "local"
-    jwt_expiration_minutes: int = 24 * 60
+    jwt_access_expiration_minutes: int = 5
+    jwt_refresh_expiration_minutes: int = 24 * 60
 
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
 
