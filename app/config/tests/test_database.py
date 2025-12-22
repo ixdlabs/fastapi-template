@@ -1,8 +1,91 @@
+import uuid
 import pytest
-from app.config.database import create_db_engine, get_db
+from sqlalchemy import ForeignKey, String
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.config.database import Base, create_db_engine, get_db
 from app.config.settings import Settings
 
 from pytest import MonkeyPatch
+
+# Base Model Testing
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class Parent(Base):
+    __tablename__ = "parents"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String)
+
+    children: Mapped[list["Child"]] = relationship(back_populates="parent")
+
+    @hybrid_property
+    def name_upper(self) -> str:
+        return self.name.upper()
+
+
+class Child(Base):
+    __tablename__ = "children"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    parent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("parents.id"))
+    value: Mapped[str] = mapped_column(String)
+
+    parent: Mapped[Parent] = relationship(back_populates="children")
+
+
+def test_class_properties():
+    assert set(Parent.columns) == {"id", "name"}
+    assert Parent.relations == ["children"]
+    assert Parent.hybrid_properties == ["name_upper"]
+
+
+@pytest.mark.asyncio
+async def test_to_dict_basic():
+    parent = Parent(name="alice")
+    data = parent.to_dict()
+    assert data == {"id": parent.id, "name": "alice"}
+
+
+def test_to_dict_exclude():
+    parent = Parent(name="alice")
+    data = parent.to_dict(exclude=["id"])
+    assert data == {"name": "alice"}
+
+
+def test_to_dict_with_hybrid_properties():
+    parent = Parent(name="alice")
+    data = parent.to_dict(hybrid_attributes=True)
+    assert data["name_upper"] == "ALICE"
+
+
+def test_to_dict_nested_relationships():
+    parent = Parent(name="alice")
+    child1 = Child(value="a", parent=parent)
+    child2 = Child(value="b", parent=parent)
+    parent.children = [child1, child2]
+
+    data = parent.to_dict(nested=True)
+
+    assert "children" in data
+    assert len(data["children"]) == 2
+    assert data["children"][0]["value"] in {"a", "b"}
+
+
+def test_to_dict_nested_with_hybrids():
+    parent = Parent(name="alice")
+    child = Child(value="x", parent=parent)
+    parent.children = [child]
+
+    data = parent.to_dict(nested=True, hybrid_attributes=True)
+
+    assert data["name_upper"] == "ALICE"
+    assert data["children"][0]["value"] == "x"
+
+
+# DB Engine and Session Testing
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 def test_create_db_engine_is_cached(monkeypatch: MonkeyPatch):
