@@ -10,4 +10,5 @@ router = APIRouter()
 
 router.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 router.include_router(user_router, prefix="/api/v1/users", tags=["Users"])
+
 router.include_router(notification_router, prefix="/api/v1/notifications", tags=["Notifications"])

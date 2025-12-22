@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from types import SimpleNamespace
 
 from app.main import app
 from app.config.auth import get_current_user
@@ -13,24 +14,12 @@ from app.features.notifications.tests.fixtures import NotificationFactory, Notif
 client = TestClient(app, base_url="https://testserver")
 
 
-# async def force_login(user: User, db: AsyncSession):
-#     user = await db.merge(user)
-#     async def mock_get_current_user():
-#         return user
-
-#     app.dependency_overrides[get_current_user] = mock_get_current_user
-
-
 async def force_login(user: User, db: AsyncSession):
     await db.refresh(user)
-
-    # Create a simple namespace object with just the needed attributes
-    from types import SimpleNamespace
 
     mock_user = SimpleNamespace(
         id=user.id,
         username=user.username,
-        # Add other attributes as needed
     )
 
     async def mock_get_current_user():
@@ -45,8 +34,6 @@ async def test_get_notifications_list_returns_correct_data(db_fixture: AsyncSess
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-
-    # force_login(user)
     await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user)
@@ -78,7 +65,6 @@ async def test_get_summary_counts_only_unread_inapp(db_fixture: AsyncSession):
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    # force_login(user)
     await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user)
@@ -90,7 +76,6 @@ async def test_get_summary_counts_only_unread_inapp(db_fixture: AsyncSession):
     )
     db_fixture.add(unread)
 
-    # Read In-App (Count = 0)
     read_notif = NotificationDeliveryFactory.build(
         notification=notification, channel=NotificationChannel.INAPP, status=NotificationStatus.READ
     )
@@ -111,14 +96,12 @@ async def test_read_all_updates_status(db_fixture: AsyncSession):
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    # force_login(user)
     await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user)
     db_fixture.add(notification)
     await db_fixture.flush()
 
-    # Create 2 Unread Notifications
     d1 = NotificationDeliveryFactory.build(
         notification=notification, channel=NotificationChannel.INAPP, status=NotificationStatus.SENT
     )
@@ -145,7 +128,6 @@ async def test_get_specific_notification_details(db_fixture: AsyncSession):
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    # force_login(user)
     await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user, data={"key": "value"})
@@ -168,19 +150,15 @@ async def test_get_specific_notification_details(db_fixture: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_cannot_access_other_users_notification(db_fixture: AsyncSession):
-    # User 1 (Logged In)
     user1: User = UserFactory.build()
     db_fixture.add(user1)
 
-    # User 2 (Owner of notification)
     user2: User = UserFactory.build()
     db_fixture.add(user2)
     await db_fixture.commit()
 
-    # force_login(user1)
     await force_login(user1, db_fixture)
 
-    # Notification belongs to User 2
     notification = NotificationFactory.build(user=user2)
     db_fixture.add(notification)
     await db_fixture.flush()
@@ -203,7 +181,6 @@ async def test_mark_single_notification_as_read(db_fixture: AsyncSession):
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    # force_login(user)
     await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user)
@@ -232,7 +209,6 @@ async def test_mark_single_notification_as_unread(db_fixture: AsyncSession):
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    # force_login(user)
     await force_login(user, db_fixture)
 
     notification = NotificationFactory.build(user=user)

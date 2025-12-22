@@ -62,7 +62,6 @@ router = APIRouter()
 async def get_notifications(
     db: DbDep, current_user: CurrentUserDep, query: Annotated[NotificationListInput, Query()]
 ) -> Page[NotificationListOutput]:
-    # Count query
     count_stmt = (
         select(func.count())
         .select_from(NotificationDelivery)
@@ -71,7 +70,6 @@ async def get_notifications(
     )
     total_count = await db.scalar(count_stmt) or 0
 
-    # Data query - select specific columns
     order_column = (
         NotificationDelivery.created_at if query.order_by == "created_at" else NotificationDelivery.updated_at
     )
