@@ -47,8 +47,10 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
-    deliveries: Mapped[list["NotificationDelivery"]] = relationship(back_populates="notification", passive_deletes=True)
-    user: Mapped["User"] = relationship(back_populates="notifications")
+    deliveries: Mapped[list["NotificationDelivery"]] = relationship(
+        back_populates="notification", passive_deletes=True, lazy="noload"
+    )
+    user: Mapped["User"] = relationship(back_populates="notifications", lazy="noload")
 
 
 # Delivery of a notification via a channel
@@ -75,4 +77,4 @@ class NotificationDelivery(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
-    notification: Mapped["Notification"] = relationship(back_populates="deliveries")
+    notification: Mapped["Notification"] = relationship(back_populates="deliveries", lazy="noload")

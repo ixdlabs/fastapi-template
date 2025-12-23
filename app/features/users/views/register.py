@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.config.audit_log import AuditLoggerDep
 from app.config.auth import AuthenticatorDep
 from app.config.background import BackgroundDep
 from app.config.database import DbDep
@@ -38,7 +39,11 @@ router = APIRouter()
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
-    form: RegisterInput, db: DbDep, authenticator: AuthenticatorDep, background: BackgroundDep
+    form: RegisterInput,
+    db: DbDep,
+    authenticator: AuthenticatorDep,
+    background: BackgroundDep,
+    audit_logger: AuditLoggerDep,
 ) -> RegisterOutput:
     """Register a new user."""
     stmt = select(User).where(User.username == form.username)
@@ -53,6 +58,8 @@ async def register(
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    await audit_logger.log("create", new_resource=user, exclude_columns=["hashed_password"])
 
     await background.submit(send_welcome_email_task, user.id)
 
