@@ -2,7 +2,7 @@ import uuid
 
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, Field, AliasPath, ConfigDict
+from pydantic import BaseModel, Field
 from typing import Any, Annotated, Literal
 from sqlalchemy.orm import contains_eager
 from sqlalchemy import select, update, func
@@ -15,6 +15,7 @@ from app.features.notifications.models import (
     NotificationDelivery,
     NotificationChannel,
     NotificationStatus,
+    NotificationType,
 )
 
 
@@ -32,11 +33,10 @@ class NotificationOutput(BaseModel):
     status: NotificationStatus
     sent_at: datetime | None
     read_at: datetime | None
-    created_at: datetime
-    updated_at: datetime
-    type: str = Field(validation_alias=AliasPath("notification", "type"))
-    data: dict[str, Any] = Field(validation_alias=AliasPath("notification", "data"))
-    model_config = ConfigDict(from_attributes=True)
+    created_at: datetime | None
+    updated_at: datetime | None
+    type: NotificationType
+    data: dict[str, Any]
 
 
 class NotificationSummaryOutput(BaseModel):
@@ -70,7 +70,23 @@ async def get_notifications(query: Annotated[NotificationListInput, Query()], cu
     stmt = stmt.order_by(order_column)
     result = await paginate(db, stmt, limit=query.limit, offset=query.offset)
 
-    return result
+    response = result.map_to(
+        lambda notification: NotificationOutput(
+            id=notification.id,
+            recipient=notification.recipient,
+            title=notification.title,
+            body=notification.body,
+            status=notification.status,
+            sent_at=notification.sent_at,
+            read_at=notification.read_at,
+            created_at=notification.created_at,
+            updated_at=notification.updated_at,
+            type=notification.notification.type,
+            data=notification.notification.data,
+        )
+    )
+
+    return response
 
 
 # Notifications Summary GET endpoint
@@ -88,6 +104,7 @@ async def count_unread_notifications(current_user: CurrentUserDep, db: DbDep) ->
             Notification.user_id == current_user.id,
             NotificationDelivery.channel == NotificationChannel.INAPP,
             NotificationDelivery.status == NotificationStatus.SENT,
+            NotificationDelivery.read_at is None,
         )
     )
     count = await db.scalar(stmt) or 0
@@ -108,13 +125,10 @@ async def read_all_notifications(current_user: CurrentUserDep, db: DbDep):
             Notification.user_id == current_user.id,
             NotificationDelivery.channel == NotificationChannel.INAPP,
             NotificationDelivery.status == NotificationStatus.SENT,
+            NotificationDelivery.read_at is None,
         )
     )
-    stmt = (
-        update(NotificationDelivery)
-        .where(NotificationDelivery.id.in_(subquery))
-        .values(status=NotificationStatus.READ, read_at=datetime.now())
-    )
+    stmt = update(NotificationDelivery).where(NotificationDelivery.id.in_(subquery)).values(read_at=datetime.now())
 
     await db.execute(stmt)
     await db.commit()
@@ -166,14 +180,13 @@ async def read_notification(notification_id: uuid.UUID, current_user: CurrentUse
 
     if notification is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
-    elif notification.status == NotificationStatus.READ:
-        return
-    else:
-        notification.status = NotificationStatus.READ
-        notification.read_at = datetime.now()
-        notification.updated_at = datetime.now()
 
-        await db.commit()
+    if notification.status == NotificationStatus.SENT and notification.read_at is not None:
+        return
+
+    notification.read_at = datetime.now()
+
+    await db.commit()
 
 
 # Unread Notification POST endpoint
@@ -195,10 +208,9 @@ async def unread_notification(notification_id: uuid.UUID, current_user: CurrentU
     if notification is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
 
-    if notification.status == NotificationStatus.SENT:
+    if notification.status == NotificationStatus.SENT and notification.read_at is None:
         return
 
-    notification.status = NotificationStatus.SENT
     notification.read_at = None
 
     await db.commit()
