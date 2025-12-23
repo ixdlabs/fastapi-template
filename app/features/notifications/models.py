@@ -29,7 +29,6 @@ class NotificationStatus(enum.Enum):
     PENDING = "pending"
     SENT = "sent"
     FAILED = "failed"
-    READ = "read"
 
 
 # System notification

@@ -2,13 +2,14 @@ import uuid
 
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasPath, ConfigDict
 from typing import Any, Annotated, Literal
+from sqlalchemy.orm import contains_eager
 from sqlalchemy import select, update, func
 
 from app.config.auth import CurrentUserDep
 from app.config.database import DbDep
-from app.config.pagination import Page
+from app.config.pagination import Page, paginate  # noqa: F401
 from app.features.notifications.models import (
     Notification,
     NotificationDelivery,
@@ -23,29 +24,19 @@ class NotificationListInput(BaseModel):
     order_by: Literal["created_at", "updated_at"] = "created_at"
 
 
-class NotificationListOutput(BaseModel):
-    id: uuid.UUID
-    title: str | None
-    data: dict[str, Any]
-    body: str
-    status: NotificationStatus
-    created_at: datetime
-
-
 class NotificationOutput(BaseModel):
     id: uuid.UUID
-    data: dict[str, Any]
-
     recipient: str
     title: str | None
     body: str
     status: NotificationStatus
-
     sent_at: datetime | None
     read_at: datetime | None
-
     created_at: datetime
     updated_at: datetime
+    type: str = Field(validation_alias=AliasPath("notification", "type"))
+    data: dict[str, Any] = Field(validation_alias=AliasPath("notification", "data"))
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationSummaryOutput(BaseModel):
@@ -54,66 +45,41 @@ class NotificationSummaryOutput(BaseModel):
 
 router = APIRouter()
 
-# Notifications GET endpoint (Lists all the In-App notifications of the user)
+# Notifications GET endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@router.get("/")
-async def get_notifications(
-    db: DbDep, current_user: CurrentUserDep, query: Annotated[NotificationListInput, Query()]
-) -> Page[NotificationListOutput]:
-    count_stmt = (
-        select(func.count())
-        .select_from(NotificationDelivery)
+@router.get("/", response_model=Page[NotificationOutput])
+async def get_notifications(query: Annotated[NotificationListInput, Query()], current_user: CurrentUserDep, db: DbDep):
+    """Lists all the In-App, SENT notifications of the user"""
+    stmt = (
+        select(NotificationDelivery)
         .join(Notification)
-        .where(Notification.user_id == current_user.id, NotificationDelivery.channel == NotificationChannel.INAPP)
+        .where(
+            Notification.user_id == current_user.id,
+            NotificationDelivery.channel == NotificationChannel.INAPP,
+            NotificationDelivery.status == NotificationStatus.SENT,
+        )
+        .options(contains_eager(NotificationDelivery.notification))
     )
-    total_count = await db.scalar(count_stmt) or 0
 
     order_column = (
         NotificationDelivery.created_at if query.order_by == "created_at" else NotificationDelivery.updated_at
     )
 
-    stmt = (
-        select(
-            NotificationDelivery.id,
-            NotificationDelivery.title,
-            NotificationDelivery.body,
-            NotificationDelivery.status,
-            NotificationDelivery.created_at,
-            Notification.data,
-        )
-        .join(Notification)
-        .where(Notification.user_id == current_user.id, NotificationDelivery.channel == NotificationChannel.INAPP)
-        .order_by(order_column.desc())
-        .limit(query.limit)
-        .offset(query.offset)
-    )
+    stmt = stmt.order_by(order_column)
+    result = await paginate(db, stmt, limit=query.limit, offset=query.offset)
 
-    result = await db.execute(stmt)
-    rows = result.all()
-
-    items = [
-        NotificationListOutput(
-            id=row[0],
-            title=row[1],
-            body=row[2],
-            status=row[3],
-            created_at=row[4],
-            data=row[5],
-        )
-        for row in rows
-    ]
-
-    return Page(count=total_count, items=items)
+    return result
 
 
-# Notifications Summary GET endpoint (Return the count of unread In-App notifications)
+# Notifications Summary GET endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 @router.get("/summary")
-async def count_unread_notifications(db: DbDep, current_user: CurrentUserDep) -> NotificationSummaryOutput:
+async def count_unread_notifications(current_user: CurrentUserDep, db: DbDep) -> NotificationSummaryOutput:
+    """Return the count of unread In-App, SENT notifications"""
     stmt = (
         select(func.count())
         .select_from(NotificationDelivery)
@@ -128,12 +94,13 @@ async def count_unread_notifications(db: DbDep, current_user: CurrentUserDep) ->
     return NotificationSummaryOutput(unread_count=count)
 
 
-# Read All Notifications POST endpoint (Read all notifications)
+# Read All Notifications POST endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 @router.post("/read-all")
-async def read_all_notifications(db: DbDep, current_user: CurrentUserDep):
+async def read_all_notifications(current_user: CurrentUserDep, db: DbDep):
+    """Read all SENT notifications"""
     subquery = (
         select(NotificationDelivery.id)
         .join(Notification)
@@ -146,58 +113,48 @@ async def read_all_notifications(db: DbDep, current_user: CurrentUserDep):
     stmt = (
         update(NotificationDelivery)
         .where(NotificationDelivery.id.in_(subquery))
-        .values(status=NotificationStatus.READ, read_at=datetime.now(), updated_at=datetime.now())
+        .values(status=NotificationStatus.READ, read_at=datetime.now())
     )
 
     await db.execute(stmt)
     await db.commit()
 
 
-# Notification GET endpoint (Return a specific notification)
+# Notification GET endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 @router.get("/{notification_id}")
-async def get_notification(db: DbDep, current_user: CurrentUserDep, notification_id: uuid.UUID):
+async def get_notification(notification_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep):
+    """Return a specific notification"""
     stmt = (
-        select(NotificationDelivery, Notification.data)
+        select(NotificationDelivery)
         .join(Notification)
         .where(
             NotificationDelivery.id == notification_id,
             Notification.user_id == current_user.id,
             NotificationDelivery.channel == NotificationChannel.INAPP,
+            NotificationDelivery.status == NotificationStatus.SENT,
         )
+        .options(contains_eager(NotificationDelivery.notification))
     )
 
     result = await db.execute(stmt)
-    notification = result.first()
+    notification = result.scalars().first()
 
     if notification is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
 
-    notification_delivery = notification.NotificationDelivery
-    notification_data = notification.data
-
-    return NotificationOutput(
-        id=notification_delivery.id,
-        data=notification_data,
-        recipient=notification_delivery.recipient,
-        title=notification_delivery.title,
-        body=notification_delivery.body,
-        status=notification_delivery.status,
-        sent_at=notification_delivery.sent_at,
-        read_at=notification_delivery.read_at,
-        created_at=notification_delivery.created_at,
-        updated_at=notification_delivery.updated_at,
-    )
+    return NotificationOutput.model_validate(notification)
 
 
-# Read Notification POST endpoint (Read a specific notification)
+# Read Notification POST endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 @router.post("/{notification_id}/read")
-async def read_notification(db: DbDep, current_user: CurrentUserDep, notification_id: uuid.UUID):
+async def read_notification(notification_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep):
+    """Read a specific SENT notification"""
     stmt = (
         select(NotificationDelivery)
         .join(Notification)
@@ -219,12 +176,13 @@ async def read_notification(db: DbDep, current_user: CurrentUserDep, notificatio
         await db.commit()
 
 
-# Unread Notification POST endpoint (Unread a specific notification)
+# Unread Notification POST endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 @router.post("/{notification_id}/unread")
-async def unread_notification(db: DbDep, current_user: CurrentUserDep, notification_id: uuid.UUID):
+async def unread_notification(notification_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep):
+    """Unread a specific SENT notification"""
     stmt = (
         select(NotificationDelivery)
         .join(Notification)
@@ -236,11 +194,11 @@ async def unread_notification(db: DbDep, current_user: CurrentUserDep, notificat
 
     if notification is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
-    elif notification.status == NotificationStatus.SENT:
-        return
-    else:
-        notification.status = NotificationStatus.SENT
-        notification.read_at = None
-        notification.updated_at = datetime.now()
 
-        await db.commit()
+    if notification.status == NotificationStatus.SENT:
+        return
+
+    notification.status = NotificationStatus.SENT
+    notification.read_at = None
+
+    await db.commit()

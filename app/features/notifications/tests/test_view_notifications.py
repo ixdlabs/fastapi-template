@@ -11,7 +11,7 @@ from app.features.notifications.models import NotificationChannel, NotificationS
 from app.features.notifications.tests.fixtures import NotificationFactory, NotificationDeliveryFactory
 
 
-client = TestClient(app, base_url="https://testserver")
+client = TestClient(app)
 
 
 async def force_login(user: User, db: AsyncSession):
