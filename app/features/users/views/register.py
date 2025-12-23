@@ -59,7 +59,7 @@ async def register(
     await db.commit()
     await db.refresh(user)
 
-    await audit_logger.log("create", new_resource=user, exclude_columns=["hashed_password"])
+    await audit_logger.log("create", new_resource=user, exclude_columns=["hashed_password"], db=db)
 
     await background.submit(send_welcome_email_task, user.id)
 
