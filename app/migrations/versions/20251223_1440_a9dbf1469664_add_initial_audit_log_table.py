@@ -1,9 +1,9 @@
 """
 Add initial audit log table
 
-Revision ID: cbeb6b3e94cd
-Revises: 18ff26d7e9b4
-Create Date: 2025-12-23 13:42:58.263332
+Revision ID: a9dbf1469664
+Revises: 569d31d15a62
+Create Date: 2025-12-23 14:40:51.980769
 """
 
 from typing import Sequence, Union
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "cbeb6b3e94cd"
-down_revision: Union[str, Sequence[str], None] = "18ff26d7e9b4"
+revision: str = "a9dbf1469664"
+down_revision: Union[str, Sequence[str], None] = "569d31d15a62"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
