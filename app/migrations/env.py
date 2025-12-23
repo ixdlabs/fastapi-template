@@ -13,6 +13,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
+import alembic_postgresql_enum  # noqa: F401
 
 from app.config.database import Base
 from app.config.logging import setup_logging
