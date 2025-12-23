@@ -10,6 +10,7 @@ Fast API Docs: https://fastapi.tiangolo.com/tutorial/sql-databases/
 
 from contextlib import asynccontextmanager
 from functools import lru_cache
+import logging
 from typing import Annotated, Iterable
 import uuid
 from fastapi import Depends
@@ -19,6 +20,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapper, RelationshipProperty
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.config.settings import SettingsDep
+
+logger = logging.getLogger(__name__)
 
 # The base class for ORM models.
 # ----------------------------------------------------------------------------------------------------------------------
@@ -95,7 +98,8 @@ class Base(DeclarativeBase):
 
 
 @lru_cache
-def create_db_engine(database_url: str, debug: bool = False):
+def create_db_engine(database_url: str, debug: bool = False, is_worker: bool = False):
+    logger.info("Creating database engine", extra={"database_url": database_url, "is_worker": is_worker})
     return create_async_engine(database_url, echo=debug)
 
 
@@ -121,5 +125,7 @@ DbDep = Annotated[AsyncSession, Depends(get_db_session)]
 
 @asynccontextmanager
 async def get_db(settings: SettingsDep):
-    async for session in get_db_session(settings):
+    engine = create_db_engine(settings.database_url, debug=settings.debug, is_worker=True)
+    session_maker = async_sessionmaker(engine)
+    async with session_maker() as session:
         yield session
