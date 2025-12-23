@@ -35,7 +35,7 @@ class AuditLogger:
 
             # Actor data
             self.data["actor_type"] = "anonymous" if track_current_user else "system"
-            if track_current_user and self.token is not None:
+            if track_current_user and self.token:
                 auth_user = get_current_user(self.token, self.authenticator)
                 self.data["actor_type"] = "user"
                 self.data["actor_id"] = auth_user.id
