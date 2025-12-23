@@ -1,9 +1,9 @@
 """
 Add initial notification table
 
-Revision ID: 18ff26d7e9b4
-Revises: 1562821e8c45
-Create Date: 2025-12-23 13:42:17.307681
+Revision ID: 569d31d15a62
+Revises: 219d937b4488
+Create Date: 2025-12-23 14:40:15.811520
 """
 
 from typing import Sequence, Union
@@ -13,13 +13,16 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "18ff26d7e9b4"
-down_revision: Union[str, Sequence[str], None] = "1562821e8c45"
+revision: str = "569d31d15a62"
+down_revision: Union[str, Sequence[str], None] = "219d937b4488"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    sa.Enum("PENDING", "SENT", "FAILED", "READ", name="notificationstatus").create(op.get_bind())
+    sa.Enum("EMAIL", "SMS", "INAPP", name="notificationchannel").create(op.get_bind())
+    sa.Enum("CUSTOM", "WELCOME", name="notificationtype").create(op.get_bind())
     op.create_table(
         "notifications",
         sa.Column("id", sa.UUID(), nullable=False),
@@ -64,3 +67,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("notification_delivery")
     op.drop_table("notifications")
+    sa.Enum("CUSTOM", "WELCOME", name="notificationtype").drop(op.get_bind())
+    sa.Enum("EMAIL", "SMS", "INAPP", name="notificationchannel").drop(op.get_bind())
+    sa.Enum("PENDING", "SENT", "FAILED", "READ", name="notificationstatus").drop(op.get_bind())
