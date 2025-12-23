@@ -1,5 +1,5 @@
 import factory
-from app.features.users.models import User
+from app.features.users.models import User, UserType
 
 
 class UserFactory(factory.Factory):
@@ -9,6 +9,7 @@ class UserFactory(factory.Factory):
     username = factory.Faker("user_name")
     first_name = factory.Faker("first_name")
     last_name = factory.Faker("last_name")
+    type = UserType.CUSTOMER
 
     @factory.post_generation
     def password(self, create, extracted, **kwargs):

@@ -16,7 +16,7 @@ import jwt
 from pydantic import BaseModel, ValidationError
 
 from app.config.settings import Settings, SettingsDep
-from app.features.users.models import User
+from app.features.users.models import User, UserType
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class AuthUser(BaseModel):
     id: uuid.UUID
+    type: UserType
     username: str
     first_name: str
     last_name: str
@@ -47,7 +48,13 @@ class Authenticator:
         access_expiration = current_time + timedelta(minutes=self.settings.jwt_access_expiration_minutes)
         refresh_expiration = current_time + timedelta(minutes=self.settings.jwt_refresh_expiration_minutes)
 
-        auth_user = AuthUser(id=user.id, username=user.username, first_name=user.first_name, last_name=user.last_name)
+        auth_user = AuthUser(
+            id=user.id,
+            type=user.type,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+        )
         access_payload = {"sub": str(user.id), "exp": access_expiration, "user": auth_user.model_dump_json()}
         refresh_payload = {"sub": str(user.id), "exp": refresh_expiration}
 

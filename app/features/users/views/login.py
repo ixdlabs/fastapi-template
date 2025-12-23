@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.config.auth import AuthenticatorDep
 from app.config.database import DbDep
 from app.config.exceptions import raises
-from app.features.users.models import User
+from app.features.users.models import User, UserType
 
 
 class LoginInput(BaseModel):
@@ -23,6 +23,7 @@ class LoginOutput(BaseModel):
 
 class LoginOutputUser(BaseModel):
     id: uuid.UUID
+    type: UserType
     username: str
     first_name: str
     last_name: str
@@ -73,6 +74,7 @@ async def login(form: LoginInput, db: DbDep, authenticator: AuthenticatorDep) ->
         refresh_token=refresh_token,
         user=LoginOutputUser(
             id=user.id,
+            type=user.type,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,

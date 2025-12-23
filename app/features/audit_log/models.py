@@ -14,9 +14,9 @@ from app.config.database import Base
 
 
 class ActorType(enum.Enum):
-    USER = "USER"
-    SYSTEM = "SYSTEM"
-    ANONYMOUS = "ANONYMOUS"
+    USER = "user"
+    SYSTEM = "system"
+    ANONYMOUS = "anonymous"
 
 
 class AuditLog(Base):

@@ -7,7 +7,7 @@ import logging
 from app.config.auth import AuthenticatorDep, AuthException
 from app.config.database import DbDep
 from app.config.exceptions import raises
-from app.features.users.models import User
+from app.features.users.models import User, UserType
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ class RefreshOutput(BaseModel):
 
 class RefreshOutputUser(BaseModel):
     id: uuid.UUID
+    type: UserType
     username: str
     first_name: str
     last_name: str
@@ -58,6 +59,7 @@ async def refresh(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep
         refresh_token=refresh_token,
         user=RefreshOutputUser(
             id=user.id,
+            type=user.type,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,

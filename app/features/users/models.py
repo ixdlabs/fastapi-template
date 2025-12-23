@@ -1,4 +1,5 @@
 from datetime import datetime
+import enum
 import uuid
 import typing
 
@@ -9,17 +10,28 @@ from app.config.database import Base
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
-from sqlalchemy import UUID, String, DateTime
+from sqlalchemy import UUID, Enum, String, DateTime
 
 if typing.TYPE_CHECKING:
     from app.features.notifications.models import Notification
+
+
+class UserType(enum.Enum):
+    ADMIN = "admin"
+    CUSTOMER = "customer"
+
+
+# User
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    type: Mapped[UserType] = mapped_column(Enum(UserType))
     username: Mapped[str] = mapped_column(String, unique=True)
+
     first_name: Mapped[str] = mapped_column(String)
     last_name: Mapped[str] = mapped_column(String)
     hashed_password: Mapped[str] = mapped_column(String)

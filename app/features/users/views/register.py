@@ -8,7 +8,7 @@ from app.config.auth import AuthenticatorDep
 from app.config.background import BackgroundDep
 from app.config.database import DbDep
 from app.config.exceptions import raises
-from app.features.users.models import User
+from app.features.users.models import User, UserType
 from app.features.users.tasks.welcome_email import send_welcome_email_task
 
 
@@ -27,6 +27,7 @@ class RegisterOutput(BaseModel):
 
 class RegisterOutputUser(BaseModel):
     id: uuid.UUID
+    type: UserType
     username: str
     first_name: str
     last_name: str
@@ -54,7 +55,7 @@ async def register(
     if user is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
 
-    user = User(username=form.username, first_name=form.first_name, last_name=form.last_name)
+    user = User(username=form.username, type=UserType.CUSTOMER, first_name=form.first_name, last_name=form.last_name)
     user.set_password(form.password)
 
     db.add(user)
@@ -71,6 +72,7 @@ async def register(
         refresh_token=refresh_token,
         user=RegisterOutputUser(
             id=user.id,
+            type=user.type,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,
