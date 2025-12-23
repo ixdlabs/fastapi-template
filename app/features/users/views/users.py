@@ -37,8 +37,8 @@ class UserDetailOutput(BaseModel):
 
 
 class UserUpdateInput(BaseModel):
-    first_name: str
-    last_name: str
+    first_name: str = Field(..., min_length=1, max_length=256)
+    last_name: str = Field(..., min_length=1, max_length=256)
 
 
 router = APIRouter()

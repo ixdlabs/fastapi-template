@@ -1,7 +1,7 @@
 from typing import Annotated
 import uuid
 from fastapi import APIRouter, HTTPException, status, Form
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.config.auth import AuthenticatorDep
@@ -10,8 +10,8 @@ from app.features.users.models import User
 
 
 class LoginInput(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., min_length=3, max_length=64)
+    password: str = Field(..., min_length=1, max_length=128)
 
 
 class LoginOutput(BaseModel):

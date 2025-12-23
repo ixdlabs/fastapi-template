@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.config.audit_log import AuditLoggerDep
@@ -12,10 +12,10 @@ from app.features.users.tasks.welcome_email import send_welcome_email_task
 
 
 class RegisterInput(BaseModel):
-    username: str
-    password: str
-    first_name: str
-    last_name: str
+    username: str = Field(..., min_length=3, max_length=64)
+    password: str = Field(..., min_length=1, max_length=128)
+    first_name: str = Field(..., min_length=1, max_length=256)
+    last_name: str = Field(..., min_length=1, max_length=256)
 
 
 class RegisterOutput(BaseModel):

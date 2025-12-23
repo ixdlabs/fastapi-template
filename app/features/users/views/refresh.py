@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 import logging
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class RefreshInput(BaseModel):
-    refresh_token: str
+    refresh_token: str = Field(..., min_length=1)
 
 
 class RefreshOutput(BaseModel):
