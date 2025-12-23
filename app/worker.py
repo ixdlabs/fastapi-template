@@ -1,4 +1,6 @@
 import logging
+import os
+import time
 
 from celery import Celery
 from celery.signals import worker_process_init
@@ -15,7 +17,8 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 setup_logging(settings)
 
-settings = get_settings()
+os.environ["TZ"] = settings.server_timezone
+time.tzset()
 
 app = Celery("tasks", broker=settings.celery_broker_url)
 app.conf.task_always_eager = settings.celery_task_always_eager

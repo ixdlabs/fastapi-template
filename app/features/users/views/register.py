@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
@@ -10,7 +10,7 @@ from app.config.background import BackgroundDep
 from app.config.database import DbDep
 from app.config.exceptions import raises
 from app.features.users.models import User, UserType
-from app.features.users.tasks.welcome_email import send_welcome_email_task
+from app.features.users.tasks.email_verification import send_email_verification_email_task
 
 
 class RegisterInput(BaseModel):
@@ -53,11 +53,18 @@ async def register(
     audit_logger: AuditLoggerDep,
 ) -> RegisterOutput:
     """Register a new user."""
-    stmt = select(User).where(User.username == form.username)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-    if user is not None:
+    username_check_stmt = select(User).where(User.username == form.username)
+    username_check_result = await db.execute(username_check_stmt)
+    username_check_user = username_check_result.scalar_one_or_none()
+    if username_check_user is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
+
+    if form.email is not None:
+        email_check_stmt = select(User).where(User.email == form.email)
+        email_check_result = await db.execute(email_check_stmt)
+        email_check_user = email_check_result.scalar_one_or_none()
+        if email_check_user is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
 
     user = User(
         username=form.username,
@@ -66,7 +73,7 @@ async def register(
         last_name=form.last_name,
         email=form.email,
         email_verified=False,
-        joined_at=datetime.now(timezone.utc),
+        joined_at=datetime.now(),
     )
     user.set_password(form.password)
 
@@ -75,7 +82,8 @@ async def register(
     await db.refresh(user)
 
     await audit_logger.log("create", new_resource=user, exclude_columns=["hashed_password"])
-    await background.submit(send_welcome_email_task, user.id)
+    if user.email is not None:
+        await background.submit(send_email_verification_email_task, user.id)
 
     access_token, refresh_token = authenticator.encode(user)
     return RegisterOutput(

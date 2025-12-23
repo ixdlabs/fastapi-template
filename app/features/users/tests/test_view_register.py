@@ -12,13 +12,20 @@ client = TestClient(app)
 
 @pytest.mark.asyncio
 async def test_user_can_register_with_valid_data(db_fixture: AsyncSession):
-    user_data = {"username": "newuser", "first_name": "New", "last_name": "User", "password": "newpassword"}
+    user_data = {
+        "username": "newuser",
+        "first_name": "New",
+        "last_name": "User",
+        "password": "newpassword",
+        "email": "newuser@example.com",
+    }
     response = client.post("/api/auth/register", json=user_data)
     assert response.status_code == 201
     data = response.json()
     assert data["user"]["username"] == user_data["username"]
     assert data["user"]["first_name"] == user_data["first_name"]
     assert data["user"]["last_name"] == user_data["last_name"]
+    assert data["user"]["email"] == user_data["email"]
 
     stmt = select(User).where(User.username == user_data["username"])
     result = await db_fixture.execute(stmt)
@@ -43,3 +50,22 @@ async def test_user_cannot_register_with_existing_username(db_fixture: AsyncSess
     response = client.post("/api/auth/register", json=user_data)
     assert response.status_code == 400
     assert response.json() == {"detail": "Username already exists"}
+
+
+@pytest.mark.asyncio
+async def test_user_cannot_register_with_existing_email(db_fixture: AsyncSession):
+    existing_user: User = UserFactory.build(email="existing@example.com")
+    db_fixture.add(existing_user)
+    await db_fixture.commit()
+    await db_fixture.refresh(existing_user)
+
+    user_data = {
+        "username": "uniqueusername",
+        "first_name": "Another",
+        "last_name": "User",
+        "password": "anotherpassword",
+        "email": "existing@example.com",
+    }
+    response = client.post("/api/auth/register", json=user_data)
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Email already exists"}
