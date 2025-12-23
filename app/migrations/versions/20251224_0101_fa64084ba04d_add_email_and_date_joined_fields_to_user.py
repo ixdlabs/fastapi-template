@@ -20,7 +20,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.add_column("users", sa.Column("email", sa.String(), nullable=True))
-    op.add_column("users", sa.Column("email_verified", sa.Boolean(), nullable=False, server_default=sa.false()))
     op.add_column("users", sa.Column("joined_at", sa.DateTime(), nullable=True))
     op.execute("UPDATE users SET joined_at = created_at WHERE joined_at IS NULL")
     with op.batch_alter_table("users") as batch_op:
@@ -32,5 +31,4 @@ def downgrade() -> None:
     with op.batch_alter_table("users") as batch_op:
         batch_op.drop_constraint("uq_users_email", type_="unique")
         batch_op.drop_column("joined_at")
-        batch_op.drop_column("email_verified")
         batch_op.drop_column("email")

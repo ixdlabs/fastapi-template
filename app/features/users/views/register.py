@@ -10,7 +10,7 @@ from app.config.background import BackgroundDep
 from app.config.database import DbDep
 from app.config.exceptions import raises
 from app.features.users.models import User, UserType
-from app.features.users.tasks.email_verification import send_email_verification_email_task
+from app.features.users.tasks.email_verification import SendEmailVerificationInput, send_email_verification_email_task
 
 
 class RegisterInput(BaseModel):
@@ -33,7 +33,6 @@ class RegisterOutputUser(BaseModel):
     username: str
     first_name: str
     last_name: str
-    email: str | None
     joined_at: datetime
 
 
@@ -71,8 +70,6 @@ async def register(
         type=UserType.CUSTOMER,
         first_name=form.first_name,
         last_name=form.last_name,
-        email=form.email,
-        email_verified=False,
         joined_at=datetime.now(),
     )
     user.set_password(form.password)
@@ -82,8 +79,9 @@ async def register(
     await db.refresh(user)
 
     await audit_logger.log("create", new_resource=user, exclude_columns=["hashed_password"])
-    if user.email is not None:
-        await background.submit(send_email_verification_email_task, user.id)
+    if form.email is not None:
+        task_input = SendEmailVerificationInput(user_id=user.id, email=form.email)
+        await background.submit(send_email_verification_email_task, task_input.model_dump_json())
 
     access_token, refresh_token = authenticator.encode(user)
     return RegisterOutput(
@@ -95,7 +93,6 @@ async def register(
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,
-            email=user.email,
             joined_at=user.joined_at,
         ),
     )

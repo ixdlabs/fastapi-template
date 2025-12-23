@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.testclient import TestClient
 from app.config.auth import Authenticator
+from app.conftest import NoOpBackground
 from app.features.users.models import User, UserType
 from app.features.users.tests.fixtures import UserFactory
 from app.main import app
@@ -308,3 +309,50 @@ async def test_admin_cannot_update_nonexistent_user_profile(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "User not found"}
+
+
+@pytest.mark.asyncio
+async def test_user_update_email_triggers_verification(
+    db_fixture: AsyncSession, authenticator_fixture: Authenticator, background_fixture: NoOpBackground
+):
+    user: User = UserFactory.build(password__raw="testpassword", email="test@example.com")
+    db_fixture.add(user)
+    await db_fixture.commit()
+    await db_fixture.refresh(user)
+
+    token, _ = authenticator_fixture.encode(user)
+    update_data = {"first_name": "NewFirst", "last_name": "NewLast", "email": "newemail@example.com"}
+    response = client.put(
+        f"/api/v1/users/{user.id}",
+        json=update_data,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["first_name"] == "NewFirst"
+    assert data["last_name"] == "NewLast"
+    assert data["email"] == "test@example.com"
+
+    assert "send_email_verification_email_task" in background_fixture.called_tasks
+
+
+@pytest.mark.asyncio
+async def test_user_update_email_to_existing_email_fails(
+    db_fixture: AsyncSession, authenticator_fixture: Authenticator
+):
+    existing_user: User = UserFactory.build(email="existing@example.com")
+    user: User = UserFactory.build(password__raw="testpassword", email="user@example.com")
+    db_fixture.add_all([existing_user, user])
+    await db_fixture.commit()
+    await db_fixture.refresh(existing_user)
+    await db_fixture.refresh(user)
+
+    token, _ = authenticator_fixture.encode(user)
+    update_data = {"first_name": "NewFirst", "last_name": "NewLast", "email": "existing@example.com"}
+    response = client.put(
+        f"/api/v1/users/{user.id}",
+        json=update_data,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Email already exists"}

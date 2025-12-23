@@ -11,7 +11,6 @@ class UserFactory(factory.Factory):
     last_name = factory.Faker("last_name")
     type = UserType.CUSTOMER
     email = factory.Faker("email")
-    email_verified = True
     joined_at = factory.Faker("date_time_this_decade")
 
     @factory.post_generation

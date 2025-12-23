@@ -95,11 +95,13 @@ def authenticator_fixture(settings_fixture: Settings):
 
 
 class NoOpBackground(Background):
+    called_tasks: list[str] = []
+
     async def submit(self, fn, *args, **kwargs):
-        pass
+        self.called_tasks.append(fn.__name__)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def background_fixture(settings_fixture: Settings):
     return NoOpBackground(settings_fixture)
 

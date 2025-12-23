@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
 
+from app.conftest import NoOpBackground
 from app.features.users.models import User
 from app.features.users.tests.fixtures import UserFactory
 from app.main import app
@@ -11,7 +12,7 @@ client = TestClient(app)
 
 
 @pytest.mark.asyncio
-async def test_user_can_register_with_valid_data(db_fixture: AsyncSession):
+async def test_user_can_register_with_valid_data(db_fixture: AsyncSession, background_fixture: NoOpBackground):
     user_data = {
         "username": "newuser",
         "first_name": "New",
@@ -25,13 +26,14 @@ async def test_user_can_register_with_valid_data(db_fixture: AsyncSession):
     assert data["user"]["username"] == user_data["username"]
     assert data["user"]["first_name"] == user_data["first_name"]
     assert data["user"]["last_name"] == user_data["last_name"]
-    assert data["user"]["email"] == user_data["email"]
 
     stmt = select(User).where(User.username == user_data["username"])
     result = await db_fixture.execute(stmt)
     user = result.scalar_one_or_none()
     assert user is not None
     assert user.check_password(user_data["password"])
+
+    assert "send_email_verification_email_task" in background_fixture.called_tasks
 
 
 @pytest.mark.asyncio

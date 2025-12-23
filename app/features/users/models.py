@@ -31,13 +31,11 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     type: Mapped[UserType] = mapped_column(Enum(UserType))
     username: Mapped[str] = mapped_column(String, unique=True)
+    email: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
 
     first_name: Mapped[str] = mapped_column(String)
     last_name: Mapped[str] = mapped_column(String)
     hashed_password: Mapped[str] = mapped_column(String)
-
-    email: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
-    email_verified: Mapped[bool] = mapped_column(default=False)
 
     joined_at: Mapped[datetime] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -74,7 +72,9 @@ class UserEmailVerification(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID)
-    state: Mapped[UserEmailVerificationState] = mapped_column(Enum(UserEmailVerificationState))
+    state: Mapped[UserEmailVerificationState] = mapped_column(
+        Enum(UserEmailVerificationState), default=UserEmailVerificationState.PENDING
+    )
 
     email: Mapped[str] = mapped_column(String)
     hashed_verification_token: Mapped[str] = mapped_column(String)

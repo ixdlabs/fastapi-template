@@ -6,12 +6,14 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from app.config.auth import CurrentUserDep
+from app.config.background import BackgroundDep
 from app.config.cache import CacheDep
 from app.config.database import DbDep
 from app.config.exceptions import raises
 from app.config.pagination import Page, paginate
 from app.config.rate_limit import RateLimitDep
 from app.features.users.models import User, UserType
+from app.features.users.tasks.email_verification import SendEmailVerificationInput, send_email_verification_email_task
 
 
 class UserFilterInput(BaseModel):
@@ -36,7 +38,6 @@ class UserDetailOutput(BaseModel):
     first_name: str
     last_name: str
     email: str | None
-    email_verified: bool
     joined_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -80,7 +81,6 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
         first_name=user.first_name,
         last_name=user.last_name,
         email=user.email,
-        email_verified=user.email_verified,
         joined_at=user.joined_at,
         created_at=user.created_at,
         updated_at=user.updated_at,
@@ -164,7 +164,7 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 @raises(status.HTTP_404_NOT_FOUND)
 @router.put("/{user_id}")
 async def update_user(
-    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_user: CurrentUserDep
+    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_user: CurrentUserDep, background: BackgroundDep
 ) -> UserDetailOutput:
     """Update a user's first and last name."""
     if current_user.type != UserType.ADMIN and current_user.id != user_id:
@@ -178,9 +178,18 @@ async def update_user(
 
     user.first_name = form.first_name
     user.last_name = form.last_name
-    if user.email != form.email:
-        user.email = form.email
-        user.email_verified = False  # Reset email verification on email change
+
+    # If email is being updated, check for uniqueness and send verification email
+    if form.email is not None and user.email != form.email:
+        email_stmt = select(User).where(User.email == form.email).where(User.id != user.id)
+        email_result = await db.execute(email_stmt)
+        email_user = email_result.scalar_one_or_none()
+        if email_user is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
+
+        task_input = SendEmailVerificationInput(user_id=user.id, email=form.email)
+        await background.submit(send_email_verification_email_task, task_input.model_dump_json())
+
     await db.commit()
     await db.refresh(user)
 
@@ -191,7 +200,6 @@ async def update_user(
         first_name=user.first_name,
         last_name=user.last_name,
         email=user.email,
-        email_verified=user.email_verified,
         joined_at=user.joined_at,
         created_at=user.created_at,
         updated_at=user.updated_at,
