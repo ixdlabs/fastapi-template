@@ -57,6 +57,8 @@ def db_engine_fixture(setup_logging_fixture: None):
     alembic_cfg.set_main_option("script_location", "app/migrations")
     alembic_cfg.attributes["connection"] = engine
     command.upgrade(alembic_cfg, "head")
+    command.downgrade(alembic_cfg, "base")
+    command.upgrade(alembic_cfg, "head")
     logger.info("Migrations applied for test database.")
 
     yield engine

@@ -1,6 +1,7 @@
+from datetime import datetime, timezone
 import uuid
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from app.config.audit_log import AuditLoggerDep
@@ -17,6 +18,7 @@ class RegisterInput(BaseModel):
     password: str = Field(..., min_length=1, max_length=128)
     first_name: str = Field(..., min_length=1, max_length=256)
     last_name: str = Field(..., min_length=1, max_length=256)
+    email: EmailStr | None = Field(None, max_length=320)
 
 
 class RegisterOutput(BaseModel):
@@ -31,6 +33,8 @@ class RegisterOutputUser(BaseModel):
     username: str
     first_name: str
     last_name: str
+    email: str | None
+    joined_at: datetime
 
 
 router = APIRouter()
@@ -55,7 +59,15 @@ async def register(
     if user is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
 
-    user = User(username=form.username, type=UserType.CUSTOMER, first_name=form.first_name, last_name=form.last_name)
+    user = User(
+        username=form.username,
+        type=UserType.CUSTOMER,
+        first_name=form.first_name,
+        last_name=form.last_name,
+        email=form.email,
+        email_verified=False,
+        joined_at=datetime.now(timezone.utc),
+    )
     user.set_password(form.password)
 
     db.add(user)
@@ -63,7 +75,6 @@ async def register(
     await db.refresh(user)
 
     await audit_logger.log("create", new_resource=user, exclude_columns=["hashed_password"])
-
     await background.submit(send_welcome_email_task, user.id)
 
     access_token, refresh_token = authenticator.encode(user)
@@ -76,5 +87,7 @@ async def register(
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,
+            email=user.email,
+            joined_at=user.joined_at,
         ),
     )

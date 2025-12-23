@@ -36,6 +36,10 @@ class User(Base):
     last_name: Mapped[str] = mapped_column(String)
     hashed_password: Mapped[str] = mapped_column(String)
 
+    email: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
+    email_verified: Mapped[bool] = mapped_column(default=False)
+
+    joined_at: Mapped[datetime] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 

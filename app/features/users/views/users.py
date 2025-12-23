@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 import uuid
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from app.config.auth import CurrentUserDep
@@ -35,6 +35,9 @@ class UserDetailOutput(BaseModel):
     username: str
     first_name: str
     last_name: str
+    email: str | None
+    email_verified: bool
+    joined_at: datetime
     created_at: datetime
     updated_at: datetime
 
@@ -42,6 +45,7 @@ class UserDetailOutput(BaseModel):
 class UserUpdateInput(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=256)
     last_name: str = Field(..., min_length=1, max_length=256)
+    email: EmailStr | None = Field(None, max_length=320)
 
 
 router = APIRouter()
@@ -75,6 +79,9 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
         username=user.username,
         first_name=user.first_name,
         last_name=user.last_name,
+        email=user.email,
+        email_verified=user.email_verified,
+        joined_at=user.joined_at,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
@@ -171,6 +178,9 @@ async def update_user(
 
     user.first_name = form.first_name
     user.last_name = form.last_name
+    if user.email != form.email:
+        user.email = form.email
+        user.email_verified = False  # Reset email verification on email change
     await db.commit()
     await db.refresh(user)
 
@@ -180,6 +190,9 @@ async def update_user(
         username=user.username,
         first_name=user.first_name,
         last_name=user.last_name,
+        email=user.email,
+        email_verified=user.email_verified,
+        joined_at=user.joined_at,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )

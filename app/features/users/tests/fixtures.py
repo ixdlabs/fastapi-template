@@ -10,6 +10,9 @@ class UserFactory(factory.Factory):
     first_name = factory.Faker("first_name")
     last_name = factory.Faker("last_name")
     type = UserType.CUSTOMER
+    email = factory.Faker("email")
+    email_verified = True
+    joined_at = factory.Faker("date_time_this_decade")
 
     @factory.post_generation
     def password(self, create, extracted, **kwargs):

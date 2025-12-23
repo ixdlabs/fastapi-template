@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.testclient import TestClient
 from app.config.auth import Authenticator
-from app.features.users.models import User
+from app.features.users.models import User, UserType
 from app.features.users.tests.fixtures import UserFactory
 from app.main import app
 
@@ -63,7 +63,7 @@ async def test_user_can_not_access_nonexistent_user(db_fixture: AsyncSession, au
 
 @pytest.mark.asyncio
 async def test_admin_can_access_other_user_detail(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
-    admin_user: User = UserFactory.build(type="ADMIN", password__raw="adminpassword")
+    admin_user: User = UserFactory.build(type=UserType.ADMIN, password__raw="adminpassword")
     normal_user: User = UserFactory.build(password__raw="userpassword")
     db_fixture.add_all([admin_user, normal_user])
     await db_fixture.commit()
@@ -81,7 +81,7 @@ async def test_admin_can_access_other_user_detail(db_fixture: AsyncSession, auth
 
 @pytest.mark.asyncio
 async def test_admin_can_not_access_nonexistent_user(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
-    admin_user: User = UserFactory.build(type="ADMIN", password__raw="adminpassword")
+    admin_user: User = UserFactory.build(type=UserType.ADMIN, password__raw="adminpassword")
     db_fixture.add(admin_user)
     await db_fixture.commit()
     await db_fixture.refresh(admin_user)
@@ -167,7 +167,7 @@ async def test_user_cannot_delete_other_user_account(db_fixture: AsyncSession, a
 
 @pytest.mark.asyncio
 async def test_admin_can_delete_other_user_account(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
-    admin_user: User = UserFactory.build(type="ADMIN", password__raw="adminpassword")
+    admin_user: User = UserFactory.build(type=UserType.ADMIN, password__raw="adminpassword")
     normal_user: User = UserFactory.build(password__raw="userpassword")
     db_fixture.add_all([admin_user, normal_user])
     await db_fixture.commit()
@@ -187,7 +187,7 @@ async def test_admin_can_delete_other_user_account(db_fixture: AsyncSession, aut
 
 @pytest.mark.asyncio
 async def test_admin_cannot_delete_nonexistent_user(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
-    admin_user: User = UserFactory.build(type="ADMIN", password__raw="adminpassword")
+    admin_user: User = UserFactory.build(type=UserType.ADMIN, password__raw="adminpassword")
     db_fixture.add(admin_user)
     await db_fixture.commit()
     await db_fixture.refresh(admin_user)
@@ -261,7 +261,7 @@ async def test_user_cannot_update_other_user_profile(db_fixture: AsyncSession, a
 
 @pytest.mark.asyncio
 async def test_admin_can_update_other_user_profile(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
-    admin_user: User = UserFactory.build(type="ADMIN", password__raw="adminpassword")
+    admin_user: User = UserFactory.build(type=UserType.ADMIN, password__raw="adminpassword")
     normal_user: User = UserFactory.build(password__raw="userpassword", first_name="OldFirst", last_name="OldLast")
     db_fixture.add_all([admin_user, normal_user])
     await db_fixture.commit()
@@ -293,7 +293,7 @@ async def test_admin_can_update_other_user_profile(db_fixture: AsyncSession, aut
 async def test_admin_cannot_update_nonexistent_user_profile(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator
 ):
-    admin_user: User = UserFactory.build(type="ADMIN", password__raw="adminpassword")
+    admin_user: User = UserFactory.build(type=UserType.ADMIN, password__raw="adminpassword")
     db_fixture.add(admin_user)
     await db_fixture.commit()
     await db_fixture.refresh(admin_user)
