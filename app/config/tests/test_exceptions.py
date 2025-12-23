@@ -70,8 +70,9 @@ async def test_custom_exception_handler_logs_unexpected_error(test_app: FastAPI,
 def test_raises_adds_metadata_to_function():
     @raises(status.HTTP_400_BAD_REQUEST)
     def foo():
-        pass
+        return 123
 
+    assert foo() == 123
     assert hasattr(foo, "__raises__")
     assert isinstance(foo.__raises__, dict)
     assert status.HTTP_400_BAD_REQUEST in foo.__raises__
@@ -80,24 +81,27 @@ def test_raises_adds_metadata_to_function():
 def test_raises_uses_explicit_reason_when_provided():
     @raises(status.HTTP_400_BAD_REQUEST, reason="Custom reason")
     def foo():
-        pass
+        return 123
 
+    assert foo() == 123
     assert foo.__raises__[status.HTTP_400_BAD_REQUEST] == ["Custom reason"]
 
 
 def test_raises_uses_common_cause_when_reason_not_provided():
     @raises(status.HTTP_404_NOT_FOUND)
     def foo():
-        pass
+        return 123
 
+    assert foo() == 123
     assert foo.__raises__[status.HTTP_404_NOT_FOUND] == ["The requested resource could not be found."]
 
 
 def test_raises_falls_back_to_string_when_no_common_cause_exists():
     @raises(418)  # I'm a teapot (not in possible_common_causes)
     def foo():
-        pass
+        return 123
 
+    assert foo() == 123
     assert foo.__raises__[418] == ["string"]
 
 
@@ -105,8 +109,9 @@ def test_raises_accumulates_multiple_status_codes():
     @raises(status.HTTP_400_BAD_REQUEST)
     @raises(status.HTTP_401_UNAUTHORIZED)
     def foo():
-        pass
+        return 123
 
+    assert foo() == 123
     assert set(foo.__raises__.keys()) == {status.HTTP_400_BAD_REQUEST, status.HTTP_401_UNAUTHORIZED}
 
 
@@ -114,15 +119,17 @@ def test_raises_accumulates_multiple_reasons_for_same_status_code():
     @raises(status.HTTP_400_BAD_REQUEST, reason="Reason one")
     @raises(status.HTTP_400_BAD_REQUEST, reason="Reason two")
     def foo():
-        pass
+        return 123
 
+    assert foo() == 123
     assert foo.__raises__[status.HTTP_400_BAD_REQUEST] == ["Reason two", "Reason one"]
 
 
 def test_raises_preserves_existing_raises_metadata():
     def foo():
-        pass
+        return 123
 
+    assert foo() == 123
     existing_reason_default_dict = defaultdict(list)
     existing_reason_default_dict[status.HTTP_403_FORBIDDEN].append("Existing reason")
     setattr(foo, "__raises__", existing_reason_default_dict)
@@ -134,7 +141,8 @@ def test_raises_preserves_existing_raises_metadata():
 
 def test_raises_returns_same_function_object():
     def foo():
-        pass
+        return 123
 
+    assert foo() == 123
     decorated = raises(status.HTTP_400_BAD_REQUEST)(foo)
     assert decorated is foo

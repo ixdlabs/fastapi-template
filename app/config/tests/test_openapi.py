@@ -36,8 +36,9 @@ def app_fixture():
 
     @app.get("/items")
     def get_items():
-        pass
+        return "items"
 
+    assert get_items() == "items"
     return app
 
 
@@ -78,7 +79,9 @@ def test_custom_adds_raises_metadata_to_openapi():
     @raises(status.HTTP_404_NOT_FOUND)
     @app.get("/items")
     def get_items():
-        pass
+        return "items"
+
+    assert get_items() == "items"
 
     schema = openapi.custom(app)()
     responses = schema["paths"]["/items"]["get"]["responses"]
@@ -92,7 +95,9 @@ def test_custom_ignores_routes_not_in_schema():
     @raises(status.HTTP_400_BAD_REQUEST, reason="Bad request")
     @app.get("/hidden", include_in_schema=False)
     def hidden():
-        pass
+        return "hidden"
+
+    assert hidden() == "hidden"
 
     schema = openapi.custom(app)()
     assert "/hidden" not in schema["paths"]
@@ -104,7 +109,9 @@ def test_custom_calls_add_route_response(monkeypatch):
     @raises(status.HTTP_400_BAD_REQUEST, reason="Bad request")
     @app.get("/items")
     def get_items():
-        pass
+        return "items"
+
+    assert get_items() == "items"
 
     spy = MagicMock()
     monkeypatch.setattr("app.config.openapi.add_route_response", spy)
