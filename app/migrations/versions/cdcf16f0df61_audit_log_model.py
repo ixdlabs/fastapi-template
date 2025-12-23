@@ -1,9 +1,9 @@
 """
 audit log model
 
-Revision ID: 4b36299df787
+Revision ID: cdcf16f0df61
 Revises: 8fe065d4a4de
-Create Date: 2025-12-23 11:08:53.402695
+Create Date: 2025-12-23 11:16:53.733017
 """
 
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "4b36299df787"
+revision: str = "cdcf16f0df61"
 down_revision: Union[str, Sequence[str], None] = "8fe065d4a4de"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.Column("old_value", sa.JSON(), nullable=True),
         sa.Column("new_value", sa.JSON(), nullable=True),
         sa.Column("changed_value", sa.JSON(), nullable=True),
-        sa.Column("request_id", sa.String(), nullable=True),
+        sa.Column("trace_id", sa.String(), nullable=True),
         sa.Column("request_ip_address", sa.String(), nullable=True),
         sa.Column("request_user_agent", sa.String(), nullable=True),
         sa.Column("request_method", sa.String(), nullable=True),

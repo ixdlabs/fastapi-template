@@ -35,7 +35,7 @@ class AuditLog(Base):
     new_value: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     changed_value: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
-    request_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String, nullable=True)
     request_ip_address: Mapped[str | None] = mapped_column(String, nullable=True)
     request_user_agent: Mapped[str | None] = mapped_column(String, nullable=True)
     request_method: Mapped[str | None] = mapped_column(String, nullable=True)
