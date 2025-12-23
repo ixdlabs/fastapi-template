@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.config.auth import CurrentUserDep
 from app.config.cache import CacheDep
 from app.config.database import DbDep
+from app.config.exceptions import raises
 from app.config.pagination import Page, paginate
 from app.config.rate_limit import RateLimitDep
 from app.features.users.models import User
@@ -47,6 +48,8 @@ router = APIRouter()
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED)
+@raises(status.HTTP_403_FORBIDDEN)
 @router.get("/{user_id}")
 async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep, cache: CacheDep) -> UserDetailOutput:
     """Get detailed information about a specific user."""
@@ -80,6 +83,7 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_429_TOO_MANY_REQUESTS)
 @router.get("/")
 async def user_list(
     db: DbDep, query: Annotated[UserFilterInput, Query()], rate_limit: RateLimitDep, cache: CacheDep
@@ -119,6 +123,8 @@ async def user_list(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED)
+@raises(status.HTTP_403_FORBIDDEN)
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep) -> None:
     """Delete a user by ID."""
@@ -138,6 +144,8 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED)
+@raises(status.HTTP_403_FORBIDDEN)
 @router.put("/{user_id}")
 async def update_user(
     user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_user: CurrentUserDep

@@ -1,8 +1,9 @@
 import uuid
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 from pydantic import BaseModel
 
 from app.config.auth import CurrentUserDep
+from app.config.exceptions import raises
 
 
 class MeOutput(BaseModel):
@@ -18,6 +19,7 @@ router = APIRouter()
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED)
 @router.get("/me")
 async def me(current_user: CurrentUserDep) -> MeOutput:
     """Get details of the current authenticated user."""

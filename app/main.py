@@ -31,6 +31,7 @@ app = FastAPI(
 
 db_engine = create_db_engine_from_settings(settings)
 setup_open_telemetry(app, db_engine, settings)
+app.openapi = openapi.custom(app)  # type: ignore[method-assign]
 
 app.include_router(openapi.router)
 app.include_router(router_registry.router)

@@ -6,6 +6,7 @@ import logging
 
 from app.config.auth import AuthenticatorDep, AuthException
 from app.config.database import DbDep
+from app.config.exceptions import raises
 from app.features.users.models import User
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ router = APIRouter()
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
 @router.post("/refresh")
 async def refresh(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep) -> RefreshOutput:
     """Refresh the user's tokens using refresh token."""
@@ -42,7 +44,7 @@ async def refresh(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep
         user_id = authenticator.sub(form.refresh_token)
     except AuthException as e:
         logger.warning("token validation failed", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials") from e
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from e
 
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)

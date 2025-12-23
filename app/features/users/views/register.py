@@ -7,6 +7,7 @@ from app.config.audit_log import AuditLoggerDep
 from app.config.auth import AuthenticatorDep
 from app.config.background import BackgroundDep
 from app.config.database import DbDep
+from app.config.exceptions import raises
 from app.features.users.models import User
 from app.features.users.tasks.welcome_email import send_welcome_email_task
 
@@ -37,6 +38,7 @@ router = APIRouter()
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_400_BAD_REQUEST)
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     form: RegisterInput,

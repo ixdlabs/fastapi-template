@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.config.auth import AuthenticatorDep
 from app.config.database import DbDep
+from app.config.exceptions import raises
 from app.features.users.models import User
 
 
@@ -52,6 +53,7 @@ async def oauth2(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED, "Invalid username or password")
 @router.post("/login")
 async def login(form: LoginInput, db: DbDep, authenticator: AuthenticatorDep) -> LoginOutput:
     """Login user."""
