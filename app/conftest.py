@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 import pytest
 import pytest_asyncio
+from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker, AsyncSession
 
 from alembic import command, config
@@ -50,7 +51,7 @@ def setup_logging_fixture(settings_fixture: Settings):
 @pytest.fixture(scope="session")
 def db_engine_fixture(setup_logging_fixture: None):
     Path("sqlite.test.db").unlink(missing_ok=True)
-    engine = create_async_engine("sqlite+aiosqlite:///sqlite.test.db", echo=True)
+    engine = create_async_engine("sqlite+aiosqlite:///sqlite.test.db", echo=True, poolclass=pool.NullPool)
 
     alembic_cfg = config.Config()
     alembic_cfg.set_main_option("script_location", "app/migrations")

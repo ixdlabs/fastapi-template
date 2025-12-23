@@ -1,9 +1,9 @@
 """
 Add initial user table
 
-Revision ID: c759d7fb8332
+Revision ID: 1562821e8c45
 Revises:
-Create Date: 2025-12-11 03:16:30.914234
+Create Date: 2025-12-23 13:10:55.037303
 """
 
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "c759d7fb8332"
+revision: str = "1562821e8c45"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

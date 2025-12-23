@@ -109,7 +109,18 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 
 
-def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], authenticator: AuthenticatorDep) -> AuthUser:
+optional_oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/auth/oauth2/token",
+    refreshUrl="/api/auth/refresh",
+    scheme_name="JWT",
+    auto_error=False,
+)
+
+TokenDep = Annotated[str, Depends(oauth2_scheme)]
+TokenOptionalDep = Annotated[str | None, Depends(optional_oauth2_scheme)]
+
+
+def get_current_user(token: TokenDep, authenticator: AuthenticatorDep) -> AuthUser:
     try:
         return authenticator.user(token)
     except AuthException as e:

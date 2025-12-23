@@ -47,9 +47,13 @@ uv run pytest
 
 ## 🗄️ Database Configuration
 
-SQLite is the default for development and will create `sqlite.db` automatically. No additional setup is required to start the API.
+SQLite is the default for development and will create `sqlite.db` automatically.
+No additional setup is required to start the API.
 
-To switch to PostgreSQL or another DB, set:
+For development, PostgreSQL is strongly recommended.
+Using a different database engine may lead to issues when generating migrations.
+
+To switch to PostgreSQL, set:
 
 ```bash
 DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dbname
@@ -64,6 +68,8 @@ Run migrations after changing models or switching databases:
 uv run alembic upgrade head
 # Create new migration
 uv run alembic revision --autogenerate -m "describe change"
+# Downgrade one migration
+uv run alembix downgrade -1
 ```
 
 ## 📈 Observability with OpenTelemetry
