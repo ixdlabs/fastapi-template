@@ -18,6 +18,10 @@ class ResetPasswordConfirmInput(BaseModel):
     new_password: str = Field(..., min_length=1, max_length=128)
 
 
+class ResetPasswordConfirmOutput(BaseModel):
+    detail: str = "Password has been reset successfully."
+
+
 router = APIRouter()
 
 # Password Reset Confirm endpoint
@@ -27,7 +31,9 @@ router = APIRouter()
 @raises(status.HTTP_400_BAD_REQUEST)
 @raises(status.HTTP_404_NOT_FOUND)
 @router.post("/reset-password-confirm")
-async def reset_password_confirm(form: ResetPasswordConfirmInput, db: DbDep, audit_logger: AuditLoggerDep):
+async def reset_password_confirm(
+    form: ResetPasswordConfirmInput, db: DbDep, audit_logger: AuditLoggerDep
+) -> ResetPasswordConfirmOutput:
     """Complete the password reset process using the action ID and token."""
     stmt = select(UserAction).where(UserAction.id == form.action_id)
     result = await db.execute(stmt)
@@ -50,3 +56,5 @@ async def reset_password_confirm(form: ResetPasswordConfirmInput, db: DbDep, aud
 
     await audit_logger.record("password_reset", user)
     await db.commit()
+
+    return ResetPasswordConfirmOutput()
