@@ -29,7 +29,9 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "local"
     jwt_access_expiration_minutes: int = 5
     jwt_refresh_expiration_minutes: int = 24 * 60
+
     email_verification_expiration_minutes: int = 60 * 24
+    password_reset_expiration_minutes: int = 60
 
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
 

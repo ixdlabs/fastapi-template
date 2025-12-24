@@ -13,47 +13,42 @@ from app.features.users.models import UserAction, UserActionState, UserActionTyp
 logger = logging.getLogger(__name__)
 
 
-class SendEmailVerificationInput(BaseModel):
+class SendPasswordResetInput(BaseModel):
     user_id: uuid.UUID
     email: EmailStr
 
 
-async def send_email_verification_email(task_input: SendEmailVerificationInput, settings: SettingsDep, db: DbDep):
-    # Invalidate existing pending email verification actions
+async def send_password_reset_email(task_input: SendPasswordResetInput, settings: SettingsDep, db: DbDep):
+    # Invalidate existing pending password reset actions
     update_stmt = (
         update(UserAction)
         .where(UserAction.user_id == task_input.user_id)
         .where(UserAction.state == UserActionState.PENDING)
-        .where(UserAction.type == UserActionType.EMAIL_VERIFICATION)
+        .where(UserAction.type == UserActionType.PASSWORD_RESET)
         .values(state=UserActionState.OBSOLETE)
     )
     await db.execute(update_stmt)
 
-    # Create a new email verification action
+    # Create a new password reset action
     token = str(uuid.uuid4())
-    expiration = datetime.now(timezone.utc) + timedelta(minutes=settings.email_verification_expiration_minutes)
-    action = UserAction(
-        type=UserActionType.EMAIL_VERIFICATION,
-        user_id=task_input.user_id,
-        data={"email": task_input.email},
-        expires_at=expiration,
-    )
+    expiration = datetime.now(timezone.utc) + timedelta(minutes=settings.password_reset_expiration_minutes)
+    action = UserAction(type=UserActionType.PASSWORD_RESET, user_id=task_input.user_id, expires_at=expiration)
     action.set_token(token)
     db.add(action)
 
     await db.commit()
     await db.refresh(action)
 
-    logger.info("Sending email verification email, action_id=%s, token=%s", action.id, token)
+    logger.info("Sending password reset email, action_id=%s, token=%s", action.id, token)
 
 
 # Task registration
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@shared_async_task("send_email_verification_email")
-async def send_email_verification_email_task(raw_task_input: str):
+@shared_async_task("send_password_reset_email")
+async def send_password_reset_email_task(raw_task_input: str):
     settings = get_settings()
     async with get_db(settings) as db:
-        task_input = SendEmailVerificationInput.model_validate_json(raw_task_input)
-        await send_email_verification_email(task_input=task_input, settings=settings, db=db)
+        task_input = SendPasswordResetInput.model_validate_json(raw_task_input)
+        await send_password_reset_email(task_input=task_input, settings=settings, db=db)
