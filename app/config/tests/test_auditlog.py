@@ -13,17 +13,24 @@ from app.features.users.models import User
 from app.features.users.tests.fixtures import UserFactory
 
 
-@pytest.fixture
-def request_fixture() -> Request:
+def make_request_with_token(token: str | None) -> Request:
+    headers = {"User-Agent": "pytest-agent"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     scope: Scope = {
         "type": "http",
         "method": "POST",
         "path": "/some/path",
-        "headers": Headers({"User-Agent": "pytest-agent"}).raw,
+        "headers": Headers(headers).raw,
         "query_string": b"x=1",
         "client": ("203.0.113.10", 12345),
     }
     return Request(scope)
+
+
+@pytest.fixture
+def request_fixture() -> Request:
+    return make_request_with_token(None)
 
 
 async def fetch_single_audit_log(db_fixture: AsyncSession) -> AuditLog:
@@ -37,7 +44,7 @@ async def fetch_single_audit_log(db_fixture: AsyncSession) -> AuditLog:
 async def test_audit_logger_value_error_when_resource_has_no_id(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
-    logger = AuditLogger(token=None, request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
+    logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=None)
 
     with pytest.raises(ValueError, match="Resource must have an ID to be logged in audit log"):
@@ -48,7 +55,7 @@ async def test_audit_logger_value_error_when_resource_has_no_id(
 async def test_audit_logger_create_anonymous_records_metadata_and_new_value(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
-    logger = AuditLogger(token=None, request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
+    logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4())
     await logger.record("create", resource)
     db_fixture.add(resource)
@@ -76,7 +83,7 @@ async def test_audit_logger_create_anonymous_records_metadata_and_new_value(
 async def test_audit_logger_delete_anonymous_records_old_value(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
-    logger = AuditLogger(token=None, request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
+    logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4())
     await logger.record("delete", resource)
     db_fixture.add(resource)
@@ -100,12 +107,12 @@ async def test_audit_logger_delete_anonymous_records_old_value(
 
 
 @pytest.mark.asyncio
-async def test_audit_logger_user_actor_when_token_valid(
-    db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
-):
+async def test_audit_logger_user_actor_when_token_valid(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
     user: User = UserFactory.build(id=uuid.uuid4())
     token, _ = authenticator_fixture.encode(user)
-    logger = AuditLogger(token=token, request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
+    request = make_request_with_token(token)
+
+    logger = AuditLogger(request=request, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4())
     await logger.record("update", resource)
     db_fixture.add(resource)
@@ -129,11 +136,11 @@ async def test_audit_logger_user_actor_when_token_valid(
 
 @pytest.mark.asyncio
 async def test_audit_logger_falls_back_to_anonymous_when_token_invalid(
-    db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
+    db_fixture: AsyncSession, authenticator_fixture: Authenticator
 ):
-    logger = AuditLogger(
-        token="invalid-token", request=request_fixture, authenticator=authenticator_fixture, db=db_fixture
-    )
+    request = make_request_with_token("invalid-token")
+
+    logger = AuditLogger(request=request, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4())
     await logger.record("create", resource)
     db_fixture.add(resource)
@@ -158,7 +165,7 @@ async def test_audit_logger_falls_back_to_anonymous_when_token_invalid(
 async def test_audit_logger_update_records_old_new_and_changed_value_after_track(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
-    logger = AuditLogger(token=None, request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
+    logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4(), email="user@example.com")
     await logger.track(resource)
 

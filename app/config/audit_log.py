@@ -5,7 +5,6 @@ from opentelemetry.trace import SpanContext
 from deepdiff import DeepDiff
 from app.config.auth import AuthException, Authenticator, AuthenticatorDep
 from fastapi import Request, Depends
-from app.config.auth import TokenOptionalDep
 from app.config.database import Base, DbDep
 from app.features.audit_log.models import ActorType, AuditLog
 
@@ -19,8 +18,7 @@ default_exclude_columns = ["hashed_password"]
 class AuditLogger:
     tracked_value: dict | None = None
 
-    def __init__(self, token: str | None, request: Request | None, authenticator: Authenticator, db: DbDep):
-        self.token = token
+    def __init__(self, request: Request | None, authenticator: Authenticator, db: DbDep):
         self.request = request
         self.authenticator = authenticator
         self.db = db
@@ -36,9 +34,10 @@ class AuditLogger:
             # Actor
             # ----------------------------------------------------------------------------------------------------------
             audit_log.actor_type = ActorType.ANONYMOUS
-            if self.token:
+            if self.request is not None and "Authorization" in self.request.headers:
+                token = self.request.headers["Authorization"].split(" ")[1]
                 try:
-                    user = self.authenticator.user(self.token)
+                    user = self.authenticator.user(token)
                     audit_log.actor_type = ActorType.USER
                     audit_log.actor_id = user.id
                 except AuthException:
@@ -83,13 +82,8 @@ class AuditLogger:
             self.db.add(audit_log)
 
 
-def get_audit_logger(
-    token: TokenOptionalDep,
-    request: Request,
-    authenticator: AuthenticatorDep,
-    db: DbDep,
-):
-    return AuditLogger(token, request, authenticator, db)
+def get_audit_logger(request: Request, authenticator: AuthenticatorDep, db: DbDep):
+    return AuditLogger(request, authenticator, db)
 
 
 AuditLoggerDep = Annotated[AuditLogger, Depends(get_audit_logger)]
