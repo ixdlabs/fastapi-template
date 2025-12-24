@@ -4,19 +4,19 @@ from datetime import datetime
 from typing import Any
 
 
-from sqlalchemy import String, DateTime, JSON, ForeignKey, UUID
-from sqlalchemy.sql import func
+from sqlalchemy import String, JSON, ForeignKey, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Enum
 
 
 from app.config.database import Base
+from app.config.timezone import DateTimeUTC, utc_now
 
 
 class ActorType(enum.Enum):
-    USER = "USER"
-    SYSTEM = "SYSTEM"
-    ANONYMOUS = "ANONYMOUS"
+    USER = "user"
+    SYSTEM = "system"
+    ANONYMOUS = "anonymous"
 
 
 class AuditLog(Base):
@@ -41,5 +41,5 @@ class AuditLog(Base):
     request_method: Mapped[str | None] = mapped_column(String, nullable=True)
     request_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    modified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now)
+    modified_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now, onupdate=utc_now)

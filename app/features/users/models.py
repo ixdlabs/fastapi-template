@@ -11,7 +11,9 @@ from app.config.database import Base
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
-from sqlalchemy import JSON, UUID, Enum, String, DateTime
+from sqlalchemy import JSON, UUID, Enum, String
+
+from app.config.timezone import DateTimeUTC, utc_now
 
 if typing.TYPE_CHECKING:
     from app.features.notifications.models import Notification
@@ -38,9 +40,9 @@ class User(Base):
     last_name: Mapped[str] = mapped_column(String)
     hashed_password: Mapped[str] = mapped_column(String)
 
-    joined_at: Mapped[datetime] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+    joined_at: Mapped[datetime] = mapped_column(DateTimeUTC)
+    created_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now, onupdate=utc_now)
 
     notifications: Mapped[list["Notification"]] = relationship(
         back_populates="user", passive_deletes=True, lazy="raise_on_sql"
@@ -84,9 +86,9 @@ class UserAction(Base):
     data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     hashed_token: Mapped[str] = mapped_column(String)
 
-    expires_at: Mapped[datetime] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+    expires_at: Mapped[datetime] = mapped_column(DateTimeUTC)
+    created_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now, onupdate=utc_now)
 
     def set_token(self, token: str):
         password_hasher = PasswordHasher()
@@ -95,7 +97,7 @@ class UserAction(Base):
     def is_valid(self, token: str) -> bool:
         if self.state != UserActionState.PENDING:
             return False
-        if self.expires_at.astimezone(timezone.utc) < datetime.now(timezone.utc):
+        if self.expires_at < datetime.now(timezone.utc):
             return False
 
         password_hasher = PasswordHasher()

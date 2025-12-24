@@ -1,3 +1,4 @@
+from datetime import timezone
 import factory
 from app.features.users.models import User, UserAction, UserActionState, UserActionType, UserType
 
@@ -11,7 +12,7 @@ class UserFactory(factory.Factory):
     last_name = factory.Faker("last_name")
     type = UserType.CUSTOMER
     email = factory.Faker("email")
-    joined_at = factory.Faker("date_time_this_decade")
+    joined_at = factory.Faker("date_time_this_decade", tzinfo=timezone.utc)
 
     @factory.post_generation
     def password(self, create, extracted, **kwargs):
@@ -26,7 +27,7 @@ class UserActionFactory(factory.Factory):
 
     type = UserActionType.EMAIL_VERIFICATION
     state = UserActionState.PENDING
-    expires_at = factory.Faker("future_datetime")
+    expires_at = factory.Faker("future_datetime", tzinfo=timezone.utc)
 
     @factory.post_generation
     def token(self, create, extracted, **kwargs):
