@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from app.config.audit_log import AuditLoggerDep
 from app.config.database import DbDep
 from app.config.exceptions import raises
 from app.features.users.models import User, UserAction, UserActionState, UserActionType
@@ -27,7 +28,7 @@ router = APIRouter()
 @raises(status.HTTP_400_BAD_REQUEST)
 @raises(status.HTTP_404_NOT_FOUND)
 @router.post("/verify-email")
-async def verify_email(form: VerifyEmailInput, db: DbDep) -> VerifyEmailOutput:
+async def verify_email(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLoggerDep) -> VerifyEmailOutput:
     """Verify email of a user using the generated token."""
     # Retrieve the action record
     stmt = select(UserAction).where(UserAction.id == form.action_id)
@@ -59,10 +60,13 @@ async def verify_email(form: VerifyEmailInput, db: DbDep) -> VerifyEmailOutput:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already in use by another user")
 
     # Update user email and action state
+    await audit_logger.track(user)
     user.email = action_email
     action.state = UserActionState.COMPLETED
     db.add(user)
     db.add(action)
+
+    await audit_logger.record("verify_email", user)
     await db.commit()
     await db.refresh(user)
 

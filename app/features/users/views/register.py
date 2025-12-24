@@ -77,9 +77,9 @@ async def register(
         joined_at=datetime.now(timezone.utc),
     )
     user.set_password(form.password)
-    await audit_logger.add("create", user)
-
     db.add(user)
+
+    await audit_logger.record("create", user)
     await db.commit()
     await db.refresh(user)
 

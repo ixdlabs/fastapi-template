@@ -17,21 +17,18 @@ default_exclude_columns = ["hashed_password"]
 
 
 class AuditLogger:
-    def __init__(self, token: str | None, request: Request, authenticator: Authenticator, db: DbDep):
+    tracked_value: dict | None = None
+
+    def __init__(self, token: str | None, request: Request | None, authenticator: Authenticator, db: DbDep):
         self.token = token
         self.request = request
         self.authenticator = authenticator
         self.db = db
 
-    async def add(
-        self,
-        action: Literal["create", "delete", "update"],
-        resource: Base,
-        *,
-        exclude_columns: list[str] | None = None,
-        track_current_user: bool = True,
-    ) -> None:
-        exclude_columns = [*default_exclude_columns, *(exclude_columns or [])]
+    async def track(self, resource: Base):
+        self.tracked_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
+
+    async def record(self, action: Literal["create", "delete"] | str, resource: Base) -> None:
         with tracer.start_as_current_span("audit-logging") as span:
             audit_log = AuditLog()
             audit_log.action = action
@@ -39,7 +36,7 @@ class AuditLogger:
             # Actor
             # ----------------------------------------------------------------------------------------------------------
             audit_log.actor_type = ActorType.ANONYMOUS
-            if track_current_user and self.token:
+            if self.token:
                 try:
                     user = self.authenticator.user(self.token)
                     audit_log.actor_type = ActorType.USER
@@ -52,7 +49,7 @@ class AuditLogger:
             ctx: SpanContext = span.get_span_context()
             audit_log.trace_id = f"{ctx.trace_id:032x}"
 
-            if track_current_user:
+            if self.request is not None:
                 audit_log.request_ip_address = self.request.client.host if self.request.client else None
                 audit_log.request_user_agent = self.request.headers.get("User-Agent")
                 audit_log.request_method = self.request.method
@@ -72,15 +69,13 @@ class AuditLogger:
             # Resource snapshots
             # ----------------------------------------------------------------------------------------------------------
             if action == "delete":
-                audit_log.old_value = resource.to_dict(nested=True, exclude=exclude_columns)
+                audit_log.old_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
             elif action == "create":
-                audit_log.new_value = resource.to_dict(nested=True, exclude=exclude_columns)
-            else:
-                audit_log.new_value = resource.to_dict(nested=True, exclude=exclude_columns)
-                old_resource = await self.db.get(type(resource), resource.id)
-                if old_resource is not None:
-                    audit_log.old_value = old_resource.to_dict(nested=True, exclude=exclude_columns)
-                    audit_log.changed_value = DeepDiff(audit_log.old_value, audit_log.new_value)
+                audit_log.new_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
+            elif self.tracked_value is not None:
+                audit_log.old_value = self.tracked_value
+                audit_log.new_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
+                audit_log.changed_value = DeepDiff(audit_log.old_value, audit_log.new_value)
 
             # Persist audit log (Do not commit here, commit should be handled by caller)
             # ----------------------------------------------------------------------------------------------------------

@@ -153,8 +153,7 @@ async def delete_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    await audit_logger.add("delete", user)
-
+    await audit_logger.record("delete", user)
     await db.delete(user)
     await db.commit()
 
@@ -185,6 +184,7 @@ async def update_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+    await audit_logger.track(user)
     user.first_name = form.first_name
     user.last_name = form.last_name
 
@@ -199,8 +199,7 @@ async def update_user(
         task_input = SendEmailVerificationInput(user_id=user.id, email=form.email)
         await background.submit(send_email_verification_email_task, task_input.model_dump_json())
 
-    await audit_logger.add("update", user)
-
+    await audit_logger.record("update", user)
     await db.commit()
     await db.refresh(user)
 
