@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.features.users.models import UserEmailVerification, UserEmailVerificationState
@@ -24,7 +24,8 @@ async def test_is_valid_returns_false_for_incorrect_verification_token():
 
 @pytest.mark.asyncio
 async def test_is_valid_returns_false_for_expired_token():
-    user: UserEmailVerification = UserEmailVerificationFactory.build(expires_at=datetime.now() - timedelta(minutes=1))
+    old_expiration_time = datetime.now(timezone.utc) - timedelta(minutes=1)
+    user: UserEmailVerification = UserEmailVerificationFactory.build(expires_at=old_expiration_time)
     raw_token = "SecurePassword123!"
     user.set_verification_token(raw_token)
     assert not user.is_valid(raw_token)

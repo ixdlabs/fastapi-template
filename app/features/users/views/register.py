@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
@@ -70,7 +70,7 @@ async def register(
         type=UserType.CUSTOMER,
         first_name=form.first_name,
         last_name=form.last_name,
-        joined_at=datetime.now(),
+        joined_at=datetime.now(timezone.utc),
     )
     user.set_password(form.password)
 

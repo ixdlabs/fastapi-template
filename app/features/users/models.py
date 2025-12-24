@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
 import uuid
 import typing
@@ -90,7 +90,7 @@ class UserEmailVerification(Base):
     def is_valid(self, verification_token: str) -> bool:
         if self.state != UserEmailVerificationState.PENDING:
             return False
-        if self.expires_at < datetime.now():
+        if self.expires_at.astimezone(timezone.utc) < datetime.now(timezone.utc):
             return False
 
         password_hasher = PasswordHasher()

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import uuid
 from pydantic import BaseModel, EmailStr
@@ -19,7 +19,7 @@ class SendEmailVerificationInput(BaseModel):
 
 
 async def send_email_verification_email(input: SendEmailVerificationInput, settings: SettingsDep, db: DbDep):
-    expiration = datetime.now() + timedelta(minutes=settings.email_verification_expiration_minutes)
+    expiration = datetime.now(timezone.utc) + timedelta(minutes=settings.email_verification_expiration_minutes)
     token = str(uuid.uuid4())
 
     update_stmt = (
