@@ -1,8 +1,7 @@
-from datetime import datetime
 from typing import Annotated, Literal
 import uuid
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import AwareDatetime, BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from app.config.auth import CurrentUserDep
@@ -37,10 +36,10 @@ class UserDetailOutput(BaseModel):
     username: str
     first_name: str
     last_name: str
-    email: str | None
-    joined_at: datetime
-    created_at: datetime
-    updated_at: datetime
+    email: EmailStr | None
+    joined_at: AwareDatetime
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
 
 
 class UserUpdateInput(BaseModel):
