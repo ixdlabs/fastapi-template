@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import enum
 import uuid
 import typing
+from typing import Any
 
 from argon2 import PasswordHasher
 from argon2.exceptions import Argon2Error
@@ -10,7 +11,7 @@ from app.config.database import Base
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
-from sqlalchemy import UUID, Enum, String, DateTime
+from sqlalchemy import JSON, UUID, Enum, String, DateTime
 
 if typing.TYPE_CHECKING:
     from app.features.notifications.models import Notification
@@ -61,40 +62,44 @@ class User(Base):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class UserEmailVerificationState(enum.Enum):
+class UserActionType(enum.Enum):
+    EMAIL_VERIFICATION = "email_verification"
+    PASSWORD_RESET = "password_reset"
+
+
+class UserActionState(enum.Enum):
     PENDING = "pending"
-    VERIFIED = "verified"
+    COMPLETED = "completed"
     OBSELETE = "obselete"
 
 
-class UserEmailVerification(Base):
-    __tablename__ = "user_email_verifications"
+class UserAction(Base):
+    __tablename__ = "user_actions"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    type: Mapped[UserActionType] = mapped_column(Enum(UserActionType))
+    state: Mapped[UserActionState] = mapped_column(Enum(UserActionState), default=UserActionState.PENDING)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID)
-    state: Mapped[UserEmailVerificationState] = mapped_column(
-        Enum(UserEmailVerificationState), default=UserEmailVerificationState.PENDING
-    )
 
-    email: Mapped[str] = mapped_column(String)
-    hashed_verification_token: Mapped[str] = mapped_column(String)
+    data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    hashed_token: Mapped[str] = mapped_column(String)
 
     expires_at: Mapped[datetime] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
-    def set_verification_token(self, token: str):
+    def set_token(self, token: str):
         password_hasher = PasswordHasher()
-        self.hashed_verification_token = password_hasher.hash(token)
+        self.hashed_token = password_hasher.hash(token)
 
-    def is_valid(self, verification_token: str) -> bool:
-        if self.state != UserEmailVerificationState.PENDING:
+    def is_valid(self, token: str) -> bool:
+        if self.state != UserActionState.PENDING:
             return False
         if self.expires_at.astimezone(timezone.utc) < datetime.now(timezone.utc):
             return False
 
         password_hasher = PasswordHasher()
         try:
-            return password_hasher.verify(self.hashed_verification_token, verification_token)
+            return password_hasher.verify(self.hashed_token, token)
         except Argon2Error:
             return False

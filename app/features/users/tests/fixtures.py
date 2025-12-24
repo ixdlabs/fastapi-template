@@ -1,5 +1,5 @@
 import factory
-from app.features.users.models import User, UserEmailVerification, UserEmailVerificationState, UserType
+from app.features.users.models import User, UserAction, UserActionState, UserActionType, UserType
 
 
 class UserFactory(factory.Factory):
@@ -20,16 +20,16 @@ class UserFactory(factory.Factory):
         self.set_password(raw_password)
 
 
-class UserEmailVerificationFactory(factory.Factory):
+class UserActionFactory(factory.Factory):
     class Meta:
-        model = UserEmailVerification
+        model = UserAction
 
-    state = UserEmailVerificationState.PENDING
-    email = factory.Faker("email")
+    type = UserActionType.EMAIL_VERIFICATION
+    state = UserActionState.PENDING
     expires_at = factory.Faker("future_datetime")
 
     @factory.post_generation
     def token(self, create, extracted, **kwargs):
-        raw_token = kwargs.get("raw", "verificationtoken")
-        assert isinstance(self, UserEmailVerification), "sanity check failed"
-        self.set_verification_token(raw_token)
+        raw_token = kwargs.get("raw", "testtoken")
+        assert isinstance(self, UserAction), "sanity check failed"
+        self.set_token(raw_token)
