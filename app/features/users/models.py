@@ -72,7 +72,7 @@ class UserActionType(enum.Enum):
 class UserActionState(enum.Enum):
     PENDING = "pending"
     COMPLETED = "completed"
-    OBSELETE = "obselete"
+    OBSOLETE = "obsolete"
 
 
 class UserAction(Base):

@@ -27,7 +27,7 @@ async def send_email_verification_email(task_input: SendEmailVerificationInput, 
         .where(UserAction.user_id == task_input.user_id)
         .where(UserAction.state == UserActionState.PENDING)
         .where(UserAction.type == UserActionType.EMAIL_VERIFICATION)
-        .values(state=UserActionState.OBSELETE)
+        .values(state=UserActionState.OBSOLETE)
     )
     await db.execute(update_stmt)
 
