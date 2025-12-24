@@ -28,9 +28,7 @@ class AuditLogger:
         new_resource: Base | None = None,
         exclude_columns: list[str] | None = None,
         track_current_user: bool = True,
-        db: DbDep,
     ) -> None:
-        db = db or self.db
         with tracer.start_as_current_span("audit-logging") as span:
             audit_log = AuditLog()
             audit_log.action = action
@@ -38,7 +36,7 @@ class AuditLogger:
             # Actor data
             if track_current_user and self.token:
                 auth_user = get_current_user(self.token, self.authenticator)
-                audit_log.actor_type = ActorType.USER.value
+                audit_log.actor_type = ActorType.USER
                 audit_log.actor_id = auth_user.id
 
             # Trace data
@@ -53,6 +51,8 @@ class AuditLogger:
             # Resource data
             if old_resource is not None:
                 audit_log.old_value = old_resource.to_dict(nested=True, exclude=exclude_columns)
+                audit_log.resource_type = old_resource.__tablename__
+                audit_log.resource_id = old_resource.id
             if new_resource is not None:
                 audit_log.new_value = new_resource.to_dict(nested=True, exclude=exclude_columns)
             if new_resource is not None and old_resource is not None:
@@ -61,11 +61,16 @@ class AuditLogger:
                     new_resource.to_dict(nested=True, exclude=exclude_columns),
                 )
 
-            db.add(audit_log)
-            await db.commit()
+            self.db.add(audit_log)
+            await self.db.commit()
 
 
-def get_audit_logger(token: TokenOptionalDep, request: Request, authenticator: AuthenticatorDep, db: DbDep):
+def get_audit_logger(
+    token: TokenOptionalDep,
+    request: Request,
+    authenticator: AuthenticatorDep,
+    db: DbDep,
+):
     return AuditLogger(token, request, authenticator, db)
 
 
