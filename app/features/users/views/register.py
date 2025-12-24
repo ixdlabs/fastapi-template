@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import AwareDatetime, BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from app.config.audit_log import AuditLoggerDep
@@ -33,7 +33,7 @@ class RegisterOutputUser(BaseModel):
     username: str
     first_name: str
     last_name: str
-    joined_at: datetime
+    joined_at: AwareDatetime
 
 
 router = APIRouter()
@@ -70,7 +70,7 @@ async def register(
         type=UserType.CUSTOMER,
         first_name=form.first_name,
         last_name=form.last_name,
-        joined_at=datetime.now(),
+        joined_at=datetime.now(timezone.utc),
     )
     user.set_password(form.password)
 

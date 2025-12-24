@@ -1,5 +1,6 @@
+from datetime import timezone
 import factory
-from app.features.users.models import User, UserEmailVerification, UserEmailVerificationState, UserType
+from app.features.users.models import User, UserAction, UserActionState, UserActionType, UserType
 
 
 class UserFactory(factory.Factory):
@@ -11,7 +12,7 @@ class UserFactory(factory.Factory):
     last_name = factory.Faker("last_name")
     type = UserType.CUSTOMER
     email = factory.Faker("email")
-    joined_at = factory.Faker("date_time_this_decade")
+    joined_at = factory.Faker("date_time_this_decade", tzinfo=timezone.utc)
 
     @factory.post_generation
     def password(self, create, extracted, **kwargs):
@@ -20,16 +21,16 @@ class UserFactory(factory.Factory):
         self.set_password(raw_password)
 
 
-class UserEmailVerificationFactory(factory.Factory):
+class UserActionFactory(factory.Factory):
     class Meta:
-        model = UserEmailVerification
+        model = UserAction
 
-    state = UserEmailVerificationState.PENDING
-    email = factory.Faker("email")
-    expires_at = factory.Faker("future_datetime")
+    type = UserActionType.EMAIL_VERIFICATION
+    state = UserActionState.PENDING
+    expires_at = factory.Faker("future_datetime", tzinfo=timezone.utc)
 
     @factory.post_generation
     def token(self, create, extracted, **kwargs):
-        raw_token = kwargs.get("raw", "verificationtoken")
-        assert isinstance(self, UserEmailVerification), "sanity check failed"
-        self.set_verification_token(raw_token)
+        raw_token = kwargs.get("raw", "testtoken")
+        assert isinstance(self, UserAction), "sanity check failed"
+        self.set_token(raw_token)

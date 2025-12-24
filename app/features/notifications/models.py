@@ -7,8 +7,10 @@ from app.config.database import Base
 
 from sqlalchemy.types import Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import UUID, String, DateTime, JSON, ForeignKey
+from sqlalchemy import UUID, String, JSON, ForeignKey
 from typing import Any
+
+from app.config.timezone import DateTimeUTC, utc_now
 
 if typing.TYPE_CHECKING:
     from app.features.users.models import User
@@ -29,7 +31,6 @@ class NotificationStatus(enum.Enum):
     PENDING = "pending"
     SENT = "sent"
     FAILED = "failed"
-    READ = "read"
 
 
 # System notification
@@ -44,13 +45,13 @@ class Notification(Base):
     type: Mapped[NotificationType] = mapped_column(Enum(NotificationType))
     data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now, onupdate=utc_now)
 
     deliveries: Mapped[list["NotificationDelivery"]] = relationship(
-        back_populates="notification", passive_deletes=True, lazy="noload"
+        back_populates="notification", passive_deletes=True, lazy="raise_on_sql"
     )
-    user: Mapped["User"] = relationship(back_populates="notifications", lazy="noload")
+    user: Mapped["User"] = relationship(back_populates="notifications", lazy="raise_on_sql")
 
 
 # Delivery of a notification via a channel
@@ -71,10 +72,10 @@ class NotificationDelivery(Base):
     status: Mapped[NotificationStatus] = mapped_column(Enum(NotificationStatus), default=NotificationStatus.PENDING)
     failure_message: Mapped[str | None] = mapped_column(String, nullable=True)
     provider_ref: Mapped[str | None] = mapped_column(String, nullable=True)
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTimeUTC, nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTimeUTC, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now, onupdate=utc_now)
 
-    notification: Mapped["Notification"] = relationship(back_populates="deliveries", lazy="noload")
+    notification: Mapped["Notification"] = relationship(back_populates="deliveries", lazy="raise_on_sql")

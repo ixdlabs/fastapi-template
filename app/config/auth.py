@@ -5,7 +5,7 @@ It provides a way to retrieve the current authenticated user based on a JWT toke
 Docs: https://fastapi.tiangolo.com/tutorial/security/
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from typing import Annotated, Any
 import uuid
@@ -44,7 +44,7 @@ class Authenticator:
 
     def encode(self, user: User) -> tuple[str, str]:
         """Encode a JWT access token + refresh token for the given user."""
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
         access_expiration = current_time + timedelta(minutes=self.settings.jwt_access_expiration_minutes)
         refresh_expiration = current_time + timedelta(minutes=self.settings.jwt_refresh_expiration_minutes)
 

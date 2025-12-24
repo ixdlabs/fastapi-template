@@ -1,9 +1,9 @@
 """
 Add initial audit log table
 
-Revision ID: a9dbf1469664
-Revises: 569d31d15a62
-Create Date: 2025-12-23 14:40:51.980769
+Revision ID: 06f5f77c1299
+Revises: 97e7f834a7d6
+Create Date: 2025-12-24 16:26:20.787667
 """
 
 from typing import Sequence, Union
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "a9dbf1469664"
-down_revision: Union[str, Sequence[str], None] = "569d31d15a62"
+revision: str = "06f5f77c1299"
+down_revision: Union[str, Sequence[str], None] = "97e7f834a7d6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -42,7 +42,7 @@ def upgrade() -> None:
         sa.Column("request_user_agent", sa.String(), nullable=True),
         sa.Column("request_method", sa.String(), nullable=True),
         sa.Column("request_url", sa.String(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("modified_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["actor_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),

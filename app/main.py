@@ -1,5 +1,3 @@
-import os
-import time
 from fastapi import FastAPI
 import uvicorn
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -20,9 +18,6 @@ from app import worker  # noqa: F401
 
 settings = get_settings()
 setup_logging(settings)
-
-os.environ["TZ"] = settings.server_timezone
-time.tzset()
 
 app = FastAPI(
     title="Sample API",

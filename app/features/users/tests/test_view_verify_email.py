@@ -2,8 +2,8 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.users.models import User, UserEmailVerification, UserEmailVerificationState
-from app.features.users.tests.fixtures import UserEmailVerificationFactory, UserFactory
+from app.features.users.models import User, UserAction, UserActionState
+from app.features.users.tests.fixtures import UserActionFactory, UserFactory
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -18,17 +18,13 @@ async def test_verify_email_success(db_fixture: AsyncSession):
     await db_fixture.commit()
     await db_fixture.refresh(user)
 
-    verification: UserEmailVerification = UserEmailVerificationFactory.build(user_id=user.id, email="new@example.com")
-    verification.set_verification_token("valid-token")
-    db_fixture.add(verification)
+    action: UserAction = UserActionFactory.build(user_id=user.id, data={"email": "new@example.com"})
+    action.set_token("valid-token")
+    db_fixture.add(action)
     await db_fixture.commit()
-    await db_fixture.refresh(verification)
+    await db_fixture.refresh(action)
 
-    response = client.post(
-        "/api/auth/verify-email",
-        json={"verification_id": str(verification.id), "token": "valid-token"},
-    )
-
+    response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 200
     data = response.json()
 
@@ -36,21 +32,17 @@ async def test_verify_email_success(db_fixture: AsyncSession):
     assert data["email"] == "new@example.com"
 
     await db_fixture.refresh(user)
-    await db_fixture.refresh(verification)
+    await db_fixture.refresh(action)
 
     assert user.email == "new@example.com"
-    assert verification.state == UserEmailVerificationState.VERIFIED
+    assert action.state == UserActionState.COMPLETED
 
 
 @pytest.mark.asyncio
 async def test_verify_email_verification_not_found(db_fixture: AsyncSession):
-    response = client.post(
-        "/api/auth/verify-email",
-        json={"verification_id": str(uuid.uuid4()), "token": "any-token"},
-    )
-
+    response = client.post("/api/auth/verify-email", json={"action_id": str(uuid.uuid4()), "token": "any-token"})
     assert response.status_code == 404
-    assert response.json()["detail"] == "Verification not found"
+    assert response.json()["detail"] == "Action not found"
 
 
 @pytest.mark.asyncio
@@ -60,38 +52,28 @@ async def test_verify_email_invalid_token(db_fixture: AsyncSession):
     await db_fixture.commit()
     await db_fixture.refresh(user)
 
-    verification: UserEmailVerification = UserEmailVerificationFactory.build(user_id=user.id, email="new@example.com")
-    verification.set_verification_token("correct-token")
+    action: UserAction = UserActionFactory.build(user_id=user.id, data={"email": "new@example.com"})
+    action.set_token("correct-token")
 
-    db_fixture.add(verification)
+    db_fixture.add(action)
     await db_fixture.commit()
-    await db_fixture.refresh(verification)
+    await db_fixture.refresh(action)
 
-    response = client.post(
-        "/api/auth/verify-email",
-        json={"verification_id": str(verification.id), "token": "wrong-token"},
-    )
-
+    response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "wrong-token"})
     assert response.status_code == 400
-    assert response.json()["detail"] == "Invalid verification token"
+    assert response.json()["detail"] == "Invalid action token"
 
 
 @pytest.mark.asyncio
 async def test_verify_email_user_not_found(db_fixture: AsyncSession):
-    verification: UserEmailVerification = UserEmailVerificationFactory.build(
-        user_id=uuid.uuid4(), email="new@example.com"
-    )
-    verification.set_verification_token("valid-token")
+    action: UserAction = UserActionFactory.build(user_id=uuid.uuid4(), data={"email": "new@example.com"})
+    action.set_token("valid-token")
 
-    db_fixture.add(verification)
+    db_fixture.add(action)
     await db_fixture.commit()
-    await db_fixture.refresh(verification)
+    await db_fixture.refresh(action)
 
-    response = client.post(
-        "/api/auth/verify-email",
-        json={"verification_id": str(verification.id), "token": "valid-token"},
-    )
-
+    response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 404
     assert response.json()["detail"] == "User not found"
 
@@ -106,20 +88,14 @@ async def test_verify_email_email_already_in_use(db_fixture: AsyncSession):
     await db_fixture.refresh(user1)
     await db_fixture.refresh(user2)
 
-    verification: UserEmailVerification = UserEmailVerificationFactory.build(
-        user_id=user1.id, email="user2@example.com"
-    )
-    verification.set_verification_token("valid-token")
+    action: UserAction = UserActionFactory.build(user_id=user1.id, data={"email": "user2@example.com"})
+    action.set_token("valid-token")
 
-    db_fixture.add(verification)
+    db_fixture.add(action)
     await db_fixture.commit()
-    await db_fixture.refresh(verification)
+    await db_fixture.refresh(action)
 
-    response = client.post(
-        "/api/auth/verify-email",
-        json={"verification_id": str(verification.id), "token": "valid-token"},
-    )
-
+    response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 400
     assert response.json()["detail"] == "Email already in use by another user"
 
@@ -131,20 +107,14 @@ async def test_verify_email_already_verified(db_fixture: AsyncSession):
     await db_fixture.commit()
     await db_fixture.refresh(user)
 
-    verification: UserEmailVerification = UserEmailVerificationFactory.build(
-        user_id=user.id,
-        email="new@example.com",
-        state=UserEmailVerificationState.VERIFIED,
+    action: UserAction = UserActionFactory.build(
+        user_id=user.id, data={"email": "new@example.com"}, state=UserActionState.COMPLETED
     )
-    verification.set_verification_token("valid-token")
+    action.set_token("valid-token")
 
-    db_fixture.add(verification)
+    db_fixture.add(action)
     await db_fixture.commit()
-    await db_fixture.refresh(verification)
+    await db_fixture.refresh(action)
 
-    response = client.post(
-        "/api/auth/verify-email",
-        json={"verification_id": str(verification.id), "token": "valid-token"},
-    )
-
+    response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 400
