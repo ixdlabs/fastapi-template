@@ -3,7 +3,7 @@ from typing import Annotated
 from opentelemetry import trace
 from opentelemetry.trace import SpanContext
 from deepdiff import DeepDiff
-from app.config.auth import Authenticator, AuthenticatorDep, get_current_user
+from app.config.auth import AuthException, Authenticator, AuthenticatorDep
 from fastapi import Request, Depends
 from app.config.auth import TokenOptionalDep
 from app.config.database import Base, DbDep
@@ -20,7 +20,7 @@ class AuditLogger:
         self.authenticator = authenticator
         self.db = db
 
-    async def log(
+    async def create_log(
         self,
         action: str,
         *,
@@ -28,41 +28,74 @@ class AuditLogger:
         new_resource: Base | None = None,
         exclude_columns: list[str] | None = None,
         track_current_user: bool = True,
+        commit: bool = False,
     ) -> None:
-        with tracer.start_as_current_span("audit-logging") as span:
-            audit_log = AuditLog()
-            audit_log.action = action
+        assert old_resource is not None or new_resource is not None, (
+            "Either old_resource or new_resource must be provided"
+        )
 
-            # Actor data
-            if track_current_user and self.token:
-                auth_user = get_current_user(self.token, self.authenticator)
+        with tracer.start_as_current_span("audit-logging") as span:
+            try:
+                audit_log = AuditLog()
+                self._populate_audit_log_from_context(
+                    audit_log, span, action, old_resource, new_resource, exclude_columns, track_current_user
+                )
+                self.db.add(audit_log)
+                if commit:
+                    await self.db.commit()
+            except Exception:
+                logger.error("Failed to log audit event", exc_info=True)
+
+    def _populate_audit_log_from_context(
+        self,
+        audit_log: AuditLog,
+        span: trace.Span,
+        action: str,
+        old_resource: Base | None,
+        new_resource: Base | None,
+        exclude_columns: list[str] | None,
+        track_current_user: bool,
+    ):
+        audit_log.action = action
+
+        # Actor data
+        audit_log.actor_type = ActorType.ANONYMOUS
+        if track_current_user and self.token:
+            try:
+                auth_user = self.authenticator.user(self.token)
                 audit_log.actor_type = ActorType.USER
                 audit_log.actor_id = auth_user.id
+            except AuthException:
+                pass
 
-            # Trace data
-            ctx: SpanContext = span.get_span_context()
-            audit_log.trace_id = "{:032x}".format(ctx.trace_id)
-            if track_current_user:
-                audit_log.request_ip_address = self.request.client.host if self.request.client else None
-                audit_log.request_user_agent = self.request.headers["User-Agent"]
-                audit_log.request_method = self.request.method
-                audit_log.request_url = str(self.request.url)
+        # Trace data
+        ctx: SpanContext = span.get_span_context()
+        audit_log.trace_id = "{:032x}".format(ctx.trace_id)
+        if track_current_user:
+            audit_log.request_ip_address = self.request.client.host if self.request.client else None
+            audit_log.request_user_agent = self.request.headers["User-Agent"]
+            audit_log.request_method = self.request.method
+            audit_log.request_url = str(self.request.url)
 
-            # Resource data
-            if old_resource is not None:
-                audit_log.old_value = old_resource.to_dict(nested=True, exclude=exclude_columns)
-                audit_log.resource_type = old_resource.__tablename__
-                audit_log.resource_id = old_resource.id
-            if new_resource is not None:
-                audit_log.new_value = new_resource.to_dict(nested=True, exclude=exclude_columns)
-            if new_resource is not None and old_resource is not None:
-                audit_log.changed_value = DeepDiff(
-                    old_resource.to_dict(nested=True, exclude=exclude_columns),
-                    new_resource.to_dict(nested=True, exclude=exclude_columns),
-                )
+        # Resource data
+        resource: Base | None = None
+        if old_resource is not None:
+            audit_log.old_value = old_resource.to_dict(nested=True, exclude=exclude_columns)
+            audit_log.resource_type = old_resource.__tablename__
+            audit_log.resource_id = old_resource.id
+            resource = old_resource
+        if new_resource is not None:
+            audit_log.new_value = new_resource.to_dict(nested=True, exclude=exclude_columns)
+            resource = resource or new_resource
+        if new_resource is not None and old_resource is not None:
+            audit_log.changed_value = DeepDiff(
+                old_resource.to_dict(nested=True, exclude=exclude_columns),
+                new_resource.to_dict(nested=True, exclude=exclude_columns),
+            )
 
-            self.db.add(audit_log)
-            await self.db.commit()
+        if resource is not None:
+            audit_log.resource_type = resource.__tablename__
+            audit_log.resource_id = resource.id
 
 
 def get_audit_logger(

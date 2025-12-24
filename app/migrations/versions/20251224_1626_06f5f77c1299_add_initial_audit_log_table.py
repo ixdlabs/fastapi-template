@@ -24,7 +24,7 @@ def upgrade() -> None:
     op.create_table(
         "audit_logs",
         sa.Column("id", sa.UUID(), nullable=False),
-        sa.Column("actor_id", sa.UUID(), nullable=False),
+        sa.Column("actor_id", sa.UUID(), nullable=True),
         sa.Column(
             "actor_type",
             postgresql.ENUM("USER", "SYSTEM", "ANONYMOUS", name="actortype", create_type=False),
@@ -32,7 +32,6 @@ def upgrade() -> None:
         ),
         sa.Column("action", sa.String(), nullable=False),
         sa.Column("resource_type", sa.String(), nullable=False),
-        sa.Column("resource", sa.String(), nullable=False),
         sa.Column("resource_id", sa.UUID(), nullable=False),
         sa.Column("old_value", sa.JSON(), nullable=True),
         sa.Column("new_value", sa.JSON(), nullable=True),
