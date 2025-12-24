@@ -5,9 +5,9 @@ It provides a way to retrieve the current authenticated user based on a JWT toke
 Docs: https://fastapi.tiangolo.com/tutorial/security/
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 import uuid
 
 from fastapi import Depends, HTTPException, Security, status
@@ -16,7 +16,7 @@ import jwt
 from pydantic import BaseModel, ValidationError
 
 from app.config.settings import Settings, SettingsDep
-from app.features.users.models import User
+from app.features.users.models import User, UserType
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class AuthUser(BaseModel):
     id: uuid.UUID
+    type: UserType
     username: str
     first_name: str
     last_name: str
@@ -43,13 +44,20 @@ class Authenticator:
 
     def encode(self, user: User) -> tuple[str, str]:
         """Encode a JWT access token + refresh token for the given user."""
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now()
         access_expiration = current_time + timedelta(minutes=self.settings.jwt_access_expiration_minutes)
         refresh_expiration = current_time + timedelta(minutes=self.settings.jwt_refresh_expiration_minutes)
 
-        auth_user = AuthUser(id=user.id, username=user.username, first_name=user.first_name, last_name=user.last_name)
-        access_payload = {"sub": str(user.id), "exp": access_expiration, "user": auth_user.model_dump_json()}
-        refresh_payload = {"sub": str(user.id), "exp": refresh_expiration}
+        auth_user = AuthUser(
+            id=user.id,
+            type=user.type,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+        )
+        user_dump = auth_user.model_dump_json()
+        access_payload = {"sub": str(user.id), "exp": access_expiration, "user": user_dump, "type": "access"}
+        refresh_payload = {"sub": str(user.id), "exp": refresh_expiration, "type": "refresh"}
 
         access_token = jwt.encode(payload=access_payload, key=self.settings.jwt_secret_key, algorithm="HS256")
         refresh_token = jwt.encode(payload=refresh_payload, key=self.settings.jwt_secret_key, algorithm="HS256")
@@ -58,9 +66,12 @@ class Authenticator:
     def user(self, access_token: str) -> AuthUser:
         """Extract the user information from the given JWT access token."""
         try:
-            payload = jwt.decode(access_token, self.settings.jwt_secret_key, algorithms=["HS256"])
+            payload: dict[str, Any] = jwt.decode(access_token, self.settings.jwt_secret_key, algorithms=["HS256"])
         except jwt.PyJWTError as e:
             raise AuthException("JWT decode error") from e
+
+        if payload.get("type") != "access":
+            raise AuthException("Invalid JWT access token (wrong type)")
 
         user_data = payload.get("user")
         if user_data is None:
@@ -76,7 +87,7 @@ class Authenticator:
     def sub(self, token: str) -> uuid.UUID:
         """Extract the subject (user ID) from the given JWT token."""
         try:
-            payload = jwt.decode(token, self.settings.jwt_secret_key, algorithms=["HS256"])
+            payload: dict[str, Any] = jwt.decode(token, self.settings.jwt_secret_key, algorithms=["HS256"])
         except jwt.PyJWTError as e:
             raise AuthException("JWT decode error") from e
 

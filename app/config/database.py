@@ -16,8 +16,9 @@ import uuid
 from fastapi import Depends
 from sqlalchemy import inspect
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import DeclarativeBase, Mapper, RelationshipProperty
+from sqlalchemy.orm import DeclarativeBase, Mapper, RelationshipProperty, attributes
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.util import Properties
 
 from app.config.settings import SettingsDep
 
@@ -30,8 +31,8 @@ logger = logging.getLogger(__name__)
 # noinspection PyPep8Naming
 class classproperty(object):
     """
-    @property for @classmethod
-    taken from http://stackoverflow.com/a/13624858
+    Helper for defining class property.
+    Taken from https://stackoverflow.com/a/13624858
     """
 
     def __init__(self, fget):
@@ -45,20 +46,25 @@ class Base(DeclarativeBase):
     __abstract__ = True
     id: uuid.UUID
 
+    @classmethod
     @classproperty
     def columns(cls) -> list[str]:
         inspected = inspect(cls)
         assert isinstance(inspected, Mapper)
         return inspected.columns.keys()
 
+    @classmethod
     @classproperty
     def relations(cls) -> list[str]:
+        assert isinstance(cls.__mapper__.attrs, Properties)
         return [c.key for c in cls.__mapper__.attrs if isinstance(c, RelationshipProperty)]
 
+    @classmethod
     @classproperty
     def hybrid_properties(cls) -> list[str]:
         inspected = inspect(cls)
         assert isinstance(inspected, Mapper)
+        assert isinstance(inspected.all_orm_descriptors, Properties)
         return [item.__name__ for item in inspected.all_orm_descriptors if isinstance(item, hybrid_property)]
 
     def to_dict(self, nested: bool = False, hybrid_attributes: bool = False, exclude: list[str] | None = None) -> dict:
@@ -83,6 +89,9 @@ class Base(DeclarativeBase):
 
         if nested:
             for key in self.relations:
+                state = attributes.instance_state(self)
+                if key in state.unloaded:
+                    continue
                 obj = getattr(self, key)
                 if isinstance(obj, Base):
                     result[key] = obj.to_dict(hybrid_attributes=hybrid_attributes)

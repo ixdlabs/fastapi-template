@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import timedelta
 from celery.schedules import crontab
-from app.features.users.tasks.welcome_email import send_welcome_email_task
+from app.features.users.tasks.email_verification import send_email_verification_email_task
 from app.features.users.tasks.echo import echo_task
 
 
@@ -31,6 +31,6 @@ periodic_tasks = [
 
 
 __all__ = [
-    "send_welcome_email_task",
+    "send_email_verification_email_task",
     "echo_task",
 ]

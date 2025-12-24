@@ -60,6 +60,8 @@ def db_engine_fixture(setup_logging_fixture: None):
     alembic_cfg.set_main_option("script_location", "app/migrations")
     alembic_cfg.attributes["connection"] = engine
     command.upgrade(alembic_cfg, "head")
+    command.downgrade(alembic_cfg, "base")
+    command.upgrade(alembic_cfg, "head")
     logger.info("Migrations applied for test database.")
 
     yield engine
@@ -96,11 +98,13 @@ def authenticator_fixture(settings_fixture: Settings):
 
 
 class NoOpBackground(Background):
+    called_tasks: list[str] = []
+
     async def submit(self, fn, *args, **kwargs):
-        pass
+        self.called_tasks.append(fn.__name__)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def background_fixture(settings_fixture: Settings):
     return NoOpBackground(settings_fixture)
 

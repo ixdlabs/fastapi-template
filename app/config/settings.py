@@ -29,8 +29,10 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "local"
     jwt_access_expiration_minutes: int = 5
     jwt_refresh_expiration_minutes: int = 24 * 60
+    email_verification_expiration_minutes: int = 60 * 24
 
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
+    server_timezone: str = "UTC"
 
     celery_task_always_eager: bool = False
     celery_broker_url: str = "sqla+sqlite:///sqlite.celery.db"

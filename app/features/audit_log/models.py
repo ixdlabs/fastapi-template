@@ -25,7 +25,7 @@ class AuditLog(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
 
     actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    actor_type: Mapped[str] = mapped_column(Enum(ActorType))
+    actor_type: Mapped[ActorType] = mapped_column(Enum(ActorType))
     action: Mapped[str] = mapped_column(String)
     resource_type: Mapped[str] = mapped_column(String)
     resource: Mapped[str] = mapped_column(String)

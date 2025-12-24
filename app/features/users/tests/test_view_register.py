@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
 
+from app.conftest import NoOpBackground
 from app.features.users.models import User
 from app.features.users.tests.fixtures import UserFactory
 from app.main import app
@@ -11,8 +12,14 @@ client = TestClient(app)
 
 
 @pytest.mark.asyncio
-async def test_user_can_register_with_valid_data(db_fixture: AsyncSession):
-    user_data = {"username": "newuser", "first_name": "New", "last_name": "User", "password": "newpassword"}
+async def test_user_can_register_with_valid_data(db_fixture: AsyncSession, background_fixture: NoOpBackground):
+    user_data = {
+        "username": "newuser",
+        "first_name": "New",
+        "last_name": "User",
+        "password": "newpassword",
+        "email": "newuser@example.com",
+    }
     response = client.post("/api/auth/register", json=user_data)
     assert response.status_code == 201
     data = response.json()
@@ -25,6 +32,8 @@ async def test_user_can_register_with_valid_data(db_fixture: AsyncSession):
     user = result.scalar_one_or_none()
     assert user is not None
     assert user.check_password(user_data["password"])
+
+    assert "send_email_verification_email_task" in background_fixture.called_tasks
 
 
 @pytest.mark.asyncio
@@ -43,3 +52,22 @@ async def test_user_cannot_register_with_existing_username(db_fixture: AsyncSess
     response = client.post("/api/auth/register", json=user_data)
     assert response.status_code == 400
     assert response.json() == {"detail": "Username already exists"}
+
+
+@pytest.mark.asyncio
+async def test_user_cannot_register_with_existing_email(db_fixture: AsyncSession):
+    existing_user: User = UserFactory.build(email="existing@example.com")
+    db_fixture.add(existing_user)
+    await db_fixture.commit()
+    await db_fixture.refresh(existing_user)
+
+    user_data = {
+        "username": "uniqueusername",
+        "first_name": "Another",
+        "last_name": "User",
+        "password": "anotherpassword",
+        "email": "existing@example.com",
+    }
+    response = client.post("/api/auth/register", json=user_data)
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Email already exists"}
