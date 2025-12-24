@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 import jwt
 import pytest
@@ -52,7 +52,7 @@ def test_user_decodes_valid_access_token(authenticator_fixture: Authenticator, u
 
 
 def test_user_fails_with_unknown_token_type(authenticator_fixture: Authenticator, user_fixture: User):
-    current_time = datetime.now()
+    current_time = datetime.now(timezone.utc)
     expiration = current_time + timedelta(minutes=5)
     payload = {"sub": str(user_fixture.id), "exp": expiration, "type": "unknown_type"}
     token = jwt.encode(payload=payload, key=authenticator_fixture.settings.jwt_secret_key, algorithm="HS256")
@@ -81,7 +81,7 @@ def test_sub_invalid_token_raises_auth_exception(authenticator_fixture: Authenti
 def test_user_missing_user_payload_raises_auth_exception(
     authenticator_fixture: Authenticator, settings_fixture: Settings
 ):
-    payload = {"sub": str(uuid.uuid4()), "exp": datetime.now() + timedelta(minutes=5)}
+    payload = {"sub": str(uuid.uuid4()), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
     with pytest.raises(AuthException):
@@ -93,7 +93,7 @@ def test_user_invalid_user_payload_raises_auth_exception(
 ):
     payload = {
         "sub": str(uuid.uuid4()),
-        "exp": datetime.now() + timedelta(minutes=5),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
         "user": {"id": "not-a-uuid"},
     }
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
@@ -103,7 +103,7 @@ def test_user_invalid_user_payload_raises_auth_exception(
 
 
 def test_sub_missing_sub_claim_raises_auth_exception(authenticator_fixture: Authenticator, settings_fixture: Settings):
-    payload = {"exp": datetime.now() + timedelta(minutes=5)}
+    payload = {"exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
     with pytest.raises(AuthException):
@@ -111,7 +111,7 @@ def test_sub_missing_sub_claim_raises_auth_exception(authenticator_fixture: Auth
 
 
 def test_sub_invalid_uuid_raises_auth_exception(authenticator_fixture: Authenticator, settings_fixture: Settings):
-    payload = {"sub": "not-a-uuid", "exp": datetime.now() + timedelta(minutes=5)}
+    payload = {"sub": "not-a-uuid", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
     with pytest.raises(AuthException):
@@ -123,7 +123,7 @@ def test_expired_token_raises_auth_exception(
 ):
     payload = {
         "sub": str(user_fixture.id),
-        "exp": datetime.now() - timedelta(minutes=1),
+        "exp": datetime.now(timezone.utc) - timedelta(minutes=1),
         "user": {
             "id": str(user_fixture.id),
             "username": user_fixture.username,
