@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.sync_enum_values(
+    op.sync_enum_values(  # type: ignore[attr-defined]
         enum_schema="public",
         enum_name="notificationstatus",
         new_values=["PENDING", "SENT", "FAILED"],
@@ -32,7 +32,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.sync_enum_values(
+    op.sync_enum_values(  # type: ignore[attr-defined]
         enum_schema="public",
         enum_name="notificationstatus",
         new_values=["PENDING", "SENT", "FAILED", "READ"],
