@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from typing import Any, Annotated, Literal
-from sqlalchemy.orm import contains_eager
+from sqlalchemy.orm import joinedload
 from sqlalchemy import select, update, func
 
 from app.config.auth import CurrentUserDep
@@ -57,12 +57,12 @@ async def get_notifications(
     stmt = (
         select(NotificationDelivery)
         .join(Notification)
+        .options(joinedload(NotificationDelivery.notification))
         .where(
             Notification.user_id == current_user.id,
             NotificationDelivery.channel == NotificationChannel.INAPP,
             NotificationDelivery.status == NotificationStatus.SENT,
         )
-        .options(contains_eager(NotificationDelivery.notification))
     )
 
     order_column = (
@@ -146,13 +146,12 @@ async def get_notification(notification_id: uuid.UUID, current_user: CurrentUser
     stmt = (
         select(NotificationDelivery)
         .join(Notification)
+        .options(joinedload(NotificationDelivery.notification))
         .where(
-            NotificationDelivery.id == notification_id,
             Notification.user_id == current_user.id,
             NotificationDelivery.channel == NotificationChannel.INAPP,
             NotificationDelivery.status == NotificationStatus.SENT,
         )
-        .options(contains_eager(NotificationDelivery.notification))
     )
 
     result = await db.execute(stmt)

@@ -1,12 +1,10 @@
 import pytest
 from datetime import datetime
-from httpx import AsyncClient
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app
 
-# from app.conftest import logged_in_user_fixture
 from app.features.users.models import User
 from app.features.users.tests.fixtures import UserFactory
 from app.features.notifications.models import NotificationChannel, NotificationStatus
@@ -36,10 +34,7 @@ async def test_get_notifications_list_returns_correct_data(db_fixture: AsyncSess
     await db_fixture.commit()
     await db_fixture.refresh(notification_delivery)
 
-    # response = client.get("api/v1/notifications")
-
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("api/v1/notifications")
+    response = client.get("api/v1/notifications")
 
     assert response.status_code == 200
     data = response.json()
@@ -165,7 +160,6 @@ async def test_mark_single_notification_as_read(db_fixture: AsyncSession, logged
     assert response.status_code == 200
 
     await db_fixture.refresh(notification_delivery)
-    # assert notification_delivery.status == NotificationStatus.READ
     assert notification_delivery.read_at is not None
 
 
