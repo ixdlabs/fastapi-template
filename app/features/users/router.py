@@ -1,10 +1,10 @@
 from fastapi import APIRouter
 
-from app.features.users.views import login, refresh, register, users, me, verify_email
+from app.features.users.views import crud_users, login, refresh, register, me, verify_email
 
 
 user_router = APIRouter()
-user_router.include_router(users.router)
+user_router.include_router(crud_users.router)
 
 
 auth_router = APIRouter()
