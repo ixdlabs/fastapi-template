@@ -137,6 +137,20 @@ def test_expired_token_raises_auth_exception(
         authenticator_fixture.user(expired_token)
 
 
+def test_unexpected_user_payload_raises_auth_exception(
+    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+):
+    payload = {
+        "sub": str(user_fixture.id),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "user": {"unexpected_field": "unexpected_value"},
+    }
+    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+
+    with pytest.raises(AuthException):
+        authenticator_fixture.user(token)
+
+
 # Tests for get_current_user
 # ----------------------------------------------------------------------------------------------------------------------
 

@@ -68,13 +68,14 @@ class AuditLogger:
 
             # Resource snapshots
             # ----------------------------------------------------------------------------------------------------------
+            audit_log.new_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
             if action == "delete":
-                audit_log.old_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
+                audit_log.old_value = audit_log.new_value
+                audit_log.new_value = None
             elif action == "create":
-                audit_log.new_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
+                pass
             elif self.tracked_value is not None:
                 audit_log.old_value = self.tracked_value
-                audit_log.new_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
                 audit_log.changed_value = DeepDiff(audit_log.old_value, audit_log.new_value)
 
             # Persist audit log (Do not commit here, commit should be handled by caller)
