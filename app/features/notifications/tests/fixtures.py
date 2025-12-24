@@ -29,3 +29,4 @@ class NotificationDeliveryFactory(factory.Factory):
     title = factory.Faker("sentence", nb_words=5)
     body = factory.Faker("text", max_nb_chars=200)
     status = NotificationStatus.SENT
+    read_at = None

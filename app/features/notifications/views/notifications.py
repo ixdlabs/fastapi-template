@@ -49,8 +49,10 @@ router = APIRouter()
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@router.get("/", response_model=Page[NotificationOutput])
-async def get_notifications(query: Annotated[NotificationListInput, Query()], current_user: CurrentUserDep, db: DbDep):
+@router.get("/")
+async def get_notifications(
+    query: Annotated[NotificationListInput, Query()], current_user: CurrentUserDep, db: DbDep
+) -> Page[NotificationOutput]:
     """Lists all the In-App, SENT notifications of the user"""
     stmt = (
         select(NotificationDelivery)
@@ -104,7 +106,7 @@ async def count_unread_notifications(current_user: CurrentUserDep, db: DbDep) ->
             Notification.user_id == current_user.id,
             NotificationDelivery.channel == NotificationChannel.INAPP,
             NotificationDelivery.status == NotificationStatus.SENT,
-            NotificationDelivery.read_at is None,
+            NotificationDelivery.read_at.is_(None),
         )
     )
     count = await db.scalar(stmt) or 0
@@ -125,7 +127,7 @@ async def read_all_notifications(current_user: CurrentUserDep, db: DbDep):
             Notification.user_id == current_user.id,
             NotificationDelivery.channel == NotificationChannel.INAPP,
             NotificationDelivery.status == NotificationStatus.SENT,
-            NotificationDelivery.read_at is None,
+            NotificationDelivery.read_at.is_(None),
         )
     )
     stmt = update(NotificationDelivery).where(NotificationDelivery.id.in_(subquery)).values(read_at=datetime.now())
@@ -159,7 +161,19 @@ async def get_notification(notification_id: uuid.UUID, current_user: CurrentUser
     if notification is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
 
-    return NotificationOutput.model_validate(notification)
+    return NotificationOutput(
+        id=notification.id,
+        recipient=notification.recipient,
+        title=notification.title,
+        body=notification.body,
+        status=notification.status,
+        sent_at=notification.sent_at,
+        read_at=notification.read_at,
+        created_at=notification.created_at,
+        updated_at=notification.updated_at,
+        type=notification.notification.type,
+        data=notification.notification.data,
+    )
 
 
 # Read Notification POST endpoint

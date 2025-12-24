@@ -4,15 +4,18 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker, AsyncSession
+from types import SimpleNamespace
 
 from alembic import command, config
 
-from app.config.auth import Authenticator, get_authenticator
+from app.config.auth import Authenticator, get_authenticator, get_current_user
 from app.config.background import Background, get_background
 from app.config.cache import get_cache_backend
 from app.config.database import get_db_session
 from app.config.logging import setup_logging
 from app.config.rate_limit import get_rate_limit_strategy
+from app.features.users.tests.fixtures import UserFactory
+from app.features.users.models import User
 from limits.aio.storage import MemoryStorage
 from limits.aio.strategies import MovingWindowRateLimiter, RateLimiter
 from app.config.settings import Settings, get_settings
@@ -144,3 +147,19 @@ def override_dependencies(
 
     yield
     app.dependency_overrides.clear()
+
+
+# Fake user log in for tests
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture
+async def logged_in_user_fixture(db_fixture: AsyncSession):
+    user: User = UserFactory.build()
+    db_fixture.add(user)
+    await db_fixture.commit()
+    await db_fixture.refresh(user)
+    mock_user = SimpleNamespace(id=user.id, username=user.username)
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    yield user
+    del app.dependency_overrides[get_current_user]
