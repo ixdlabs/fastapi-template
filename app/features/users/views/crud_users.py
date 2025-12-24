@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import AwareDatetime, BaseModel, EmailStr, Field
 from sqlalchemy import select
 
+from app.config.audit_log import AuditLoggerDep
 from app.config.auth import CurrentUserDep
 from app.config.background import BackgroundDep
 from app.config.cache import CacheDep
@@ -139,7 +140,9 @@ async def user_list(
 @raises(status.HTTP_403_FORBIDDEN)
 @raises(status.HTTP_404_NOT_FOUND)
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep) -> None:
+async def delete_user(
+    user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep, audit_logger: AuditLoggerDep
+) -> None:
     """Delete a user by ID."""
     if current_user.type != UserType.ADMIN and current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this user")
@@ -149,6 +152,8 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    await audit_logger.add("delete", user)
 
     await db.delete(user)
     await db.commit()
@@ -163,7 +168,12 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 @raises(status.HTTP_404_NOT_FOUND)
 @router.put("/{user_id}")
 async def update_user(
-    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_user: CurrentUserDep, background: BackgroundDep
+    user_id: uuid.UUID,
+    form: UserUpdateInput,
+    db: DbDep,
+    current_user: CurrentUserDep,
+    background: BackgroundDep,
+    audit_logger: AuditLoggerDep,
 ) -> UserDetailOutput:
     """Update a user's first and last name."""
     if current_user.type != UserType.ADMIN and current_user.id != user_id:
@@ -188,6 +198,8 @@ async def update_user(
 
         task_input = SendEmailVerificationInput(user_id=user.id, email=form.email)
         await background.submit(send_email_verification_email_task, task_input.model_dump_json())
+
+    await audit_logger.add("update", user)
 
     await db.commit()
     await db.refresh(user)

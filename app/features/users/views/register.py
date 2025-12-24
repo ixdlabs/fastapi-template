@@ -69,6 +69,7 @@ async def register(
 
     # Create user
     user = User(
+        id=uuid.uuid4(),
         username=form.username,
         type=UserType.CUSTOMER,
         first_name=form.first_name,
@@ -76,14 +77,13 @@ async def register(
         joined_at=datetime.now(timezone.utc),
     )
     user.set_password(form.password)
+    await audit_logger.add("create", user)
+
     db.add(user)
     await db.commit()
-
-    # Audit log
-    await audit_logger.create_log("create", new_resource=user, exclude_columns=["hashed_password"], commit=True)
+    await db.refresh(user)
 
     # Send email verification if email provided
-    await db.refresh(user)
     if form.email is not None:
         task_input = SendEmailVerificationInput(user_id=user.id, email=form.email)
         await background.submit(send_email_verification_email_task, task_input.model_dump_json())
