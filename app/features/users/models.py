@@ -42,7 +42,7 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     notifications: Mapped[list["Notification"]] = relationship(
-        back_populates="user", passive_deletes=True, lazy="noload"
+        back_populates="user", passive_deletes=True, lazy="raise_on_sql"
     )
 
     def set_password(self, password: str):

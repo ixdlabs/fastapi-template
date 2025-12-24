@@ -16,7 +16,7 @@ import uuid
 from fastapi import Depends
 from sqlalchemy import inspect
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import DeclarativeBase, Mapper, RelationshipProperty
+from sqlalchemy.orm import DeclarativeBase, Mapper, RelationshipProperty, attributes
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.util import Properties
 
@@ -89,6 +89,9 @@ class Base(DeclarativeBase):
 
         if nested:
             for key in self.relations:
+                state = attributes.instance_state(self)
+                if key in state.unloaded:
+                    continue
                 obj = getattr(self, key)
                 if isinstance(obj, Base):
                     result[key] = obj.to_dict(hybrid_attributes=hybrid_attributes)
