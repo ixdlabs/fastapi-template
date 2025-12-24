@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.config.database import Base, create_db_engine, get_db
+from app.config.database import Base, create_db_engine, get_db, get_db_session
 from app.config.settings import Settings
 
 from pytest import MonkeyPatch
@@ -60,7 +60,7 @@ def test_to_dict_with_hybrid_properties():
     assert data["name_upper"] == "ALICE"
 
 
-def test_to_dict_nested_relationships():
+def test_to_dict_nested_list_relationships():
     parent = Parent(name="alice")
     child1 = Child(value="a", parent=parent)
     child2 = Child(value="b", parent=parent)
@@ -71,6 +71,17 @@ def test_to_dict_nested_relationships():
     assert "children" in data
     assert len(data["children"]) == 2
     assert data["children"][0]["value"] in {"a", "b"}
+
+
+def test_to_dict_nested_single_relationship():
+    child = Child(value="x")
+    parent = Parent(name="bob")
+    child.parent = parent
+
+    data = child.to_dict(nested=True)
+
+    assert "parent" in data
+    assert data["parent"]["name"] == "bob"
 
 
 def test_to_dict_nested_with_hybrids():
@@ -103,6 +114,13 @@ def test_create_db_engine_is_cached(monkeypatch: MonkeyPatch):
     assert engine_three is not engine_one
 
     create_db_engine.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_get_db_session_provides_session():
+    test_settings = Settings.model_construct(database_url="sqlite+aiosqlite:///:memory:", debug=True)
+    async for db in get_db_session(test_settings):
+        assert str(db.bind.url) == "sqlite+aiosqlite:///:memory:"
 
 
 @pytest.mark.asyncio

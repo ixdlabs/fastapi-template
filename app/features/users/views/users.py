@@ -2,15 +2,18 @@ from datetime import datetime
 from typing import Annotated, Literal
 import uuid
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from app.config.auth import CurrentUserDep
+from app.config.background import BackgroundDep
 from app.config.cache import CacheDep
 from app.config.database import DbDep
+from app.config.exceptions import raises
 from app.config.pagination import Page, paginate
 from app.config.rate_limit import RateLimitDep
-from app.features.users.models import User
+from app.features.users.models import User, UserType
+from app.features.users.tasks.email_verification import SendEmailVerificationInput, send_email_verification_email_task
 
 
 class UserFilterInput(BaseModel):
@@ -22,6 +25,7 @@ class UserFilterInput(BaseModel):
 
 class UserListOutput(BaseModel):
     id: uuid.UUID
+    type: UserType
     username: str
     first_name: str
     last_name: str
@@ -29,16 +33,20 @@ class UserListOutput(BaseModel):
 
 class UserDetailOutput(BaseModel):
     id: uuid.UUID
+    type: UserType
     username: str
     first_name: str
     last_name: str
+    email: str | None
+    joined_at: datetime
     created_at: datetime
     updated_at: datetime
 
 
 class UserUpdateInput(BaseModel):
-    first_name: str
-    last_name: str
+    first_name: str = Field(..., min_length=1, max_length=256)
+    last_name: str = Field(..., min_length=1, max_length=256)
+    email: EmailStr | None = Field(None, max_length=320)
 
 
 router = APIRouter()
@@ -47,6 +55,9 @@ router = APIRouter()
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED)
+@raises(status.HTTP_403_FORBIDDEN)
+@raises(status.HTTP_404_NOT_FOUND)
 @router.get("/{user_id}")
 async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep, cache: CacheDep) -> UserDetailOutput:
     """Get detailed information about a specific user."""
@@ -54,19 +65,23 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
     if cache_result := await cache.get():
         return cache_result
 
-    if current_user.id != user_id:
+    if current_user.type != UserType.ADMIN and current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this user")
 
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    assert user is not None, "User not found - Sanity check failed"
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     response = UserDetailOutput(
         id=user.id,
+        type=user.type,
         username=user.username,
         first_name=user.first_name,
         last_name=user.last_name,
+        email=user.email,
+        joined_at=user.joined_at,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
@@ -80,6 +95,7 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_429_TOO_MANY_REQUESTS)
 @router.get("/")
 async def user_list(
     db: DbDep, query: Annotated[UserFilterInput, Query()], rate_limit: RateLimitDep, cache: CacheDep
@@ -106,6 +122,7 @@ async def user_list(
     response = result.map_to(
         lambda user: UserListOutput(
             id=user.id,
+            type=user.type,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,
@@ -119,16 +136,20 @@ async def user_list(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED)
+@raises(status.HTTP_403_FORBIDDEN)
+@raises(status.HTTP_404_NOT_FOUND)
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep) -> None:
     """Delete a user by ID."""
-    if current_user.id != user_id:
+    if current_user.type != UserType.ADMIN and current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this user")
 
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    assert user is not None, "User not found - Sanity check failed"
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     await db.delete(user)
     await db.commit()
@@ -138,29 +159,48 @@ async def delete_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED)
+@raises(status.HTTP_403_FORBIDDEN)
+@raises(status.HTTP_404_NOT_FOUND)
 @router.put("/{user_id}")
 async def update_user(
-    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_user: CurrentUserDep
+    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_user: CurrentUserDep, background: BackgroundDep
 ) -> UserDetailOutput:
     """Update a user's first and last name."""
-    if current_user.id != user_id:
+    if current_user.type != UserType.ADMIN and current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this user")
 
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    assert user is not None, "User not found - Sanity check failed"
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     user.first_name = form.first_name
     user.last_name = form.last_name
+
+    # If email is being updated, check for uniqueness and send verification email
+    if form.email is not None and user.email != form.email:
+        email_stmt = select(User).where(User.email == form.email).where(User.id != user.id)
+        email_result = await db.execute(email_stmt)
+        email_user = email_result.scalar_one_or_none()
+        if email_user is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
+
+        task_input = SendEmailVerificationInput(user_id=user.id, email=form.email)
+        await background.submit(send_email_verification_email_task, task_input.model_dump_json())
+
     await db.commit()
     await db.refresh(user)
 
     return UserDetailOutput(
         id=user.id,
+        type=user.type,
         username=user.username,
         first_name=user.first_name,
         last_name=user.last_name,
+        email=user.email,
+        joined_at=user.joined_at,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )

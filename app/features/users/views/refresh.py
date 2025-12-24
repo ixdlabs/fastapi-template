@@ -1,18 +1,19 @@
 import uuid
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 import logging
 
 from app.config.auth import AuthenticatorDep, AuthException
 from app.config.database import DbDep
-from app.features.users.models import User
+from app.config.exceptions import raises
+from app.features.users.models import User, UserType
 
 logger = logging.getLogger(__name__)
 
 
 class RefreshInput(BaseModel):
-    refresh_token: str
+    refresh_token: str = Field(..., min_length=1)
 
 
 class RefreshOutput(BaseModel):
@@ -23,6 +24,7 @@ class RefreshOutput(BaseModel):
 
 class RefreshOutputUser(BaseModel):
     id: uuid.UUID
+    type: UserType
     username: str
     first_name: str
     last_name: str
@@ -35,6 +37,7 @@ router = APIRouter()
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
 @router.post("/refresh")
 async def refresh(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep) -> RefreshOutput:
     """Refresh the user's tokens using refresh token."""
@@ -42,7 +45,7 @@ async def refresh(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep
         user_id = authenticator.sub(form.refresh_token)
     except AuthException as e:
         logger.warning("token validation failed", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials") from e
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from e
 
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
@@ -56,6 +59,7 @@ async def refresh(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep
         refresh_token=refresh_token,
         user=RefreshOutputUser(
             id=user.id,
+            type=user.type,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,

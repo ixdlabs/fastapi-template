@@ -1,3 +1,5 @@
+import os
+import time
 from fastapi import FastAPI
 import uvicorn
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -19,6 +21,9 @@ from app import worker  # noqa: F401
 settings = get_settings()
 setup_logging(settings)
 
+os.environ["TZ"] = settings.server_timezone
+time.tzset()
+
 app = FastAPI(
     title="Sample API",
     description="This is a sample API built with FastAPI.",
@@ -31,6 +36,7 @@ app = FastAPI(
 
 db_engine = create_db_engine_from_settings(settings)
 setup_open_telemetry(app, db_engine, settings)
+app.openapi = openapi.custom(app)  # type: ignore[method-assign]
 
 app.include_router(openapi.router)
 app.include_router(router_registry.router)

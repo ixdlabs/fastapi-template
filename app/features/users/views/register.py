@@ -1,21 +1,24 @@
+from datetime import datetime
 import uuid
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from app.config.audit_log import AuditLoggerDep
 from app.config.auth import AuthenticatorDep
 from app.config.background import BackgroundDep
 from app.config.database import DbDep
-from app.features.users.models import User
-from app.features.users.tasks.welcome_email import send_welcome_email_task
+from app.config.exceptions import raises
+from app.features.users.models import User, UserType
+from app.features.users.tasks.email_verification import SendEmailVerificationInput, send_email_verification_email_task
 
 
 class RegisterInput(BaseModel):
-    username: str
-    password: str
-    first_name: str
-    last_name: str
+    username: str = Field(..., min_length=3, max_length=64)
+    password: str = Field(..., min_length=1, max_length=128)
+    first_name: str = Field(..., min_length=1, max_length=256)
+    last_name: str = Field(..., min_length=1, max_length=256)
+    email: EmailStr | None = Field(None, max_length=320)
 
 
 class RegisterOutput(BaseModel):
@@ -26,9 +29,11 @@ class RegisterOutput(BaseModel):
 
 class RegisterOutputUser(BaseModel):
     id: uuid.UUID
+    type: UserType
     username: str
     first_name: str
     last_name: str
+    joined_at: datetime
 
 
 router = APIRouter()
@@ -37,6 +42,7 @@ router = APIRouter()
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_400_BAD_REQUEST)
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     form: RegisterInput,
@@ -46,13 +52,26 @@ async def register(
     audit_logger: AuditLoggerDep,
 ) -> RegisterOutput:
     """Register a new user."""
-    stmt = select(User).where(User.username == form.username)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-    if user is not None:
+    username_check_stmt = select(User).where(User.username == form.username)
+    username_check_result = await db.execute(username_check_stmt)
+    username_check_user = username_check_result.scalar_one_or_none()
+    if username_check_user is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
 
-    user = User(username=form.username, first_name=form.first_name, last_name=form.last_name)
+    if form.email is not None:
+        email_check_stmt = select(User).where(User.email == form.email)
+        email_check_result = await db.execute(email_check_stmt)
+        email_check_user = email_check_result.scalar_one_or_none()
+        if email_check_user is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
+
+    user = User(
+        username=form.username,
+        type=UserType.CUSTOMER,
+        first_name=form.first_name,
+        last_name=form.last_name,
+        joined_at=datetime.now(),
+    )
     user.set_password(form.password)
 
     db.add(user)
@@ -60,8 +79,9 @@ async def register(
     await db.refresh(user)
 
     await audit_logger.log("create", new_resource=user, exclude_columns=["hashed_password"])
-
-    await background.submit(send_welcome_email_task, user.id)
+    if form.email is not None:
+        task_input = SendEmailVerificationInput(user_id=user.id, email=form.email)
+        await background.submit(send_email_verification_email_task, task_input.model_dump_json())
 
     access_token, refresh_token = authenticator.encode(user)
     return RegisterOutput(
@@ -69,8 +89,10 @@ async def register(
         refresh_token=refresh_token,
         user=RegisterOutputUser(
             id=user.id,
+            type=user.type,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,
+            joined_at=user.joined_at,
         ),
     )
