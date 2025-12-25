@@ -65,20 +65,6 @@ async def test_verify_email_invalid_token(db_fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_verify_email_user_not_found(db_fixture: AsyncSession):
-    action: UserAction = UserActionFactory.build(user_id=uuid.uuid4(), data={"email": "new@example.com"})
-    action.set_token("valid-token")
-
-    db_fixture.add(action)
-    await db_fixture.commit()
-    await db_fixture.refresh(action)
-
-    response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "valid-token"})
-    assert response.status_code == 404
-    assert response.json()["detail"] == "User not found"
-
-
-@pytest.mark.asyncio
 async def test_verify_email_email_already_in_use(db_fixture: AsyncSession):
     user1: User = UserFactory.build(email="user1@example.com")
     user2: User = UserFactory.build(email="user2@example.com")

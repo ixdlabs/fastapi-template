@@ -2,6 +2,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from app.config.audit_log import AuditLoggerDep
 from app.config.database import DbDep
@@ -31,7 +32,12 @@ router = APIRouter()
 async def verify_email(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLoggerDep) -> VerifyEmailOutput:
     """Verify email of a user using the generated token."""
     # Retrieve the action record
-    stmt = select(UserAction).where(UserAction.id == form.action_id)
+    stmt = (
+        select(UserAction)
+        .join(UserAction.user)
+        .options(joinedload(UserAction.user))
+        .where(UserAction.id == form.action_id)
+    )
     result = await db.execute(stmt)
     action = result.scalar_one_or_none()
     if action is None:
@@ -45,12 +51,7 @@ async def verify_email(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLog
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Action data is missing email")
     action_email = action.data["email"]
 
-    # Retrieve the user associated with the action
-    user_stmt = select(User).where(User.id == action.user_id)
-    user_result = await db.execute(user_stmt)
-    user = user_result.scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user = action.user
 
     # Check if email is already used by another user
     email_other_stmt = select(User).where(User.email == action_email).where(User.id != user.id)
@@ -63,8 +64,6 @@ async def verify_email(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLog
     await audit_logger.track(user)
     user.email = action_email
     action.state = UserActionState.COMPLETED
-    db.add(user)
-    db.add(action)
 
     await audit_logger.record("verify_email", user)
     await db.commit()

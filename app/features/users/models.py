@@ -11,7 +11,7 @@ from app.config.database import Base
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
-from sqlalchemy import JSON, UUID, Enum, String
+from sqlalchemy import JSON, UUID, Enum, ForeignKey, String
 
 from app.config.timezone import DateTimeUTC, utc_now
 
@@ -19,13 +19,15 @@ if typing.TYPE_CHECKING:
     from app.features.notifications.models import Notification
 
 
+# User
+# This is the primary user model representing users in the system. Login is based on username.
+# Email is optional and unique and kept primarily for forgot password flows (email has to be verified before being set).
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 class UserType(enum.Enum):
     ADMIN = "admin"
     CUSTOMER = "customer"
-
-
-# User
-# ----------------------------------------------------------------------------------------------------------------------
 
 
 class User(Base):
@@ -34,6 +36,16 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     type: Mapped[UserType] = mapped_column(Enum(UserType))
     username: Mapped[str] = mapped_column(String, unique=True)
+
+    # This system follows the pattern of emails being unique but optional.
+    # As a result, only one user can have a given email at a time, but users can have no email at all.
+    # This is acceptable since the login identifier is the username, not the email.
+    # To make sure the email is not locked down unnecessarily, the email is set only when the user verifies it.
+    # Until then the email field is null and the email under verification is stored in the UserAction data.
+    #
+    # But in case of adapting to a system where email is required, unique, and used for login,
+    # email can be set at registration and a separate flag can be used to indicate whether it's verified or not.
+    # Then the email verification process would only update the flag to verified.
     email: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
 
     first_name: Mapped[str] = mapped_column(String)
@@ -44,6 +56,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now, onupdate=utc_now)
 
+    actions: Mapped[list["UserAction"]] = relationship(back_populates="user", passive_deletes=True, lazy="raise_on_sql")
     notifications: Mapped[list["Notification"]] = relationship(
         back_populates="user", passive_deletes=True, lazy="raise_on_sql"
     )
@@ -60,7 +73,8 @@ class User(Base):
             return False
 
 
-# User Email Verification
+# User Action
+# User actions represent one-time actions that users can perform, such as email verification or password reset.
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -81,7 +95,7 @@ class UserAction(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     type: Mapped[UserActionType] = mapped_column(Enum(UserActionType))
     state: Mapped[UserActionState] = mapped_column(Enum(UserActionState), default=UserActionState.PENDING)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
 
     data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     hashed_token: Mapped[str] = mapped_column(String)
@@ -89,6 +103,8 @@ class UserAction(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTimeUTC)
     created_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now, onupdate=utc_now)
+
+    user: Mapped["User"] = relationship(back_populates="actions", lazy="raise_on_sql")
 
     def set_token(self, token: str):
         password_hasher = PasswordHasher()

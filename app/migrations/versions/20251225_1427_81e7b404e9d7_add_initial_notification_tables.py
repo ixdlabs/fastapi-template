@@ -1,9 +1,9 @@
 """
 Add initial notification tables
 
-Revision ID: 97e7f834a7d6
-Revises: 62063851dee2
-Create Date: 2025-12-24 16:25:26.420367
+Revision ID: 81e7b404e9d7
+Revises: c5fc9a287198
+Create Date: 2025-12-25 14:27:49.225883
 """
 
 from typing import Sequence, Union
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "97e7f834a7d6"
-down_revision: Union[str, Sequence[str], None] = "62063851dee2"
+revision: str = "81e7b404e9d7"
+down_revision: Union[str, Sequence[str], None] = "c5fc9a287198"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

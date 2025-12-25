@@ -96,24 +96,6 @@ async def test_reset_password_confirm_invalid_token(db_fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_reset_password_confirm_user_not_found(db_fixture: AsyncSession):
-    action: UserAction = UserActionFactory.build(user_id=uuid.uuid4(), type=UserActionType.PASSWORD_RESET)
-    action.set_token("valid-token")
-
-    db_fixture.add(action)
-    await db_fixture.commit()
-    await db_fixture.refresh(action)
-
-    response = client.post(
-        "/api/auth/reset-password-confirm",
-        json={"action_id": str(action.id), "token": "valid-token", "new_password": "password"},
-    )
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == "User not found"
-
-
-@pytest.mark.asyncio
 async def test_reset_password_confirm_already_completed(db_fixture: AsyncSession):
     user: User = UserFactory.build()
     db_fixture.add(user)
