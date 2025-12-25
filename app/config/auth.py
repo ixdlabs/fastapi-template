@@ -123,6 +123,12 @@ oauth2_scheme = OAuth2PasswordBearer(
 TokenDep = Annotated[str, Depends(oauth2_scheme)]
 
 
+class AuthenticationFailedException(ServiceException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    type = "auth/authentication-failed"
+    detail = "Authentication failed"
+
+
 def get_current_user(token: TokenDep, authenticator: AuthenticatorDep) -> AuthUser:
     try:
         return authenticator.user(token)
@@ -134,11 +140,32 @@ def get_current_user(token: TokenDep, authenticator: AuthenticatorDep) -> AuthUs
 CurrentUserDep = Annotated[AuthUser, Security(get_current_user)]
 
 
-# Exceptions
+# Dependency to only authenticate tasks (only authenticates if debug mode is on)
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AuthenticationFailedException(ServiceException):
+class TaskRunner(BaseModel):
+    id: str | None
+
+
+oauth2_scheme_debug_on = OAuth2PasswordBearer(
+    tokenUrl="/api/auth/oauth2/token",
+    refreshUrl="/api/auth/refresh",
+    scheme_name="JWT (Debug Only)",
+    auto_error=False,
+)
+
+
+class TaskRunningPermissionDeniedException(ServiceException):
     status_code = status.HTTP_401_UNAUTHORIZED
-    type = "auth/authentication-failed"
-    detail = "Authentication failed"
+    type = "auth/task-running-permission-denied"
+    detail = "Task running permission denied, this is only allowed in debug mode"
+
+
+def get_task_user(_: Annotated[str | None, Depends(oauth2_scheme_debug_on)], settings: SettingsDep) -> TaskRunner:
+    if settings.debug:
+        return TaskRunner(id="api-debug-mode")
+    raise TaskRunningPermissionDeniedException()
+
+
+TaskRunnerDep = Annotated[TaskRunner, Security(get_task_user)]

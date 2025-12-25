@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
+from app.config.auth import TaskRunnerDep
 from app.config.database import DbDep
 from app.config.settings import SettingsDep
 from app.features.users.models import UserAction, UserActionState, UserActionType
@@ -33,14 +34,18 @@ class SendPasswordResetOutput(BaseModel):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@router.post("send-password-reset-email")
+@router.post("/send-password-reset-email")
 async def send_password_reset_email(
-    task_input: SendPasswordResetInput, settings: SettingsDep, db: DbDep
+    task_input: SendPasswordResetInput, task_runner: TaskRunnerDep, settings: SettingsDep, db: DbDep
 ) -> SendPasswordResetOutput:
     """
     Sends a password reset email to the user by creating a new password reset action.
     This invalidates any existing pending password reset actions for the user.
+
+    In the REST API, this endpoint is only reachable in debug mode to allow testing.
     """
+    logger.info("Task initiated by runner_id=%s", task_runner.id)
+
     # Invalidate existing pending password reset actions
     update_stmt = (
         update(UserAction)

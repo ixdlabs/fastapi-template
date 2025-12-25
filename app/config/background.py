@@ -78,7 +78,7 @@ def shared_async_task(name: str):
                 raise error_container["error"]
             return result_container["result"]
 
-        return shared_task(name=name)(wrapper)
+        return shared_task(name=name, bind=True)(wrapper)
 
     return decorator
 
