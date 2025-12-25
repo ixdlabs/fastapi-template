@@ -1,13 +1,17 @@
 from typing import Annotated
 import uuid
-from fastapi import APIRouter, HTTPException, status, Form
+from fastapi import APIRouter, status, Form
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.config.auth import AuthenticatorDep
 from app.config.database import DbDep
-from app.config.exceptions import raises
+from app.config.exceptions import ServiceException, raises
 from app.features.users.models import User, UserType
+
+
+# Input/Output
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class LoginInput(BaseModel):
@@ -34,12 +38,22 @@ class OAuth2TokenResponse(BaseModel):
     token_type: str
 
 
-router = APIRouter()
+# Exceptions
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class InvalidUsernameOrPasswordException(ServiceException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    type = "users/login/invalid-username-or-password"
+    detail = "Invalid username or password"
 
 
 # Token endpoint (for OAuth2 compatibility)
 # This in only implemented to support authentication in Swagger UI itself.
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+router = APIRouter()
 
 
 @router.post("/oauth2/token", include_in_schema=False)
@@ -54,7 +68,7 @@ async def oauth2(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@raises(status.HTTP_401_UNAUTHORIZED, "Invalid username or password")
+@raises(InvalidUsernameOrPasswordException)
 @router.post("/login")
 async def login(form: LoginInput, db: DbDep, authenticator: AuthenticatorDep) -> LoginOutput:
     """Login a user and return access and refresh tokens."""
@@ -63,12 +77,12 @@ async def login(form: LoginInput, db: DbDep, authenticator: AuthenticatorDep) ->
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+        raise InvalidUsernameOrPasswordException()
 
     # Verify password
     password_valid = user.check_password(form.password)
     if not password_valid:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+        raise InvalidUsernameOrPasswordException()
 
     # Generate tokens
     access_token, refresh_token = authenticator.encode(user)

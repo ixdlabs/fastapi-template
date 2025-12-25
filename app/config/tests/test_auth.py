@@ -3,9 +3,8 @@ import uuid
 import jwt
 import pytest
 import pytest_asyncio
-from fastapi import HTTPException
 
-from app.config.auth import AuthUser, AuthException, get_current_user, get_authenticator
+from app.config.auth import AuthUser, AuthException, AuthenticationFailedException, get_current_user, get_authenticator
 from app.config.auth import Authenticator
 from app.config.settings import Settings
 
@@ -156,7 +155,7 @@ def test_unexpected_user_payload_raises_auth_exception(
 
 
 def test_get_current_user_raises_401(authenticator_fixture: Authenticator):
-    with pytest.raises(HTTPException):
+    with pytest.raises(AuthenticationFailedException):
         get_current_user("invalid.token.value", authenticator_fixture)
 
 

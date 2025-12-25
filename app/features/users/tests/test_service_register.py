@@ -51,7 +51,7 @@ async def test_user_cannot_register_with_existing_username(db_fixture: AsyncSess
     }
     response = client.post("/api/auth/register", json=user_data)
     assert response.status_code == 400
-    assert response.json() == {"detail": "Username already exists"}
+    assert response.json()["detail"] == "Username already exists"
 
 
 @pytest.mark.asyncio
@@ -70,4 +70,4 @@ async def test_user_cannot_register_with_existing_email(db_fixture: AsyncSession
     }
     response = client.post("/api/auth/register", json=user_data)
     assert response.status_code == 400
-    assert response.json() == {"detail": "Email already exists"}
+    assert response.json()["detail"] == "Email already exists"

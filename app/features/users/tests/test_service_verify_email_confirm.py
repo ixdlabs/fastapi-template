@@ -83,7 +83,7 @@ async def test_verify_email_confirm_email_already_in_use(db_fixture: AsyncSessio
 
     response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 400
-    assert response.json()["detail"] == "Email already in use by another user"
+    assert response.json()["detail"] == "Email is already in use by another user"
 
 
 @pytest.mark.asyncio
@@ -141,4 +141,4 @@ async def test_verify_email_confirm_missing_email_in_action_data(db_fixture: Asy
 
     response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 400
-    assert response.json()["detail"] == "No email found in action data"
+    assert response.json()["detail"] == "Invalid action token"

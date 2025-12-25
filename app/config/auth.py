@@ -10,11 +10,12 @@ import logging
 from typing import Annotated, Any
 import uuid
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, Security, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
 from pydantic import BaseModel, ValidationError
 
+from app.config.exceptions import ServiceException
 from app.config.settings import Settings, SettingsDep
 from app.features.users.models import User, UserType
 
@@ -127,7 +128,17 @@ def get_current_user(token: TokenDep, authenticator: AuthenticatorDep) -> AuthUs
         return authenticator.user(token)
     except AuthException as e:
         logger.warning("token validation failed", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials") from e
+        raise AuthenticationFailedException() from e
 
 
 CurrentUserDep = Annotated[AuthUser, Security(get_current_user)]
+
+
+# Exceptions
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class AuthenticationFailedException(ServiceException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    type = "auth/authentication-failed"
+    detail = "Authentication failed"

@@ -49,7 +49,7 @@ async def test_change_password_incorrect_old_password(db_fixture: AsyncSession, 
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "Old password is incorrect."
+    assert response.json()["detail"] == "Old password is incorrect"
 
 
 @pytest.mark.asyncio
@@ -67,7 +67,7 @@ async def test_change_password_same_as_old(db_fixture: AsyncSession, authenticat
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "New password must be different from old password."
+    assert response.json()["detail"] == "New password must be different from old password"
 
 
 @pytest.mark.asyncio

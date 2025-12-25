@@ -81,3 +81,12 @@ def shared_async_task(name: str):
         return shared_task(name=name)(wrapper)
 
     return decorator
+
+
+# Helper to get the import string for a Celery task.
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def celery_import_string(task: CeleryTask) -> str:
+    """Get the import string for a Celery task."""
+    return f"{task.__module__}.{task.__name__}"

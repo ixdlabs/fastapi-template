@@ -1,13 +1,13 @@
 from http import HTTPStatus
 from unittest.mock import MagicMock
-from fastapi import FastAPI, status
+from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import BaseRoute
 import pytest
 
 from fastapi.testclient import TestClient
 from app.config import openapi
-from app.config.exceptions import raises
+from app.config.exceptions import ServiceException, raises
 from app.main import app
 
 client = TestClient(app)
@@ -42,27 +42,31 @@ def app_fixture():
     return test_app
 
 
-def test_add_route_response_adds_new_response(app_fixture: FastAPI):
+class SampleException(ServiceException):
+    status_code = 400
+    type = "sample/error"
+    detail = "This is a sample error"
+
+
+def test_add_service_exception_documentation_adds_new_response(app_fixture: FastAPI):
     openapi_schema = get_openapi(title=app_fixture.title, version=app_fixture.version, routes=app_fixture.routes)
     route: BaseRoute = next(r for r in app_fixture.routes if getattr(r, "path") == "/items")
-    openapi.add_route_response(route, openapi_schema=openapi_schema, status_code=404, descriptions=["Not found"])
-    response = openapi_schema["paths"]["/items"]["get"]["responses"]["404"]
+    openapi.add_service_exception_documentation(route, openapi_schema, status_code=400, exceptions=[SampleException])
+    response = openapi_schema["paths"]["/items"]["get"]["responses"]["400"]
 
-    assert response["description"] == HTTPStatus.NOT_FOUND.phrase
+    assert response["description"] == HTTPStatus.BAD_REQUEST.phrase
     assert response["content"]["application/json"]["schema"]["properties"]["detail"]["type"] == "string"
-    assert "Not found" in response["content"]["application/json"]["examples"]
-    assert response["content"]["application/json"]["examples"]["Not found"]["value"] == {"detail": "Not found"}
+    assert "sample/error" in response["content"]["application/json"]["examples"]
+    assert response["content"]["application/json"]["examples"]["sample/error"]["value"]["type"] == "sample/error"
 
 
-def test_add_route_response_does_not_override_existing_response(app_fixture: FastAPI):
+def test_add_service_exception_documentation_does_not_override_existing_response(app_fixture: FastAPI):
     openapi_schema = get_openapi(title=app_fixture.title, version=app_fixture.version, routes=app_fixture.routes)
     route: BaseRoute = next(r for r in app_fixture.routes if getattr(r, "path") == "/items")
-    openapi_schema["paths"]["/items"]["get"]["responses"]["404"] = {"description": "Existing"}
-    openapi.add_route_response(
-        route=route, openapi_schema=openapi_schema, status_code=404, descriptions=["New description"]
-    )
+    openapi_schema["paths"]["/items"]["get"]["responses"]["400"] = {"description": "Existing"}
+    openapi.add_service_exception_documentation(route, openapi_schema, status_code=400, exceptions=[SampleException])
 
-    assert openapi_schema["paths"]["/items"]["get"]["responses"]["404"]["description"] == "Existing"
+    assert openapi_schema["paths"]["/items"]["get"]["responses"]["400"]["description"] == "Existing"
 
 
 def test_custom_returns_cached_openapi_schema():
@@ -75,8 +79,7 @@ def test_custom_returns_cached_openapi_schema():
 def test_custom_adds_raises_metadata_to_openapi():
     test_app = FastAPI()
 
-    @raises(status.HTTP_404_NOT_FOUND, reason="Not found")
-    @raises(status.HTTP_404_NOT_FOUND)
+    @raises(SampleException)
     @test_app.get("/items")
     def get_items():
         return "items"
@@ -85,14 +88,14 @@ def test_custom_adds_raises_metadata_to_openapi():
 
     schema = openapi.custom(test_app)()
     responses = schema["paths"]["/items"]["get"]["responses"]
-    assert "404" in responses
-    assert "Not found" in responses["404"]["content"]["application/json"]["examples"]
+    assert "400" in responses
+    assert "sample/error" in responses["400"]["content"]["application/json"]["examples"]
 
 
 def test_custom_ignores_routes_not_in_schema():
     test_app = FastAPI()
 
-    @raises(status.HTTP_400_BAD_REQUEST, reason="Bad request")
+    @raises(SampleException)
     @test_app.get("/hidden", include_in_schema=False)
     def hidden():
         return "hidden"
@@ -103,10 +106,10 @@ def test_custom_ignores_routes_not_in_schema():
     assert "/hidden" not in schema["paths"]
 
 
-def test_custom_calls_add_route_response(monkeypatch):
+def test_custom_calls_add_service_exception_documentation(monkeypatch):
     test_app = FastAPI()
 
-    @raises(status.HTTP_400_BAD_REQUEST, reason="Bad request")
+    @raises(SampleException)
     @test_app.get("/items")
     def get_items():
         return "items"
@@ -114,6 +117,6 @@ def test_custom_calls_add_route_response(monkeypatch):
     assert get_items() == "items"
 
     spy = MagicMock()
-    monkeypatch.setattr("app.config.openapi.add_route_response", spy)
+    monkeypatch.setattr("app.config.openapi.add_service_exception_documentation", spy)
     openapi.custom(test_app)()
     spy.assert_called_once()

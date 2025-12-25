@@ -1,16 +1,20 @@
 from datetime import datetime, timedelta, timezone
 import logging
 import uuid
+from fastapi import APIRouter
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
-from app.config.background import shared_async_task
-from app.config.database import DbDep, get_db
-from app.config.settings import SettingsDep, get_settings
+from app.config.database import DbDep
+from app.config.settings import SettingsDep
 from app.features.users.models import UserAction, UserActionState, UserActionType
 
 
 logger = logging.getLogger(__name__)
+
+
+# Input/Output
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class SendPasswordResetInput(BaseModel):
@@ -18,7 +22,27 @@ class SendPasswordResetInput(BaseModel):
     email: EmailStr
 
 
-async def send_password_reset_email(task_input: SendPasswordResetInput, settings: SettingsDep, db: DbDep):
+class SendPasswordResetOutput(BaseModel):
+    detail: str = "Password reset email sent successfully."
+    action_id: uuid.UUID
+    token: str
+
+
+# Task/Endpoint implementation
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+router = APIRouter()
+
+
+@router.post("send-password-reset-email")
+async def send_password_reset_email(
+    task_input: SendPasswordResetInput, settings: SettingsDep, db: DbDep
+) -> SendPasswordResetOutput:
+    """
+    Sends a password reset email to the user by creating a new password reset action.
+    This invalidates any existing pending password reset actions for the user.
+    """
     # Invalidate existing pending password reset actions
     update_stmt = (
         update(UserAction)
@@ -40,15 +64,4 @@ async def send_password_reset_email(task_input: SendPasswordResetInput, settings
     await db.refresh(action)
 
     logger.info("Sending password reset email, action_id=%s, token=%s", action.id, token)
-
-
-# Task registration
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@shared_async_task("send_password_reset_email")
-async def send_password_reset_email_task(raw_task_input: str):
-    settings = get_settings()
-    async with get_db(settings) as db:
-        task_input = SendPasswordResetInput.model_validate_json(raw_task_input)
-        await send_password_reset_email(task_input=task_input, settings=settings, db=db)
+    return SendPasswordResetOutput(action_id=action.id, token=token)

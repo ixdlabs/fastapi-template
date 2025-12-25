@@ -3,15 +3,51 @@ This module defines custom exception handlers for the FastAPI application.
 Currently, it includes a handler for HTTP exceptions that logs server errors.
 """
 
+import abc
 from collections import defaultdict
 import logging
+from opentelemetry import trace
 from typing import Callable
 from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+import http
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException
 
 
+tracer = trace.get_tracer(__name__)
 logger = logging.getLogger(__name__)
+
+
+# Base Service Exception class implementing RFC 7807 error response format.
+# RFC: https://datatracker.ietf.org/doc/html/rfc7807
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ServiceException(abc.ABC, HTTPException):
+    status_code: int
+    type: str
+    detail: str
+
+    def __init__(self):
+        super().__init__(status_code=self.status_code, detail=self.detail)
+
+    def to_rfc7807(self) -> dict:
+        with tracer.start_as_current_span("rfc7807") as span:
+            return self.build_problem_details(trace_id=f"{span.get_span_context().trace_id:032x}")
+
+    @classmethod
+    def build_problem_details(cls, trace_id: str = "00000000000000000000000000000000") -> dict:
+        """Build a RFC 7807 compliant problem details dictionary."""
+        http_status = http.HTTPStatus(cls.status_code)
+        return {
+            "type": cls.type or "about:blank",
+            "title": http_status.phrase,
+            "status": cls.status_code,
+            "detail": cls.detail or http_status.description,
+            "trace_id": trace_id,
+        }
+
 
 # Custom handlers for HTTP exceptions that logs server errors.
 # ----------------------------------------------------------------------------------------------------------------------
@@ -20,6 +56,8 @@ logger = logging.getLogger(__name__)
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
     if exc.status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR:
         logger.error("server error", extra={"path": request.url.path}, exc_info=exc)
+    if isinstance(exc, ServiceException):
+        return JSONResponse(exc.to_rfc7807(), status_code=exc.status_code, headers=exc.headers)
     return await http_exception_handler(request, exc)
 
 
@@ -41,22 +79,13 @@ def register_exception_handlers(app: FastAPI):
 # Decorator to collect possible HTTP exceptions for documentation.
 # ----------------------------------------------------------------------------------------------------------------------
 
-possible_common_causes = {
-    status.HTTP_400_BAD_REQUEST: "The request contained invalid parameters.",
-    status.HTTP_401_UNAUTHORIZED: "Credentials were missing or invalid.",
-    status.HTTP_403_FORBIDDEN: "User is not authorized to perform the requested action.",
-    status.HTTP_404_NOT_FOUND: "The requested resource could not be found.",
-    status.HTTP_429_TOO_MANY_REQUESTS: "User has exceeded their rate limit.",
-}
 
-
-def raises(status_code: int, reason: str | None = None):
+def raises(exc: type[ServiceException]):
     """Decorator to collect possible HTTP exceptions for documentation."""
 
     def wrapper(func: Callable):
-        description = reason or possible_common_causes.get(status_code) or "string"
-        raising_causes: dict[int, list[str]] = getattr(func, "__raises__", defaultdict(list))
-        raising_causes[status_code].append(description)
+        raising_causes: dict[int, list[type[ServiceException]]] = getattr(func, "__raises__", defaultdict(list))
+        raising_causes[exc.status_code].append(exc)
         setattr(func, "__raises__", raising_causes)
         return func
 

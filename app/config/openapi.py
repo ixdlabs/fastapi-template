@@ -12,6 +12,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import BaseRoute
 
+from app.config.exceptions import ServiceException
+
 router = APIRouter()
 
 
@@ -64,10 +66,10 @@ def custom(app: FastAPI):
         for route in app.routes:
             if getattr(route, "include_in_schema", None):
                 endpoint = getattr(route, "endpoint")
-                raises: dict[int, list[str]] = getattr(endpoint, "__raises__", {})
-                for status_code, descriptions in raises.items():
-                    descriptions = [desc for desc in descriptions if desc is not None]
-                    add_route_response(route, openapi_schema, status_code, descriptions)
+                raises: dict[int, list[type[ServiceException]]] = getattr(endpoint, "__raises__", {})
+                for status_code, exceptions in raises.items():
+                    exceptions = [exc for exc in exceptions if exc is not None]
+                    add_service_exception_documentation(route, openapi_schema, status_code, exceptions)
 
         app.openapi_schema = openapi_schema
         return app.openapi_schema
@@ -75,7 +77,9 @@ def custom(app: FastAPI):
     return wrapper
 
 
-def add_route_response(route: BaseRoute, openapi_schema: dict, status_code: int, descriptions: list[str]):
+def add_service_exception_documentation(
+    route: BaseRoute, openapi_schema: dict, status_code: int, exceptions: list[type[ServiceException]]
+):
     route_path: str = getattr(route, "path")
     route_methods: list[str] = getattr(route, "methods")
     route_methods = [method.lower() for method in route_methods]
@@ -88,13 +92,19 @@ def add_route_response(route: BaseRoute, openapi_schema: dict, status_code: int,
                 "application/json": {
                     "schema": {
                         "type": "object",
-                        "properties": {"detail": {"type": "string"}},
+                        "properties": {
+                            "type": {"type": "string"},
+                            "title": {"type": "string"},
+                            "status": {"type": "integer"},
+                            "detail": {"type": "string"},
+                            "trace_id": {"type": "string"},
+                        },
                     },
                     "examples": {
-                        desc: {
-                            "value": {"detail": desc},
+                        exc.type: {
+                            "value": exc.build_problem_details(),
                         }
-                        for desc in descriptions
+                        for exc in exceptions
                     },
                 },
             },

@@ -1,16 +1,19 @@
 import logging
 import uuid
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from app.config.audit_log import AuditLoggerDep
 from app.config.database import DbDep
-from app.config.exceptions import raises
+from app.config.exceptions import ServiceException, raises
 from app.features.users.models import UserAction, UserActionState, UserActionType
 
 logger = logging.getLogger(__name__)
+
+# Input/Output
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class ResetPasswordConfirmInput(BaseModel):
@@ -23,14 +26,37 @@ class ResetPasswordConfirmOutput(BaseModel):
     detail: str = "Password has been reset successfully."
 
 
-router = APIRouter()
+# Exceptions
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ActionNotFoundException(ServiceException):
+    status_code = status.HTTP_404_NOT_FOUND
+    type = "users/reset-password-confirm/action-not-found"
+    detail = "Action not found"
+
+
+class InvalidActionTypeException(ServiceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    type = "users/reset-password-confirm/invalid-action-type"
+    detail = "Invalid action type"
+
+
+class InvalidActionTokenException(ServiceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    type = "users/reset-password-confirm/invalid-action-token"
+    detail = "Invalid action token"
+
 
 # Password Reset Confirm endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
+router = APIRouter()
 
-@raises(status.HTTP_400_BAD_REQUEST)
-@raises(status.HTTP_404_NOT_FOUND)
+
+@raises(ActionNotFoundException)
+@raises(InvalidActionTypeException)
+@raises(InvalidActionTokenException)
 @router.post("/reset-password-confirm")
 async def reset_password_confirm(
     form: ResetPasswordConfirmInput, db: DbDep, audit_logger: AuditLoggerDep
@@ -49,13 +75,13 @@ async def reset_password_confirm(
     result = await db.execute(stmt)
     action = result.scalar_one_or_none()
     if action is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Action not found")
+        raise ActionNotFoundException()
 
     # Validate action
     if action.type != UserActionType.PASSWORD_RESET:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action type")
+        raise InvalidActionTypeException()
     if not action.is_valid(form.token):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action token")
+        raise InvalidActionTokenException()
 
     # Reset password
     action.user.set_password(form.new_password)

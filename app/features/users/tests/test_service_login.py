@@ -14,7 +14,7 @@ client = TestClient(app)
 async def test_user_can_not_login_with_invalid_username():
     response = client.post("/api/auth/login", json={"username": "invaliduser", "password": "testpassword"})
     assert response.status_code == 401
-    assert response.json() == {"detail": "Invalid username or password"}
+    assert response.json()["detail"] == "Invalid username or password"
 
 
 @pytest.mark.asyncio
@@ -26,7 +26,7 @@ async def test__user_can_not_login_with_invalid_password(db_fixture: AsyncSessio
 
     response = client.post("/api/auth/login", json={"username": user.username, "password": "wrongpassword"})
     assert response.status_code == 401
-    assert response.json() == {"detail": "Invalid username or password"}
+    assert response.json()["detail"] == "Invalid username or password"
 
 
 @pytest.mark.asyncio
@@ -58,7 +58,7 @@ async def test_user_cannot_login_with_oauth2_invalid_password(db_fixture: AsyncS
 
     response = client.post("/api/auth/oauth2/token", data={"username": "testuser", "password": "testpassword"})
     assert response.status_code == 401
-    assert response.json() == {"detail": "Invalid username or password"}
+    assert response.json()["detail"] == "Invalid username or password"
 
 
 @pytest.mark.asyncio

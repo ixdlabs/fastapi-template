@@ -34,7 +34,11 @@ class AuditLogger:
             # Actor
             # ----------------------------------------------------------------------------------------------------------
             audit_log.actor_type = ActorType.ANONYMOUS
-            if self.request is not None and "Authorization" in self.request.headers:
+            if (
+                self.request is not None
+                and "Authorization" in self.request.headers
+                and self.request.headers["Authorization"].startswith("Bearer ")
+            ):
                 token = self.request.headers["Authorization"].split(" ")[1]
                 try:
                     user = self.authenticator.user(token)

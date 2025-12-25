@@ -4,9 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conftest import NoOpBackground
 from app.features.users.models import User
+from app.features.users.services.send_password_reset_email import SendPasswordResetInput
 from app.features.users.tests.fixtures import UserFactory
 from app.main import app
-from app.features.users.tasks.password_reset import SendPasswordResetInput
 
 client = TestClient(app)
 
@@ -37,5 +37,5 @@ async def test_reset_password_with_nonexistent_email_is_silent(background_fixtur
     payload = {"email": "doesnotexist@example.com"}
     response = client.post("/api/auth/reset-password", json=payload)
     assert response.status_code == 200
-    assert response.json() == {"detail": "If the email exists, a password reset link has been sent."}
+    assert response.json()["detail"] == "If the email exists, a password reset link has been sent."
     assert background_fixture.called_tasks == {}

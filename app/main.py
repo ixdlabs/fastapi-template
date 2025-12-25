@@ -12,7 +12,7 @@ from app.config.otel import setup_open_telemetry
 from app.config.settings import get_settings
 
 from app.features import model_registry  # noqa: F401
-from app.features import router_registry
+from app.features import view_registry
 
 from app import worker  # noqa: F401
 
@@ -34,7 +34,7 @@ setup_open_telemetry(app, db_engine, settings)
 app.openapi = openapi.custom(app)  # type: ignore[method-assign]
 
 app.include_router(openapi.router)
-app.include_router(router_registry.router)
+app.include_router(view_registry.router)
 
 register_exception_handlers(app)
 

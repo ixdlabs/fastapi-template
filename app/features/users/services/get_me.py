@@ -1,10 +1,14 @@
 import uuid
-from fastapi import APIRouter, status
+from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.config.auth import CurrentUserDep
+from app.config.auth import AuthenticationFailedException, CurrentUserDep
 from app.config.exceptions import raises
 from app.features.users.models import UserType
+
+
+# Input/Output
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class MeOutput(BaseModel):
@@ -15,13 +19,14 @@ class MeOutput(BaseModel):
     last_name: str
 
 
-router = APIRouter()
-
 # Me endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@raises(status.HTTP_401_UNAUTHORIZED)
+router = APIRouter()
+
+
+@raises(AuthenticationFailedException)
 @router.get("/me")
 async def get_me(current_user: CurrentUserDep) -> MeOutput:
     """Get the current authenticated user's information."""

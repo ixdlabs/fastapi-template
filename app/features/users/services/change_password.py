@@ -1,15 +1,19 @@
 import logging
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.config.audit_log import AuditLoggerDep
-from app.config.auth import CurrentUserDep
+from app.config.auth import AuthenticationFailedException, CurrentUserDep
 from app.config.database import DbDep
-from app.config.exceptions import raises
+from app.config.exceptions import ServiceException, raises
 from app.features.users.models import User
 
 logger = logging.getLogger(__name__)
+
+
+# Input/Output
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class ChangePasswordInput(BaseModel):
@@ -21,15 +25,38 @@ class ChangePasswordOutput(BaseModel):
     detail: str = "Password change successful."
 
 
-router = APIRouter()
+# Exceptions
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class UserNotFoundException(ServiceException):
+    status_code = status.HTTP_404_NOT_FOUND
+    type = "users/change-password/user-not-found"
+    detail = "User not found"
+
+
+class PasswordIncorrectException(ServiceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    type = "users/change-password/password-incorrect"
+    detail = "Old password is incorrect"
+
+
+class PasswordsIdenticalException(ServiceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    type = "users/change-password/passwords-identical"
+    detail = "New password must be different from old password"
+
 
 # Change Password endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
+router = APIRouter()
 
-@raises(status.HTTP_400_BAD_REQUEST)
-@raises(status.HTTP_401_UNAUTHORIZED)
-@raises(status.HTTP_404_NOT_FOUND)
+
+@raises(AuthenticationFailedException)
+@raises(PasswordIncorrectException)
+@raises(UserNotFoundException)
+@raises(PasswordsIdenticalException)
 @router.post("/change-password")
 async def change_password(
     form: ChangePasswordInput, current_user: CurrentUserDep, db: DbDep, audit_logger: AuditLoggerDep
@@ -44,15 +71,13 @@ async def change_password(
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise UserNotFoundException()
 
     # Verify old password and check new password validity
     if not user.check_password(form.old_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Old password is incorrect.")
+        raise PasswordIncorrectException()
     if form.old_password == form.new_password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="New password must be different from old password."
-        )
+        raise PasswordsIdenticalException()
 
     # Update the user's password
     user.set_password(form.new_password)

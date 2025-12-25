@@ -26,14 +26,7 @@ app.conf.imports = ("app.features.task_registry",)
 
 # Register periodic tasks from the task registry.
 # https://docs.celeryq.dev/en/main/userguide/periodic-tasks.html
-app.conf.beat_schedule = {
-    task.name: {
-        "task": task.task,
-        "schedule": task.schedule,
-        "args": task.args,
-    }
-    for task in task_registry.periodic_tasks
-}
+app.conf.beat_schedule = task_registry.periodic_tasks
 
 
 @worker_process_init.connect(weak=False)

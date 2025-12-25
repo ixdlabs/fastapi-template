@@ -6,9 +6,14 @@ from sqlalchemy import select
 from app.config.background import BackgroundDep
 from app.config.database import DbDep
 from app.features.users.models import User
-from app.features.users.tasks.password_reset import SendPasswordResetInput, send_password_reset_email_task
+from app.features.users.services.send_password_reset_email import SendPasswordResetInput
+from app.features.users.tasks import send_password_reset_email_task
 
 logger = logging.getLogger(__name__)
+
+
+# Input/Output
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class ResetPasswordInput(BaseModel):
@@ -19,10 +24,11 @@ class ResetPasswordOutput(BaseModel):
     detail: str = "If the email exists, a password reset link has been sent."
 
 
-router = APIRouter()
-
 # Password Reset endpoint
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+router = APIRouter()
 
 
 @router.post("/reset-password")

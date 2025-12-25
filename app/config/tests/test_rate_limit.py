@@ -1,7 +1,7 @@
-from fastapi import HTTPException, Request
+from fastapi import Request
 import pytest
 
-from app.config.rate_limit import RateLimit, get_rate_limit_strategy
+from app.config.rate_limit import RateLimit, RateLimitExceededException, get_rate_limit_strategy
 import time_machine
 
 
@@ -68,12 +68,12 @@ async def test_limit_blocks_when_exceeded():
         # First hit is allowed
         await rate_limit.limit("1/minute")
         # Second hit in same window should fail
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(RateLimitExceededException) as exc:
             await rate_limit.limit("1/minute")
 
         exception = exc.value
         assert exception.status_code == 429
-        assert exception.detail == "Too Many Requests"
+        assert exception.detail == "You have exceeded your rate limit"
         assert exception.headers is not None
         assert "X-RateLimit-Reset" in exception.headers
 
@@ -88,7 +88,7 @@ async def test_limit_resets_after_window():
         # First request
         await rate_limit.limit("1/minute")
         # Second request blocked
-        with pytest.raises(HTTPException):
+        with pytest.raises(RateLimitExceededException):
             await rate_limit.limit("1/minute")
 
     with time_machine.travel("2025-01-01 00:01:01"):
@@ -105,7 +105,7 @@ async def test_rate_limit_reset_header_is_correct():
 
         await rate_limit.limit("1/minute")
 
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(RateLimitExceededException) as exc:
             await rate_limit.limit("1/minute")
 
         assert exc.value.headers is not None

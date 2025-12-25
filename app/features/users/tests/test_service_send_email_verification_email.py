@@ -1,4 +1,3 @@
-from unittest.mock import AsyncMock
 import uuid
 import pytest
 from datetime import datetime, timezone, timedelta
@@ -7,10 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import Settings
 from app.features.users.models import UserAction, UserActionState, UserActionType
-from app.features.users.tasks.email_verification import (
+from app.features.users.services.send_email_verification_email import (
     SendEmailVerificationInput,
     send_email_verification_email,
-    send_email_verification_email_task,
 )
 
 
@@ -62,23 +60,3 @@ async def test_send_email_verification_email_creates_action_and_invalidates_prev
 
     # Expiration window correctness
     assert before_call + timedelta(minutes=30) <= new_action.expires_at <= after_call + timedelta(minutes=30)
-
-
-@pytest.mark.asyncio
-async def test_send_email_verification_email_task_calls_function(monkeypatch: pytest.MonkeyPatch):
-    user_id = uuid.uuid4()
-    email = "test@example.com"
-
-    task_input = SendEmailVerificationInput(user_id=user_id, email=email)
-    raw_task_input = task_input.model_dump_json()
-
-    mocked_function = AsyncMock()
-    monkeypatch.setattr("app.config.database.get_db", AsyncMock())
-    monkeypatch.setattr("app.features.users.tasks.email_verification.send_email_verification_email", mocked_function)
-
-    send_email_verification_email_task(raw_task_input)
-    mocked_function.assert_awaited_once()
-    args, kwargs = mocked_function.call_args
-    called_task_input = kwargs.get("task_input") or args[0]
-    assert called_task_input.user_id == user_id
-    assert called_task_input.email == email

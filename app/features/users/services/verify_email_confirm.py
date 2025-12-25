@@ -1,13 +1,17 @@
 import uuid
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from app.config.audit_log import AuditLoggerDep
 from app.config.database import DbDep
-from app.config.exceptions import raises
+from app.config.exceptions import ServiceException, raises
 from app.features.users.models import User, UserAction, UserActionState, UserActionType
+
+
+# Input/Output
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class VerifyEmailInput(BaseModel):
@@ -20,14 +24,45 @@ class VerifyEmailOutput(BaseModel):
     email: str
 
 
-router = APIRouter()
+# Exceptions
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ActionNotFoundException(ServiceException):
+    status_code = status.HTTP_404_NOT_FOUND
+    type = "users/verify-email-confirm/action-not-found"
+    detail = "Action not found"
+
+
+class InvalidActionTypeException(ServiceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    type = "users/verify-email-confirm/invalid-action-type"
+    detail = "Invalid action type"
+
+
+class InvalidActionTokenException(ServiceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    type = "users/verify-email-confirm/invalid-action-token"
+    detail = "Invalid action token"
+
+
+class EmailAlreadyInUseException(ServiceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    type = "users/verify-email-confirm/email-already-in-use"
+    detail = "Email is already in use by another user"
+
 
 # Verify Email endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@raises(status.HTTP_400_BAD_REQUEST)
-@raises(status.HTTP_404_NOT_FOUND)
+router = APIRouter()
+
+
+@raises(ActionNotFoundException)
+@raises(InvalidActionTypeException)
+@raises(InvalidActionTokenException)
+@raises(EmailAlreadyInUseException)
 @router.post("/verify-email")
 async def verify_email_confirm(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLoggerDep) -> VerifyEmailOutput:
     """
@@ -44,15 +79,15 @@ async def verify_email_confirm(form: VerifyEmailInput, db: DbDep, audit_logger: 
     result = await db.execute(stmt)
     action = result.scalar_one_or_none()
     if action is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Action not found")
+        raise ActionNotFoundException()
 
     # Validate action
     if action.type != UserActionType.EMAIL_VERIFICATION:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action type")
+        raise InvalidActionTypeException()
     if not action.is_valid(form.token):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action token")
+        raise InvalidActionTokenException()
     if action.data is None or "email" not in action.data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No email found in action data")
+        raise InvalidActionTokenException()
     action_email = action.data["email"]
 
     user = action.user
@@ -62,7 +97,7 @@ async def verify_email_confirm(form: VerifyEmailInput, db: DbDep, audit_logger: 
     email_other_result = await db.execute(email_other_stmt)
     email_other_user = email_other_result.scalar_one_or_none()
     if email_other_user is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already in use by another user")
+        raise EmailAlreadyInUseException()
 
     # Update user email and action state
     await audit_logger.track(user)

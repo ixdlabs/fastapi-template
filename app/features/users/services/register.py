@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 import uuid
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from pydantic import AwareDatetime, BaseModel, EmailStr, Field
 from sqlalchemy import select
 
@@ -8,9 +8,14 @@ from app.config.audit_log import AuditLoggerDep
 from app.config.auth import AuthenticatorDep
 from app.config.background import BackgroundDep
 from app.config.database import DbDep
-from app.config.exceptions import raises
+from app.config.exceptions import ServiceException, raises
 from app.features.users.models import User, UserType
-from app.features.users.tasks.email_verification import SendEmailVerificationInput, send_email_verification_email_task
+from app.features.users.services.send_email_verification_email import SendEmailVerificationInput
+from app.features.users.tasks import send_email_verification_email_task
+
+
+# Input/Output
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class RegisterInput(BaseModel):
@@ -36,13 +41,31 @@ class RegisterOutputUser(BaseModel):
     joined_at: AwareDatetime
 
 
-router = APIRouter()
+# Exceptions
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class UsernameExistsException(ServiceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    type = "users/register/username-exists"
+    detail = "Username already exists"
+
+
+class EmailExistsException(ServiceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    type = "users/register/email-exists"
+    detail = "Email already exists"
+
 
 # Register endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@raises(status.HTTP_400_BAD_REQUEST)
+router = APIRouter()
+
+
+@raises(UsernameExistsException)
+@raises(EmailExistsException)
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     form: RegisterInput,
@@ -61,7 +84,7 @@ async def register(
     username_check_result = await db.execute(username_check_stmt)
     username_check_user = username_check_result.scalar_one_or_none()
     if username_check_user is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
+        raise UsernameExistsException()
 
     # Check email if provided
     if form.email is not None:
@@ -69,7 +92,7 @@ async def register(
         email_check_result = await db.execute(email_check_stmt)
         email_check_user = email_check_result.scalar_one_or_none()
         if email_check_user is not None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
+            raise EmailExistsException()
 
     # Create user
     user = User(
