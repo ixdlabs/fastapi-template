@@ -57,7 +57,10 @@ async def test_get_summary_counts_only_unread_inapp(db_fixture: AsyncSession, lo
     db_fixture.add(unread)
 
     read_notification = NotificationDeliveryFactory.build(
-        notification=notification, channel=NotificationChannel.INAPP, read_at=datetime.now()
+        notification=notification,
+        channel=NotificationChannel.INAPP,
+        status=NotificationStatus.SENT,
+        read_at=datetime.now(),
     )
     db_fixture.add(read_notification)
 
@@ -115,7 +118,7 @@ async def test_get_specific_notification_details(db_fixture: AsyncSession, logge
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == str(delivery.id)
-    assert data["data"] == {"key": "value"}
+    assert data["notification"]["data"] == {"key": "value"}
 
 
 @pytest.mark.asyncio
