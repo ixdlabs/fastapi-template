@@ -14,6 +14,9 @@ from app.features.users.services.send_email_verification_email import SendEmailV
 from app.features.users.tasks import send_email_verification_email_task
 
 
+router = APIRouter()
+
+
 # Input/Output
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -59,9 +62,6 @@ class EmailExistsException(ServiceException):
 
 # Register endpoint
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-router = APIRouter()
 
 
 @raises(UsernameExistsException)

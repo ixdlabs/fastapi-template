@@ -13,6 +13,8 @@ from app.config.rate_limit import RateLimitDep, RateLimitExceededException
 from app.features.users.models import User, UserType
 
 
+router = APIRouter()
+
 # Input/Output
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -44,9 +46,6 @@ class UserListAccessNotAuthorizedException(ServiceException):
 
 # User list endpoint
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-router = APIRouter()
 
 
 @raises(AuthenticationFailedException)

@@ -12,6 +12,9 @@ from app.features.users.models import User, UserType
 logger = logging.getLogger(__name__)
 
 
+router = APIRouter()
+
+
 # Input/Output
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -46,9 +49,6 @@ class InvalidRefreshTokenException(ServiceException):
 
 # Refresh endpoint
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-router = APIRouter()
 
 
 @raises(InvalidRefreshTokenException)

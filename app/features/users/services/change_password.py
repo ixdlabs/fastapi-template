@@ -10,6 +10,7 @@ from app.config.exceptions import ServiceException, raises
 from app.features.users.models import User
 
 logger = logging.getLogger(__name__)
+router = APIRouter()
 
 
 # Input/Output
@@ -49,8 +50,6 @@ class PasswordsIdenticalException(ServiceException):
 
 # Change Password endpoint
 # ----------------------------------------------------------------------------------------------------------------------
-
-router = APIRouter()
 
 
 @raises(AuthenticationFailedException)

@@ -10,6 +10,7 @@ from app.features.users.services.send_password_reset_email import SendPasswordRe
 from app.features.users.tasks import send_password_reset_email_task
 
 logger = logging.getLogger(__name__)
+router = APIRouter()
 
 
 # Input/Output
@@ -26,9 +27,6 @@ class ResetPasswordOutput(BaseModel):
 
 # Password Reset endpoint
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-router = APIRouter()
 
 
 @router.post("/reset-password")

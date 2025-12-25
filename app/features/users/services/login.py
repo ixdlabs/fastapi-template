@@ -10,6 +10,9 @@ from app.config.exceptions import ServiceException, raises
 from app.features.users.models import User, UserType
 
 
+router = APIRouter()
+
+
 # Input/Output
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -51,9 +54,6 @@ class InvalidUsernameOrPasswordException(ServiceException):
 # Token endpoint (for OAuth2 compatibility)
 # This in only implemented to support authentication in Swagger UI itself.
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-router = APIRouter()
 
 
 @router.post("/oauth2/token", include_in_schema=False)

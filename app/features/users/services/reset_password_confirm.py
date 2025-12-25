@@ -11,6 +11,8 @@ from app.config.exceptions import ServiceException, raises
 from app.features.users.models import UserAction, UserActionState, UserActionType
 
 logger = logging.getLogger(__name__)
+router = APIRouter()
+
 
 # Input/Output
 # ----------------------------------------------------------------------------------------------------------------------
@@ -50,8 +52,6 @@ class InvalidActionTokenException(ServiceException):
 
 # Password Reset Confirm endpoint
 # ----------------------------------------------------------------------------------------------------------------------
-
-router = APIRouter()
 
 
 @raises(ActionNotFoundException)

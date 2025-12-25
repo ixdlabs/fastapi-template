@@ -8,6 +8,9 @@ from app.config.database import DbDep
 from app.config.exceptions import ServiceException, raises
 from app.features.users.models import User, UserType
 
+router = APIRouter()
+
+
 # Exceptions
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -26,9 +29,6 @@ class UserNotFoundException(ServiceException):
 
 # Delete user endpoint
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-router = APIRouter()
 
 
 @raises(AuthenticationFailedException)

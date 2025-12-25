@@ -10,6 +10,9 @@ from app.config.exceptions import ServiceException, raises
 from app.features.users.models import User, UserAction, UserActionState, UserActionType
 
 
+router = APIRouter()
+
+
 # Input/Output
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -54,9 +57,6 @@ class EmailAlreadyInUseException(ServiceException):
 
 # Verify Email endpoint
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-router = APIRouter()
 
 
 @raises(ActionNotFoundException)

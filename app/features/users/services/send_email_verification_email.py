@@ -11,6 +11,7 @@ from app.features.users.models import UserAction, UserActionState, UserActionTyp
 
 
 logger = logging.getLogger(__name__)
+router = APIRouter()
 
 
 # Input/Output
@@ -30,9 +31,6 @@ class SendEmailVerificationOutput(BaseModel):
 
 # Task/Endpoint implementation
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-router = APIRouter()
 
 
 @router.post("send-email-verification-email")

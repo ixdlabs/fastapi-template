@@ -7,6 +7,9 @@ from app.config.exceptions import raises
 from app.features.users.models import UserType
 
 
+router = APIRouter()
+
+
 # Input/Output
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -21,9 +24,6 @@ class MeOutput(BaseModel):
 
 # Me endpoint
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-router = APIRouter()
 
 
 @raises(AuthenticationFailedException)

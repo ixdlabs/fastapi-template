@@ -10,6 +10,9 @@ from app.config.exceptions import ServiceException, raises
 from app.features.users.models import User, UserType
 
 
+router = APIRouter()
+
+
 # Input/Output
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -44,9 +47,6 @@ class UserAccessNotAuthorizedException(ServiceException):
 
 # User detail endpoint
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-router = APIRouter()
 
 
 @raises(AuthenticationFailedException)
