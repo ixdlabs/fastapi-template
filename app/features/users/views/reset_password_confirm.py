@@ -54,7 +54,7 @@ async def reset_password_confirm(
     action.user.set_password(form.new_password)
     action.state = UserActionState.COMPLETED
 
-    await audit_logger.record("password_reset", action.user)
+    await audit_logger.record("reset_password", action.user)
     await db.commit()
 
     return ResetPasswordConfirmOutput()

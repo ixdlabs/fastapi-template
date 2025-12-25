@@ -9,6 +9,7 @@ from app.features.users.views import (
     verify_email,
     reset_password,
     reset_password_confirm,
+    change_password,
 )
 
 
@@ -24,3 +25,4 @@ auth_router.include_router(register.router)
 auth_router.include_router(verify_email.router)
 auth_router.include_router(reset_password.router)
 auth_router.include_router(reset_password_confirm.router)
+auth_router.include_router(change_password.router)
