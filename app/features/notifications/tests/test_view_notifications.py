@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -60,7 +60,7 @@ async def test_get_summary_counts_only_unread_inapp(db_fixture: AsyncSession, lo
         notification=notification,
         channel=NotificationChannel.INAPP,
         status=NotificationStatus.SENT,
-        read_at=datetime.now(),
+        read_at=datetime.now(timezone.utc),
     )
     db_fixture.add(read_notification)
 
