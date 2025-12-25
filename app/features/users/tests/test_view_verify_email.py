@@ -2,7 +2,7 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.users.models import User, UserAction, UserActionState
+from app.features.users.models import User, UserAction, UserActionState, UserActionType
 from app.features.users.tests.fixtures import UserActionFactory, UserFactory
 from fastapi.testclient import TestClient
 
@@ -104,3 +104,41 @@ async def test_verify_email_already_verified(db_fixture: AsyncSession):
 
     response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_verify_email_action_type_mismatch(db_fixture: AsyncSession):
+    user: User = UserFactory.build(email="old@example.com")
+    db_fixture.add(user)
+    await db_fixture.commit()
+    await db_fixture.refresh(user)
+
+    action: UserAction = UserActionFactory.build(
+        user_id=user.id, data={"email": "new@example.com"}, type=UserActionType.PASSWORD_RESET
+    )
+    action.set_token("valid-token")
+    db_fixture.add(action)
+    await db_fixture.commit()
+    await db_fixture.refresh(action)
+
+    response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "valid-token"})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid action type"
+
+
+@pytest.mark.asyncio
+async def test_verify_email_missing_email_in_action_data(db_fixture: AsyncSession):
+    user: User = UserFactory.build(email="old@example.com")
+    db_fixture.add(user)
+    await db_fixture.commit()
+    await db_fixture.refresh(user)
+
+    action: UserAction = UserActionFactory.build(user_id=user.id, data={})
+    action.set_token("valid-token")
+    db_fixture.add(action)
+    await db_fixture.commit()
+    await db_fixture.refresh(action)
+
+    response = client.post("/api/auth/verify-email", json={"action_id": str(action.id), "token": "valid-token"})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "No email found in action data"

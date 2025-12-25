@@ -48,7 +48,7 @@ async def verify_email(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLog
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action token")
 
     if action.data is None or "email" not in action.data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Action data is missing email")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No email found in action data")
     action_email = action.data["email"]
 
     user = action.user
