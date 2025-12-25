@@ -1,8 +1,7 @@
 import uuid
 
-from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 from typing import Any, Annotated, Literal
 from sqlalchemy.orm import joinedload
 from sqlalchemy import select
@@ -37,10 +36,10 @@ class NotificationDeliveryOutput(BaseModel):
     title: str | None
     body: str
     status: NotificationStatus
-    sent_at: datetime | None
-    read_at: datetime | None
-    created_at: datetime | None
-    updated_at: datetime | None
+    sent_at: AwareDatetime | None
+    read_at: AwareDatetime | None
+    created_at: AwareDatetime | None
+    updated_at: AwareDatetime | None
     notification: NotificationDeliveryOutputNotification
 
 
