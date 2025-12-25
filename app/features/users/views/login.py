@@ -57,17 +57,20 @@ async def oauth2(
 @raises(status.HTTP_401_UNAUTHORIZED, "Invalid username or password")
 @router.post("/login")
 async def login(form: LoginInput, db: DbDep, authenticator: AuthenticatorDep) -> LoginOutput:
-    """Login user."""
+    """Login a user and return access and refresh tokens."""
+    # Fetch user by username
     stmt = select(User).where(User.username == form.username)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
+    # Verify password
     password_valid = user.check_password(form.password)
     if not password_valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
+    # Generate tokens
     access_token, refresh_token = authenticator.encode(user)
     return LoginOutput(
         access_token=access_token,

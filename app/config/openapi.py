@@ -59,6 +59,8 @@ def custom(app: FastAPI):
             description=app.description,
             routes=app.routes,
         )
+
+        # Fix for adding exception responses from @raises decorator
         for route in app.routes:
             if getattr(route, "include_in_schema", None):
                 endpoint = getattr(route, "endpoint")

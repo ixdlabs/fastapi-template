@@ -34,13 +34,19 @@ router = APIRouter()
 async def change_password(
     form: ChangePasswordInput, current_user: CurrentUserDep, db: DbDep, audit_logger: AuditLoggerDep
 ) -> ChangePasswordOutput:
-    """Change the password for the current user."""
+    """
+    Change the password for the current user using the old password for verification.
+    The new password must be different from the old password.
+    Previously issued refresh tokens will be invalidated (not implemented yet).
+    """
+    # Fetch the current user from the database
     stmt = select(User).where(User.id == current_user.id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+    # Verify old password and check new password validity
     if not user.check_password(form.old_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Old password is incorrect.")
     if form.old_password == form.new_password:
@@ -48,6 +54,7 @@ async def change_password(
             status_code=status.HTTP_400_BAD_REQUEST, detail="New password must be different from old password."
         )
 
+    # Update the user's password
     user.set_password(form.new_password)
     await audit_logger.record("change_password", user)
     await db.commit()

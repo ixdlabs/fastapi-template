@@ -12,7 +12,7 @@ client = TestClient(app)
 
 
 @pytest.mark.asyncio
-async def test_verify_email_success(db_fixture: AsyncSession):
+async def test_verify_email_confirm_success(db_fixture: AsyncSession):
     user: User = UserFactory.build(email="old@example.com")
     db_fixture.add(user)
     await db_fixture.commit()
@@ -39,14 +39,14 @@ async def test_verify_email_success(db_fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_verify_email_verification_not_found(db_fixture: AsyncSession):
+async def test_verify_email_confirm_verification_not_found(db_fixture: AsyncSession):
     response = client.post("/api/auth/verify-email", json={"action_id": str(uuid.uuid4()), "token": "any-token"})
     assert response.status_code == 404
     assert response.json()["detail"] == "Action not found"
 
 
 @pytest.mark.asyncio
-async def test_verify_email_invalid_token(db_fixture: AsyncSession):
+async def test_verify_email_confirm_invalid_token(db_fixture: AsyncSession):
     user: User = UserFactory.build(email="old@example.com")
     db_fixture.add(user)
     await db_fixture.commit()
@@ -65,7 +65,7 @@ async def test_verify_email_invalid_token(db_fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_verify_email_email_already_in_use(db_fixture: AsyncSession):
+async def test_verify_email_confirm_email_already_in_use(db_fixture: AsyncSession):
     user1: User = UserFactory.build(email="user1@example.com")
     user2: User = UserFactory.build(email="user2@example.com")
 
@@ -87,7 +87,7 @@ async def test_verify_email_email_already_in_use(db_fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_verify_email_already_verified(db_fixture: AsyncSession):
+async def test_verify_email_confirm_already_verified(db_fixture: AsyncSession):
     user: User = UserFactory.build(email="old@example.com")
     db_fixture.add(user)
     await db_fixture.commit()
@@ -107,7 +107,7 @@ async def test_verify_email_already_verified(db_fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_verify_email_action_type_mismatch(db_fixture: AsyncSession):
+async def test_verify_email_confirm_action_type_mismatch(db_fixture: AsyncSession):
     user: User = UserFactory.build(email="old@example.com")
     db_fixture.add(user)
     await db_fixture.commit()
@@ -127,7 +127,7 @@ async def test_verify_email_action_type_mismatch(db_fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_verify_email_missing_email_in_action_data(db_fixture: AsyncSession):
+async def test_verify_email_confirm_missing_email_in_action_data(db_fixture: AsyncSession):
     user: User = UserFactory.build(email="old@example.com")
     db_fixture.add(user)
     await db_fixture.commit()

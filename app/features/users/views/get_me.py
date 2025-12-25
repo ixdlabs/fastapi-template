@@ -23,8 +23,8 @@ router = APIRouter()
 
 @raises(status.HTTP_401_UNAUTHORIZED)
 @router.get("/me")
-async def me(current_user: CurrentUserDep) -> MeOutput:
-    """Get details of the current authenticated user."""
+async def get_me(current_user: CurrentUserDep) -> MeOutput:
+    """Get the current authenticated user's information."""
     return MeOutput(
         id=current_user.id,
         type=current_user.type,

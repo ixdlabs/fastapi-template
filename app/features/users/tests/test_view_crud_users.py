@@ -101,7 +101,9 @@ async def test_admin_can_not_access_nonexistent_user(db_fixture: AsyncSession, a
 @pytest.mark.asyncio
 async def test_user_list_pagination_and_search(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
     users = [
-        UserFactory.build(username="alice", first_name="Alice", last_name="Anderson", password__raw="password1"),
+        UserFactory.build(
+            username="alice", first_name="Alice", last_name="Anderson", type=UserType.ADMIN, password__raw="password1"
+        ),
         UserFactory.build(username="bob", first_name="Bob", last_name="Brown", password__raw="password2"),
         UserFactory.build(username="charlie", first_name="Charlie", last_name="Clark", password__raw="password3"),
     ]

@@ -51,7 +51,11 @@ async def register(
     background: BackgroundDep,
     audit_logger: AuditLoggerDep,
 ) -> RegisterOutput:
-    """Register a new user."""
+    """
+    Register a new user and return access and refresh tokens.
+    Username must be unique. Email (if provided) must also be unique.
+    If an email is provided, a verification email will be sent to the user.
+    """
     # Check if username or email already exists
     username_check_stmt = select(User).where(User.username == form.username)
     username_check_result = await db.execute(username_check_stmt)
@@ -79,6 +83,7 @@ async def register(
     user.set_password(form.password)
     db.add(user)
 
+    # Finalize creation
     await audit_logger.record("create", user)
     await db.commit()
     await db.refresh(user)

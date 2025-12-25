@@ -59,15 +59,23 @@ router = APIRouter()
 @raises(status.HTTP_403_FORBIDDEN)
 @raises(status.HTTP_404_NOT_FOUND)
 @router.get("/{user_id}")
-async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep, cache: CacheDep) -> UserDetailOutput:
-    """Get detailed information about a specific user."""
+async def detail_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep, cache: CacheDep) -> UserDetailOutput:
+    """
+    Get detailed information about a specific user.
+    The authenticated user must be an admin or the user themselves.
+
+    This endpoint is cached for demonstration purposes.
+    """
+    # Check and return from cache
     cache.vary_on_path().vary_on_auth()
     if cache_result := await cache.get():
         return cache_result
 
+    # Authorization check
     if current_user.type != UserType.ADMIN and current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this user")
 
+    # Fetch user from database
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
@@ -91,22 +99,39 @@ async def user_detail(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDe
 
 
 # User list endpoint
-# This endpoint is cached and rate-limited for demonstration purposes
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@raises(status.HTTP_401_UNAUTHORIZED)
+@raises(status.HTTP_403_FORBIDDEN)
 @raises(status.HTTP_429_TOO_MANY_REQUESTS)
 @router.get("/")
-async def user_list(
-    db: DbDep, query: Annotated[UserFilterInput, Query()], rate_limit: RateLimitDep, cache: CacheDep
+async def list_users(
+    db: DbDep,
+    query: Annotated[UserFilterInput, Query()],
+    current_user: CurrentUserDep,
+    rate_limit: RateLimitDep,
+    cache: CacheDep,
 ) -> Page[UserListOutput]:
-    """List users with optional filtering, caching, and rate limiting."""
-    cache.vary_on_path().vary_on_query()
+    """
+    List users in the system with optional search and pagination.
+    The authenticated user must be an admin.
+
+    This endpoint is rate-limited and cached for demonstration purposes.
+    """
+    # Rate limiting
+    await rate_limit.limit("10/minute")
+
+    # Check and return from cache
+    cache.vary_on_path().vary_on_query().vary_on_auth()
     if cache_result := await cache.get():
         return cache_result
 
-    await rate_limit.limit("10/minute")
+    # Authorization check
+    if current_user.type != UserType.ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to list users")
 
+    # Build query with filters
     stmt = select(User)
     if query.search:
         search_pattern = f"%{query.search}%"
@@ -116,6 +141,7 @@ async def user_list(
             | User.last_name.ilike(search_pattern)
         )
 
+    # Apply ordering, pagination, and execute
     order_column = User.created_at if query.order_by == "created_at" else User.updated_at
     stmt = stmt.order_by(order_column)
     result = await paginate(db, stmt, limit=query.limit, offset=query.offset)
@@ -143,10 +169,15 @@ async def user_list(
 async def delete_user(
     user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep, audit_logger: AuditLoggerDep
 ) -> None:
-    """Delete a user by ID."""
+    """
+    Delete a user from the system.
+    The authenticated user must be an admin or the user themselves.
+    """
+    # Authorization check
     if current_user.type != UserType.ADMIN and current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this user")
 
+    # Fetch user from database
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
@@ -174,10 +205,18 @@ async def update_user(
     background: BackgroundDep,
     audit_logger: AuditLoggerDep,
 ) -> UserDetailOutput:
-    """Update a user's first and last name."""
+    """
+    Update a user's information.
+    The authenticated user must be an admin or the user themselves.
+
+    If the email is provided and is different from the current one, a verification email will be sent.
+    The email update will only take effect after verification.
+    """
+    # Authorization check
     if current_user.type != UserType.ADMIN and current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this user")
 
+    # Fetch user from database
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
@@ -185,6 +224,8 @@ async def update_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     await audit_logger.track(user)
+
+    # Update user fields
     user.first_name = form.first_name
     user.last_name = form.last_name
 
@@ -199,6 +240,7 @@ async def update_user(
         task_input = SendEmailVerificationInput(user_id=user.id, email=form.email)
         await background.submit(send_email_verification_email_task, task_input.model_dump_json())
 
+    # Finalize update
     await audit_logger.record("update", user)
     await db.commit()
     await db.refresh(user)

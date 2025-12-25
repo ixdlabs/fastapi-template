@@ -29,8 +29,11 @@ router = APIRouter()
 @raises(status.HTTP_400_BAD_REQUEST)
 @raises(status.HTTP_404_NOT_FOUND)
 @router.post("/verify-email")
-async def verify_email(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLoggerDep) -> VerifyEmailOutput:
-    """Verify email of a user using the generated token."""
+async def verify_email_confirm(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLoggerDep) -> VerifyEmailOutput:
+    """
+    Verify and set a user's email using a valid action token.
+    The email must not be already in use by another user.
+    """
     # Retrieve the action record
     stmt = (
         select(UserAction)
@@ -42,11 +45,12 @@ async def verify_email(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLog
     action = result.scalar_one_or_none()
     if action is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Action not found")
+
+    # Validate action
     if action.type != UserActionType.EMAIL_VERIFICATION:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action type")
     if not action.is_valid(form.token):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action token")
-
     if action.data is None or "email" not in action.data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No email found in action data")
     action_email = action.data["email"]
@@ -65,6 +69,7 @@ async def verify_email(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLog
     user.email = action_email
     action.state = UserActionState.COMPLETED
 
+    # Finalize
     await audit_logger.record("verify_email", user)
     await db.commit()
     await db.refresh(user)

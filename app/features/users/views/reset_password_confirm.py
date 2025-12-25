@@ -35,7 +35,11 @@ router = APIRouter()
 async def reset_password_confirm(
     form: ResetPasswordConfirmInput, db: DbDep, audit_logger: AuditLoggerDep
 ) -> ResetPasswordConfirmOutput:
-    """Complete the password reset process using the action ID and token."""
+    """
+    Reset a user's password using a valid action token.
+    Previously issued refresh tokens will be invalidated (not implemented yet).
+    """
+    # Fetch action by ID
     stmt = (
         select(UserAction)
         .join(UserAction.user)
@@ -46,14 +50,18 @@ async def reset_password_confirm(
     action = result.scalar_one_or_none()
     if action is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Action not found")
+
+    # Validate action
     if action.type != UserActionType.PASSWORD_RESET:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action type")
     if not action.is_valid(form.token):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action token")
 
+    # Reset password
     action.user.set_password(form.new_password)
     action.state = UserActionState.COMPLETED
 
+    # Finalize
     await audit_logger.record("reset_password", action.user)
     await db.commit()
 

@@ -39,20 +39,23 @@ router = APIRouter()
 
 @raises(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
 @router.post("/refresh")
-async def refresh(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep) -> RefreshOutput:
-    """Refresh the user's tokens using refresh token."""
+async def refresh_tokens(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep) -> RefreshOutput:
+    """Refresh the user's tokens using refresh token and return new access and refresh tokens."""
+    # Validate refresh token
     try:
         user_id = authenticator.sub(form.refresh_token)
     except AuthException as e:
         logger.warning("token validation failed", exc_info=True)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from e
 
+    # Fetch user by ID
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
+    # Generate new tokens
     access_token, refresh_token = authenticator.encode(user)
     return RefreshOutput(
         access_token=access_token,
