@@ -32,14 +32,14 @@ async def test_apidoc_endpoint_returns_200():
 
 @pytest.fixture
 def app_fixture():
-    app = FastAPI()
+    test_app = FastAPI()
 
-    @app.get("/items")
+    @test_app.get("/items")
     def get_items():
         return "items"
 
     assert get_items() == "items"
-    return app
+    return test_app
 
 
 def test_add_route_response_adds_new_response(app_fixture: FastAPI):
@@ -66,48 +66,48 @@ def test_add_route_response_does_not_override_existing_response(app_fixture: Fas
 
 
 def test_custom_returns_cached_openapi_schema():
-    app = FastAPI()
-    app.openapi_schema = {"cached": True}
-    result = openapi.custom(app)()
+    test_app = FastAPI()
+    test_app.openapi_schema = {"cached": True}
+    result = openapi.custom(test_app)()
     assert result == {"cached": True}
 
 
 def test_custom_adds_raises_metadata_to_openapi():
-    app = FastAPI()
+    test_app = FastAPI()
 
     @raises(status.HTTP_404_NOT_FOUND, reason="Not found")
     @raises(status.HTTP_404_NOT_FOUND)
-    @app.get("/items")
+    @test_app.get("/items")
     def get_items():
         return "items"
 
     assert get_items() == "items"
 
-    schema = openapi.custom(app)()
+    schema = openapi.custom(test_app)()
     responses = schema["paths"]["/items"]["get"]["responses"]
     assert "404" in responses
     assert "Not found" in responses["404"]["content"]["application/json"]["examples"]
 
 
 def test_custom_ignores_routes_not_in_schema():
-    app = FastAPI()
+    test_app = FastAPI()
 
     @raises(status.HTTP_400_BAD_REQUEST, reason="Bad request")
-    @app.get("/hidden", include_in_schema=False)
+    @test_app.get("/hidden", include_in_schema=False)
     def hidden():
         return "hidden"
 
     assert hidden() == "hidden"
 
-    schema = openapi.custom(app)()
+    schema = openapi.custom(test_app)()
     assert "/hidden" not in schema["paths"]
 
 
 def test_custom_calls_add_route_response(monkeypatch):
-    app = FastAPI()
+    test_app = FastAPI()
 
     @raises(status.HTTP_400_BAD_REQUEST, reason="Bad request")
-    @app.get("/items")
+    @test_app.get("/items")
     def get_items():
         return "items"
 
@@ -115,5 +115,5 @@ def test_custom_calls_add_route_response(monkeypatch):
 
     spy = MagicMock()
     monkeypatch.setattr("app.config.openapi.add_route_response", spy)
-    openapi.custom(app)()
+    openapi.custom(test_app)()
     spy.assert_called_once()

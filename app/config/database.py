@@ -99,10 +99,10 @@ class Base(DeclarativeBase):
                 if isinstance(obj, Iterable):
                     result[key] = [o.to_dict(hybrid_attributes=hybrid_attributes) for o in obj if isinstance(o, Base)]
 
-        def default(obj):
-            if isinstance(obj, uuid.UUID):
-                return str(obj)
-            return str(obj)
+        def default(value):
+            if isinstance(value, uuid.UUID):
+                return str(value)
+            return str(value)
 
         # Convert to standard dict to handle any non-serializable types.
         result = orjson.loads(orjson.dumps(result, default=default))
