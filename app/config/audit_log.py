@@ -1,74 +1,89 @@
 import logging
-from typing import Annotated
-import uuid
+from typing import Annotated, Literal
 from opentelemetry import trace
 from opentelemetry.trace import SpanContext
 from deepdiff import DeepDiff
-from app.config.auth import Authenticator, AuthenticatorDep, get_current_user
+from app.config.auth import AuthException, Authenticator, AuthenticatorDep
 from fastapi import Request, Depends
-from app.config.auth import TokenOptionalDep
-from app.config.database import Base
+from app.config.database import Base, DbDep
+from app.features.audit_log.models import ActorType, AuditLog
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-class AuditLogger:
-    data: dict[str, dict | uuid.UUID | str | None] = {}
+default_exclude_columns = ["hashed_password"]
 
-    def __init__(self, token: str | None, request: Request, authenticator: Authenticator):
-        self.token = token
+
+class AuditLogger:
+    tracked_value: dict | None = None
+
+    def __init__(self, request: Request | None, authenticator: Authenticator, db: DbDep):
         self.request = request
         self.authenticator = authenticator
+        self.db = db
 
-    async def log(
-        self,
-        action: str,
-        *,
-        old_resource: Base | None = None,
-        new_resource: Base | None = None,
-        exclude_columns: list[str] | None = None,
-        track_current_user: bool = True,
-    ) -> None:
+    async def track(self, resource: Base):
+        self.tracked_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
+
+    async def record(self, action: Literal["create", "delete"] | str, resource: Base) -> None:
         with tracer.start_as_current_span("audit-logging") as span:
-            self.data["action"] = action
+            audit_log = AuditLog()
+            audit_log.action = action
 
-            # Actor data
-            self.data["actor_type"] = "anonymous" if track_current_user else "system"
-            if track_current_user and self.token:
-                auth_user = get_current_user(self.token, self.authenticator)
-                self.data["actor_type"] = "user"
-                self.data["actor_id"] = auth_user.id
+            # Actor
+            # ----------------------------------------------------------------------------------------------------------
+            audit_log.actor_type = ActorType.ANONYMOUS
+            if self.request is not None and "Authorization" in self.request.headers:
+                token = self.request.headers["Authorization"].split(" ")[1]
+                try:
+                    user = self.authenticator.user(token)
+                    audit_log.actor_type = ActorType.USER
+                    audit_log.actor_id = user.id
+                except AuthException:
+                    pass
 
-            # Trace data
+            # Trace / request metadata
+            # ----------------------------------------------------------------------------------------------------------
             ctx: SpanContext = span.get_span_context()
-            self.data["trace_id"] = "{:032x}".format(ctx.trace_id)
-            if track_current_user:
-                self.data["request_ip_address"] = self.request.client.host if self.request.client else None
-                self.data["request_user_agent"] = self.request.headers["User-Agent"]
-                self.data["request_method"] = self.request.method
-                self.data["request_url"] = str(self.request.url)
+            audit_log.trace_id = f"{ctx.trace_id:032x}"
 
-            # Resource data
-            if old_resource is not None:
-                self.data["old_values"] = old_resource.to_dict(nested=True, exclude=exclude_columns)
-                resource = old_resource
-            if new_resource is not None:
-                self.data["new_values"] = new_resource.to_dict(nested=True, exclude=exclude_columns)
-                resource = new_resource
-            if new_resource is not None and old_resource is not None:
-                self.data["changed_values"] = DeepDiff(
-                    self.data["old_values"], self.data["new_values"], ignore_order=True
-                ).to_dict()
+            if self.request is not None:
+                audit_log.request_ip_address = self.request.client.host if self.request.client else None
+                audit_log.request_user_agent = self.request.headers.get("User-Agent")
+                audit_log.request_method = self.request.method
+                audit_log.request_url = str(self.request.url)
+
+            # Resource identity
+            # ----------------------------------------------------------------------------------------------------------
+            if resource.id is None:
+                raise ValueError(
+                    "Resource must have an ID to be logged in audit log, "
+                    "either commit the resource first or manually set the ID."
+                )
             if resource is not None:
-                self.data["resource_type"] = resource.__tablename__
-                self.data["resource_id"] = resource.id
+                audit_log.resource_type = resource.__tablename__
+                audit_log.resource_id = resource.id
 
-            logger.info("Audit Log: %s", self.data)
+            # Resource snapshots
+            # ----------------------------------------------------------------------------------------------------------
+            audit_log.new_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
+            if action == "delete":
+                audit_log.old_value = audit_log.new_value
+                audit_log.new_value = None
+            elif action == "create":
+                pass
+            elif self.tracked_value is not None:
+                audit_log.old_value = self.tracked_value
+                audit_log.changed_value = DeepDiff(audit_log.old_value, audit_log.new_value)
+
+            # Persist audit log (Do not commit here, commit should be handled by caller)
+            # ----------------------------------------------------------------------------------------------------------
+            self.db.add(audit_log)
 
 
-def get_audit_logger(token: TokenOptionalDep, request: Request, authenticator: AuthenticatorDep):
-    return AuditLogger(token, request, authenticator)
+def get_audit_logger(request: Request, authenticator: AuthenticatorDep, db: DbDep):
+    return AuditLogger(request, authenticator, db)
 
 
 AuditLoggerDep = Annotated[AuditLogger, Depends(get_audit_logger)]

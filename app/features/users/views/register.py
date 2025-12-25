@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import uuid
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import AwareDatetime, BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from app.config.audit_log import AuditLoggerDep
@@ -33,7 +33,7 @@ class RegisterOutputUser(BaseModel):
     username: str
     first_name: str
     last_name: str
-    joined_at: datetime
+    joined_at: AwareDatetime
 
 
 router = APIRouter()
@@ -52,12 +52,14 @@ async def register(
     audit_logger: AuditLoggerDep,
 ) -> RegisterOutput:
     """Register a new user."""
+    # Check if username or email already exists
     username_check_stmt = select(User).where(User.username == form.username)
     username_check_result = await db.execute(username_check_stmt)
     username_check_user = username_check_result.scalar_one_or_none()
     if username_check_user is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
 
+    # Check email if provided
     if form.email is not None:
         email_check_stmt = select(User).where(User.email == form.email)
         email_check_result = await db.execute(email_check_stmt)
@@ -65,7 +67,9 @@ async def register(
         if email_check_user is not None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
 
+    # Create user
     user = User(
+        id=uuid.uuid4(),
         username=form.username,
         type=UserType.CUSTOMER,
         first_name=form.first_name,
@@ -73,16 +77,18 @@ async def register(
         joined_at=datetime.now(timezone.utc),
     )
     user.set_password(form.password)
-
     db.add(user)
+
+    await audit_logger.record("create", user)
     await db.commit()
     await db.refresh(user)
 
-    await audit_logger.log("create", new_resource=user, exclude_columns=["hashed_password"])
+    # Send email verification if email provided
     if form.email is not None:
         task_input = SendEmailVerificationInput(user_id=user.id, email=form.email)
         await background.submit(send_email_verification_email_task, task_input.model_dump_json())
 
+    # Generate tokens and return response
     access_token, refresh_token = authenticator.encode(user)
     return RegisterOutput(
         access_token=access_token,

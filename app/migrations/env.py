@@ -7,10 +7,12 @@ Important: This file
 """
 
 import asyncio
+from typing import Any, Literal
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
+from alembic.autogenerate.api import AutogenContext
 
 from alembic import context
 import alembic_postgresql_enum  # noqa: F401
@@ -18,6 +20,7 @@ import alembic_postgresql_enum  # noqa: F401
 from app.config.database import Base
 from app.config.logging import setup_logging
 from app.config.settings import get_settings
+from app.config.timezone import DateTimeUTC
 
 from app.features import model_registry  # noqa: F401
 
@@ -34,6 +37,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_item=render_item,
     )
 
     with context.begin_transaction():
@@ -46,7 +50,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(connection=connection, target_metadata=target_metadata, render_item=render_item)
     with context.begin_transaction():
         context.run_migrations()
 
@@ -69,6 +73,14 @@ def run_migrations_online() -> None:
 
 config = context.config
 target_metadata = Base.metadata
+
+
+def render_item(type_: str, col: Any, autogen_context: AutogenContext) -> str | Literal[False]:
+    """Render custom types for autogenerate."""
+    if type_ == "type" and isinstance(col, DateTimeUTC):
+        return "sa.DateTime(timezone=True)"
+    return False
+
 
 settings = get_settings()
 setup_logging(settings)

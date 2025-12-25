@@ -14,6 +14,7 @@ import logging
 from typing import Annotated, Iterable
 import uuid
 from fastapi import Depends
+import orjson
 from sqlalchemy import inspect
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapper, RelationshipProperty, attributes
@@ -98,6 +99,13 @@ class Base(DeclarativeBase):
                 if isinstance(obj, Iterable):
                     result[key] = [o.to_dict(hybrid_attributes=hybrid_attributes) for o in obj if isinstance(o, Base)]
 
+        def default(obj):
+            if isinstance(obj, uuid.UUID):
+                return str(obj)
+            return str(obj)
+
+        # Convert to standard dict to handle any non-serializable types.
+        result = orjson.loads(orjson.dumps(result, default=default))
         return result
 
 

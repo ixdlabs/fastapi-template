@@ -1,5 +1,7 @@
+from collections import defaultdict
 import logging
 from pathlib import Path
+from typing import Any
 import pytest
 import pytest_asyncio
 from sqlalchemy import pool
@@ -98,10 +100,16 @@ def authenticator_fixture(settings_fixture: Settings):
 
 
 class NoOpBackground(Background):
-    called_tasks: list[str] = []
+    called_tasks: dict[str, list[tuple[tuple[Any, ...], dict[str, Any]]]]
+
+    def __init__(self, settings: Settings):
+        super().__init__(settings)
+        self.called_tasks = defaultdict(list)
 
     async def submit(self, fn, *args, **kwargs):
-        self.called_tasks.append(fn.__name__)
+        if fn.__name__ not in self.called_tasks:
+            self.called_tasks[fn.__name__] = []
+        self.called_tasks[fn.__name__].append((args, kwargs))
 
 
 @pytest.fixture(scope="function")
