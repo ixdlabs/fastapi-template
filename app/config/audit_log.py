@@ -13,7 +13,7 @@ import orjson
 from app.config.auth import AuthException, Authenticator, AuthenticatorDep
 from fastapi import Request, Depends
 from app.config.database import Base, DbDep
-from app.features.audit_log.models.audit_log import ActorType, AuditLog
+from app.features.audit_logs.models.audit_log import ActorType, AuditLog
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
