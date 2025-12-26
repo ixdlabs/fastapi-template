@@ -3,7 +3,7 @@ from fastapi import APIRouter, status
 from sqlalchemy import select
 
 from app.config.audit_log import AuditLoggerDep
-from app.config.auth import AuthenticationFailedException, CurrentUserDep
+from app.config.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
 from app.config.database import DbDep
 from app.config.exceptions import ServiceException, raises
 from app.features.users.models.user import UserType, User
@@ -13,12 +13,6 @@ router = APIRouter()
 
 # Exceptions
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class UserDeleteNotAuthorizedException(ServiceException):
-    status_code = status.HTTP_403_FORBIDDEN
-    type = "users/admin/delete-user/not-authorized"
-    detail = "Not authorized to delete this user"
 
 
 class UserNotFoundException(ServiceException):
@@ -32,19 +26,17 @@ class UserNotFoundException(ServiceException):
 
 
 @raises(AuthenticationFailedException)
-@raises(UserDeleteNotAuthorizedException)
+@raises(AuthorizationFailedException)
 @raises(UserNotFoundException)
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
-    user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep, audit_logger: AuditLoggerDep
+    user_id: uuid.UUID, db: DbDep, current_admin: CurrentAdminDep, audit_logger: AuditLoggerDep
 ) -> None:
     """
     Delete a user from the system.
     The authenticated user must be an admin.
     """
-    # Authorization check
-    if current_user.type != UserType.ADMIN:
-        raise UserDeleteNotAuthorizedException()
+    assert current_admin.type == UserType.ADMIN
 
     # Fetch user from database
     stmt = select(User).where(User.id == user_id)

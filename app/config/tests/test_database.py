@@ -95,6 +95,20 @@ def test_to_dict_nested_with_hybrids():
     assert data["children"][0]["value"] == "x"
 
 
+def test_to_dict_with_uuid_sub_classes():
+    class CustomUUID(uuid.UUID):
+        pass
+
+    class ModelWithCustomUUID(Base):
+        __tablename__ = "model_with_custom_uuid"
+
+        id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+
+    instance = ModelWithCustomUUID(id=CustomUUID("12345678-1234-5678-1234-567812345678"))
+    data = instance.to_dict()
+    assert data["id"] == "12345678-1234-5678-1234-567812345678"
+
+
 # DB Engine and Session Testing
 # ----------------------------------------------------------------------------------------------------------------------
 

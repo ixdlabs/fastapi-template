@@ -80,7 +80,7 @@ class TaskRegistry:
             raise error_container["error"]
         return result_container["result"]
 
-    def background_task(self, name: str):
+    def background_task(self, name: str, *, schedule: int | None = None):
         """Register a background task."""
 
         def decorator(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]:
@@ -88,22 +88,11 @@ class TaskRegistry:
             def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 return self._run_as_sync(func, *args, **kwargs)
 
-            return shared_task(name=name)(wrapper)
-
-        return decorator
-
-    def periodic_task(self, name: str, schedule: int):
-        """Register a periodic background task."""
-
-        def decorator(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]:
-            @functools.wraps(func)
-            def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-                return self._run_as_sync(func, *args, **kwargs)
-
-            self.beat_schedule[name] = {
-                "task": f"{func.__module__}.{func.__name__}",
-                "schedule": schedule,
-            }
+            if schedule is not None:
+                self.beat_schedule[name] = {
+                    "task": f"{func.__module__}.{func.__name__}",
+                    "schedule": schedule,
+                }
             return shared_task(name=name)(wrapper)
 
         return decorator

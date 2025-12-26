@@ -111,6 +111,28 @@ def get_authenticator(settings: SettingsDep) -> Authenticator:
 AuthenticatorDep = Annotated[Authenticator, Depends(get_authenticator)]
 
 
+# Exceptions
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class AuthenticationFailedException(ServiceException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    type = "auth/authentication-failed"
+    detail = "Authentication failed, please login again"
+
+
+class AuthorizationFailedException(ServiceException):
+    status_code = status.HTTP_403_FORBIDDEN
+    type = "auth/authorization-failed"
+    detail = "You do not have permission to access this resource"
+
+
+class TaskRunningPermissionDeniedException(ServiceException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    type = "auth/task-running-permission-denied"
+    detail = "Task running permission denied, this is only allowed in debug mode"
+
+
 # Dependency to get the current authenticated user
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -121,12 +143,6 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 
 TokenDep = Annotated[str, Depends(oauth2_scheme)]
-
-
-class AuthenticationFailedException(ServiceException):
-    status_code = status.HTTP_401_UNAUTHORIZED
-    type = "auth/authentication-failed"
-    detail = "Authentication failed, please login again"
 
 
 def get_current_user(token: TokenDep, authenticator: AuthenticatorDep) -> AuthUser:
@@ -140,6 +156,20 @@ def get_current_user(token: TokenDep, authenticator: AuthenticatorDep) -> AuthUs
 CurrentUserDep = Annotated[AuthUser, Security(get_current_user)]
 
 
+# Dependency to get the current authenticated admin
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def get_current_admin(token: TokenDep, authenticator: AuthenticatorDep) -> AuthUser:
+    user = get_current_user(token, authenticator)
+    if user.type != UserType.ADMIN:
+        raise AuthorizationFailedException()
+    return user
+
+
+CurrentAdminDep = Annotated[AuthUser, Security(get_current_admin)]
+
+
 # Dependency to only authenticate tasks (only authenticates if debug mode is on)
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -148,21 +178,7 @@ class TaskRunner(BaseModel):
     id: str | None
 
 
-oauth2_scheme_debug_on = OAuth2PasswordBearer(
-    tokenUrl="/api/auth/oauth2/token",
-    refreshUrl="/api/auth/refresh",
-    scheme_name="JWT (Debug Only)",
-    auto_error=False,
-)
-
-
-class TaskRunningPermissionDeniedException(ServiceException):
-    status_code = status.HTTP_401_UNAUTHORIZED
-    type = "auth/task-running-permission-denied"
-    detail = "Task running permission denied, this is only allowed in debug mode"
-
-
-def get_task_user(_: Annotated[str | None, Depends(oauth2_scheme_debug_on)], settings: SettingsDep) -> TaskRunner:
+def get_task_user(settings: SettingsDep) -> TaskRunner:
     if settings.debug:
         return TaskRunner(id="api-debug-mode")
     raise TaskRunningPermissionDeniedException()

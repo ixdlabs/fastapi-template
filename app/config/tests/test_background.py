@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import MagicMock
 import pytest
 from app.config.background import Background, TaskRegistry, get_background
@@ -44,58 +43,86 @@ async def test_submit_calls_apply_async(settings_fixture: Settings, monkeypatch:
     )
 
 
-# Tests for shared_async_task
+# Tests for TaskRegistry
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_shared_async_task_no_event_loop():
-    async def async_fn(x, y):
+def test_task_registry_background_task_runs_out_of_event_loop():
+    registry = TaskRegistry()
+
+    @registry.background_task("test_task")
+    async def sample_task(x: int, y: int) -> int:
         return x + y
 
-    registry = TaskRegistry()
-    task = registry.background_task("fn1")(async_fn)
-    result = task(2, 3)
+    result = sample_task(2, 3)
     assert result == 5
 
 
 @pytest.mark.asyncio
-async def test_shared_async_task_with_running_loop():
-    async def async_fn():
-        await asyncio.sleep(0.01)
-        return "ok"
-
+async def test_task_registry_background_task_runs_within_event_loop():
     registry = TaskRegistry()
-    task = registry.background_task("fn2")(async_fn)
-    result = task()
-    assert result == "ok"
 
+    @registry.background_task("test_task_1")
+    async def sample_task(x: int, y: int) -> int:
+        return x + y
 
-def test_shared_async_task_exception_no_loop():
-    async def async_fn():
-        raise RuntimeError("boom")
-
-    registry = TaskRegistry()
-    task = registry.background_task("fn3")(async_fn)
-    with pytest.raises(RuntimeError, match="boom"):
-        task()
+    result = sample_task(4, 5)
+    assert result == 9
 
 
 @pytest.mark.asyncio
-async def test_shared_async_task_exception_with_loop():
-    async def async_fn():
-        raise ValueError("bad")
-
+async def test_task_registry_background_task_error_propagation():
     registry = TaskRegistry()
-    task = registry.background_task("fn4")(async_fn)
-    with pytest.raises(ValueError, match="bad"):
-        task()
+
+    @registry.background_task("test_task_error")
+    async def error_task():
+        raise ValueError("Intentional error")
+
+    with pytest.raises(ValueError, match="Intentional error"):
+        error_task()
 
 
-def test_shared_async_task_returns_celery_task():
-    async def async_fn():
+def test_task_registry_background_task_registers_beat_schedule():
+    registry = TaskRegistry()
+
+    @registry.background_task("test_task_2", schedule=120)
+    async def scheduled_task():
         return 123
 
+    assert scheduled_task() == 123
+    assert "test_task_2" in registry.beat_schedule
+    schedule_entry = registry.beat_schedule["test_task_2"]
+    assert schedule_entry["schedule"] == 120
+
+
+def test_task_registry_background_task_without_schedule_does_not_register_beat_schedule():
     registry = TaskRegistry()
-    task = registry.background_task("fn5")(async_fn)
-    assert isinstance(task, CeleryTask)
-    assert task() == 123
+
+    @registry.background_task("test_task_3")
+    async def unscheduled_task():
+        return 123
+
+    assert unscheduled_task() == 123
+    assert "test_task_3" not in registry.beat_schedule
+
+
+def test_task_registry_include_registry_merges_beat_schedules():
+    registry1 = TaskRegistry()
+    registry2 = TaskRegistry()
+
+    @registry1.background_task("test_task_a", schedule=60)
+    async def task_a():
+        return "a"
+
+    @registry2.background_task("test_task_b", schedule=120)
+    async def task_b():
+        return "b"
+
+    registry1.include_registry(registry2)
+
+    assert task_a() == "a"
+    assert task_b() == "b"
+    assert "test_task_a" in registry1.beat_schedule
+    assert "test_task_b" in registry1.beat_schedule
+    assert registry1.beat_schedule["test_task_a"]["schedule"] == 60
+    assert registry1.beat_schedule["test_task_b"]["schedule"] == 120

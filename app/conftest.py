@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 
 from alembic import command, config
 
-from app.config.auth import AuthUser, Authenticator, TaskRunner, get_authenticator, get_current_user
+from app.config.auth import AuthUser, Authenticator, TaskRunner, get_authenticator, get_current_admin, get_current_user
 from app.config.background import Background, get_background
 from app.config.cache import get_cache_backend
 from app.config.database import get_db_session
@@ -197,9 +197,11 @@ async def authenticated_admin_fixture(db_fixture: AsyncSession):
         last_name=user.last_name,
     )
     app.dependency_overrides[get_current_user] = lambda: auth_user
+    app.dependency_overrides[get_current_admin] = lambda: auth_user
 
     yield user
     del app.dependency_overrides[get_current_user]
+    del app.dependency_overrides[get_current_admin]
 
 
 @pytest.fixture(scope="function")

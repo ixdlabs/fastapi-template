@@ -1,13 +1,13 @@
 from typing import Annotated, Literal
 import uuid
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from app.config.auth import AuthenticationFailedException, CurrentUserDep
+from app.config.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
 from app.config.cache import CacheDep
 from app.config.database import DbDep
-from app.config.exceptions import ServiceException, raises
+from app.config.exceptions import raises
 from app.config.pagination import Page, paginate
 from app.config.rate_limit import RateLimitDep, RateLimitExceededException
 from app.features.users.models.user import UserType, User
@@ -34,28 +34,18 @@ class UserListOutput(BaseModel):
     last_name: str
 
 
-# Exceptions
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class UserListAccessNotAuthorizedException(ServiceException):
-    status_code = status.HTTP_403_FORBIDDEN
-    type = "users/admin/list-users/not-authorized"
-    detail = "Not authorized to list users"
-
-
 # User list endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 @raises(AuthenticationFailedException)
-@raises(UserListAccessNotAuthorizedException)
+@raises(AuthorizationFailedException)
 @raises(RateLimitExceededException)
 @router.get("/")
 async def list_users(
     db: DbDep,
     query: Annotated[UserFilterInput, Query()],
-    current_user: CurrentUserDep,
+    current_admin: CurrentAdminDep,
     rate_limit: RateLimitDep,
     cache: CacheDep,
 ) -> Page[UserListOutput]:
@@ -65,6 +55,8 @@ async def list_users(
 
     This endpoint is rate-limited and cached for demonstration purposes.
     """
+    assert current_admin.type == UserType.ADMIN
+
     # Rate limiting
     await rate_limit.limit("10/minute")
 
@@ -72,10 +64,6 @@ async def list_users(
     cache.vary_on_path().vary_on_query().vary_on_auth()
     if cache_result := await cache.get():
         return cache_result
-
-    # Authorization check
-    if current_user.type != UserType.ADMIN:
-        raise UserListAccessNotAuthorizedException()
 
     # Build query with filters
     stmt = select(User)

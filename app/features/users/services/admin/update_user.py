@@ -4,7 +4,7 @@ from pydantic import AwareDatetime, BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from app.config.audit_log import AuditLoggerDep
-from app.config.auth import AuthenticationFailedException, CurrentUserDep
+from app.config.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
 from app.config.database import DbDep
 from app.config.exceptions import ServiceException, raises
 from app.features.users.models.user import UserType, User
@@ -39,12 +39,6 @@ class UserUpdateOutput(BaseModel):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class UserUpdateNotAuthorizedException(ServiceException):
-    status_code = status.HTTP_403_FORBIDDEN
-    type = "users/admin/update/not-authorized"
-    detail = "Not authorized to update this user"
-
-
 class UserNotFoundException(ServiceException):
     status_code = status.HTTP_404_NOT_FOUND
     type = "users/admin/update/user-not-found"
@@ -62,20 +56,18 @@ class EmailExistsException(ServiceException):
 
 
 @raises(AuthenticationFailedException)
-@raises(UserUpdateNotAuthorizedException)
+@raises(AuthorizationFailedException)
 @raises(UserNotFoundException)
 @raises(EmailExistsException)
 @router.put("/{user_id}")
 async def update_user(
-    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_user: CurrentUserDep, audit_logger: AuditLoggerDep
+    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_admin: CurrentAdminDep, audit_logger: AuditLoggerDep
 ) -> UserUpdateOutput:
     """
     Update a user's information.
     The authenticated user must be an admin.
     """
-    # Authorization check
-    if current_user.type != UserType.ADMIN:
-        raise UserUpdateNotAuthorizedException()
+    assert current_admin.type == UserType.ADMIN
 
     # Fetch user from database
     stmt = select(User).where(User.id == user_id)

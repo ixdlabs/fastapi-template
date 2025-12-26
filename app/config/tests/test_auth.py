@@ -4,7 +4,15 @@ import jwt
 import pytest
 import pytest_asyncio
 
-from app.config.auth import AuthUser, AuthException, AuthenticationFailedException, get_current_user, get_authenticator
+from app.config.auth import (
+    AuthUser,
+    AuthException,
+    AuthenticationFailedException,
+    TaskRunningPermissionDeniedException,
+    get_current_user,
+    get_authenticator,
+    get_task_user,
+)
 from app.config.auth import Authenticator
 from app.config.settings import Settings
 
@@ -136,11 +144,26 @@ def test_expired_token_raises_auth_exception(
         authenticator_fixture.user(expired_token)
 
 
+def test_missing_user_payload_raises_auth_exception(
+    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+):
+    payload = {
+        "sub": str(user_fixture.id),
+        "type": "access",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+    }
+    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+
+    with pytest.raises(AuthException):
+        authenticator_fixture.user(token)
+
+
 def test_unexpected_user_payload_raises_auth_exception(
     authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
 ):
     payload = {
         "sub": str(user_fixture.id),
+        "type": "access",
         "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
         "user": {"unexpected_field": "unexpected_value"},
     }
@@ -167,3 +190,17 @@ def test_get_current_user_returns_for_valid_access_token(authenticator_fixture: 
     assert user.username == user_fixture.username
     assert user.first_name == user_fixture.first_name
     assert user.last_name == user_fixture.last_name
+
+
+# Tests for get_tasl_user
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def test_get_task_user_returns_user_in_debug_mode(settings_fixture: Settings):
+    user = get_task_user(settings_fixture.model_copy(update={"debug": True}))
+    assert user.id == "api-debug-mode"
+
+
+def test_get_task_user_raises_exception_in_production_mode(settings_fixture: Settings):
+    with pytest.raises(TaskRunningPermissionDeniedException):
+        get_task_user(settings_fixture.model_copy(update={"debug": False}))

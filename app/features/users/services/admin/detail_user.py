@@ -3,7 +3,7 @@ from fastapi import APIRouter, status
 from pydantic import AwareDatetime, BaseModel, EmailStr
 from sqlalchemy import select
 
-from app.config.auth import AuthenticationFailedException, CurrentUserDep
+from app.config.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
 from app.config.cache import CacheDep
 from app.config.database import DbDep
 from app.config.exceptions import ServiceException, raises
@@ -39,35 +39,29 @@ class UserNotFoundException(ServiceException):
     detail = "User not found"
 
 
-class UserAccessNotAuthorizedException(ServiceException):
-    status_code = status.HTTP_403_FORBIDDEN
-    type = "users/admin/detail-user/not-authorized"
-    detail = "Not authorized to access this user"
-
-
 # User detail endpoint
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 @raises(AuthenticationFailedException)
-@raises(UserAccessNotAuthorizedException)
+@raises(AuthorizationFailedException)
 @raises(UserNotFoundException)
 @router.get("/{user_id}")
-async def detail_user(user_id: uuid.UUID, db: DbDep, current_user: CurrentUserDep, cache: CacheDep) -> UserDetailOutput:
+async def detail_user(
+    user_id: uuid.UUID, db: DbDep, current_admin: CurrentAdminDep, cache: CacheDep
+) -> UserDetailOutput:
     """
     Get detailed information about a specific user.
     The authenticated user must be an admin.
 
     This endpoint is cached for demonstration purposes.
     """
+    assert current_admin.type == UserType.ADMIN
+
     # Check and return from cache
     cache.vary_on_path().vary_on_auth()
     if cache_result := await cache.get():
         return cache_result
-
-    # Authorization check
-    if current_user.type != UserType.ADMIN:
-        raise UserAccessNotAuthorizedException()
 
     # Fetch user from database
     stmt = select(User).where(User.id == user_id)

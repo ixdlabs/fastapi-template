@@ -41,6 +41,6 @@ async def send_password_reset_email_task(raw_task_input: str):
         return result.model_dump_json()
 
 
-@user_task_registry.periodic_task("echo_task", schedule=60)
+@user_task_registry.background_task("echo_task", schedule=60)
 async def echo_task():
     logger.info("Echo task executed")
