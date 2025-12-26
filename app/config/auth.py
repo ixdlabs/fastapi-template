@@ -126,7 +126,7 @@ TokenDep = Annotated[str, Depends(oauth2_scheme)]
 class AuthenticationFailedException(ServiceException):
     status_code = status.HTTP_401_UNAUTHORIZED
     type = "auth/authentication-failed"
-    detail = "Authentication failed"
+    detail = "Authentication failed, please login again"
 
 
 def get_current_user(token: TokenDep, authenticator: AuthenticatorDep) -> AuthUser:

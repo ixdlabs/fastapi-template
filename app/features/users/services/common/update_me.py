@@ -45,7 +45,7 @@ class UpdateMeOutput(BaseModel):
 class UserNotFoundException(ServiceException):
     status_code = status.HTTP_404_NOT_FOUND
     type = "users/common/update/user-not-found"
-    detail = "User not found,  the account may have already been deleted"
+    detail = "User not found, the account may have already been deleted"
 
 
 class EmailExistsException(ServiceException):

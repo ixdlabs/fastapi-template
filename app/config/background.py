@@ -44,49 +44,70 @@ def get_background(settings: SettingsDep):
 BackgroundDep = Annotated[Background, Depends(get_background)]
 
 
-# Utility to create shared async Celery tasks.
+# Helper to get the import string for a Celery task.
+# This will be used to register periodic tasks in the Celery beat schedule.
+# ----------------------------------------------------------------------------------------------------------------------
 # Normally, Celery tasks are synchronous functions. This utility allows defining async functions as Celery tasks.
 # Internally, it runs the async function in an event loop, either in the current thread or in a separate thread.
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def shared_async_task(name: str):
-    """Convert an async function into a Celery task."""
+class TaskRegistry:
+    def __init__(self):
+        self.beat_schedule: dict[str, dict[str, Any]] = {}
 
-    def decorator(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]:
-        @functools.wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+    def _run_as_sync(self, func: Callable[P, Coroutine[R, Any, Any]], *args: P.args, **kwargs: P.kwargs) -> R:
+        """Converts an async function into a Celery task."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(func(*args, **kwargs))
+
+        result_container: dict[str, R] = {}
+        error_container: dict[str, BaseException] = {}
+
+        def runner():
             try:
-                asyncio.get_running_loop()
-            except RuntimeError:
-                return asyncio.run(func(*args, **kwargs))
+                result_container["result"] = asyncio.run(func(*args, **kwargs))
+            except BaseException as exc:
+                error_container["error"] = exc
 
-            result_container: dict[str, R] = {}
-            error_container: dict[str, BaseException] = {}
+        thread = threading.Thread(target=runner, daemon=True)
+        thread.start()
+        thread.join()
 
-            def runner():
-                try:
-                    result_container["result"] = asyncio.run(func(*args, **kwargs))
-                except BaseException as exc:
-                    error_container["error"] = exc
+        if "error" in error_container:
+            raise error_container["error"]
+        return result_container["result"]
 
-            thread = threading.Thread(target=runner, daemon=True)
-            thread.start()
-            thread.join()
+    def background_task(self, name: str):
+        """Register a background task."""
 
-            if "error" in error_container:
-                raise error_container["error"]
-            return result_container["result"]
+        def decorator(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]:
+            @functools.wraps(func)
+            def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                return self._run_as_sync(func, *args, **kwargs)
 
-        return shared_task(name=name)(wrapper)
+            return shared_task(name=name)(wrapper)
 
-    return decorator
+        return decorator
 
+    def periodic_task(self, name: str, schedule: int):
+        """Register a periodic background task."""
 
-# Helper to get the import string for a Celery task.
-# ----------------------------------------------------------------------------------------------------------------------
+        def decorator(func: Callable[P, Coroutine[R, Any, Any]]) -> Callable[P, R]:
+            @functools.wraps(func)
+            def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                return self._run_as_sync(func, *args, **kwargs)
 
+            self.beat_schedule[name] = {
+                "task": f"{func.__module__}.{func.__name__}",
+                "schedule": schedule,
+            }
+            return shared_task(name=name)(wrapper)
 
-def celery_import_string(task: CeleryTask) -> str:
-    """Get the import string for a Celery task."""
-    return f"{task.__module__}.{task.__name__}"
+        return decorator
+
+    def include_registry(self, registry: "TaskRegistry"):
+        """Include another TaskRegistry's tasks."""
+        self.beat_schedule.update(registry.beat_schedule)

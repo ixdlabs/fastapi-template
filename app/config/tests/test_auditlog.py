@@ -41,6 +41,10 @@ async def fetch_single_audit_log(db_fixture: AsyncSession) -> AuditLog:
     return audit
 
 
+# Tests for AuditLogger
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 @pytest.mark.asyncio
 async def test_audit_logger_value_error_when_resource_has_no_id(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request

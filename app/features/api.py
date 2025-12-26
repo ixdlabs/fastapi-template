@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 
-from app.features.users.router import user_task_router
-from app.features.users.router import admin_user_router
-from app.features.users.router import common_user_router
-from app.features.users.router import auth_router
+from app.features.users.api import user_task_router
+from app.features.users.api import admin_user_router
+from app.features.users.api import common_user_router
+from app.features.users.api import auth_router
 
 from app.features.notifications.router import notification_router
 

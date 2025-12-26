@@ -1,3 +1,9 @@
+"""
+This module defines the AuditLogger class responsible for tracking and recording audit logs
+for resource changes within the application. It captures actor information, request metadata,
+resource identity, and snapshots of the resource before and after changes.
+"""
+
 import logging
 from typing import Annotated, Literal
 from opentelemetry import trace
@@ -13,7 +19,8 @@ logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
-default_exclude_columns = ["hashed_password"]
+# Update this list to exclude any additional columns from audit logging.
+default_exclude_columns = ["hashed_password", "hashed_token"]
 
 
 class AuditLogger:
@@ -25,9 +32,22 @@ class AuditLogger:
         self.db = db
 
     async def track(self, resource: Base):
+        """
+        Track the current state of the resource before any changes are made.
+        This should be called before modifying the resource to capture its original state.
+
+        This is ignored for `create` and `delete` actions.
+        """
         self.tracked_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
 
     async def record(self, action: Literal["create", "delete"] | str, resource: Base) -> None:
+        """
+        Record an audit log entry for the specified action and resource.
+        The actual database commit is not handled here; it should be done by the caller.
+
+        For `delete` actions, call this before deleting the resource from the database.
+        For other actions, call this making the change but before committing the transaction.
+        """
         with tracer.start_as_current_span("audit-logging") as span:
             audit_log = AuditLog()
             audit_log.action = action

@@ -1,7 +1,7 @@
 import asyncio
 from unittest.mock import MagicMock
 import pytest
-from app.config.background import Background, shared_async_task, get_background
+from app.config.background import Background, TaskRegistry, get_background
 from app.config.settings import Settings
 from celery import Task as CeleryTask
 from pytest import MonkeyPatch
@@ -52,7 +52,8 @@ def test_shared_async_task_no_event_loop():
     async def async_fn(x, y):
         return x + y
 
-    task = shared_async_task("fn1")(async_fn)
+    registry = TaskRegistry()
+    task = registry.background_task("fn1")(async_fn)
     result = task(2, 3)
     assert result == 5
 
@@ -63,7 +64,8 @@ async def test_shared_async_task_with_running_loop():
         await asyncio.sleep(0.01)
         return "ok"
 
-    task = shared_async_task("fn2")(async_fn)
+    registry = TaskRegistry()
+    task = registry.background_task("fn2")(async_fn)
     result = task()
     assert result == "ok"
 
@@ -72,7 +74,8 @@ def test_shared_async_task_exception_no_loop():
     async def async_fn():
         raise RuntimeError("boom")
 
-    task = shared_async_task("fn3")(async_fn)
+    registry = TaskRegistry()
+    task = registry.background_task("fn3")(async_fn)
     with pytest.raises(RuntimeError, match="boom"):
         task()
 
@@ -82,7 +85,8 @@ async def test_shared_async_task_exception_with_loop():
     async def async_fn():
         raise ValueError("bad")
 
-    task = shared_async_task("fn4")(async_fn)
+    registry = TaskRegistry()
+    task = registry.background_task("fn4")(async_fn)
     with pytest.raises(ValueError, match="bad"):
         task()
 
@@ -91,6 +95,7 @@ def test_shared_async_task_returns_celery_task():
     async def async_fn():
         return 123
 
-    task = shared_async_task("fn5")(async_fn)
+    registry = TaskRegistry()
+    task = registry.background_task("fn5")(async_fn)
     assert isinstance(task, CeleryTask)
     assert task() == 123

@@ -48,6 +48,11 @@ async def scalar(request: Request):
     )
 
 
+# Override FastAPI's default OpenAPI generation
+# This adds RFC 7807 Problem Details for HTTP APIs documentation for custom exceptions
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 def custom(app: FastAPI):
     """Override the default FastAPI OpenAPI generation to include custom exception documentation."""
 

@@ -1,6 +1,6 @@
 import logging
 from app.config.auth import TaskRunner
-from app.config.background import shared_async_task
+from app.config.background import TaskRegistry
 from app.config.database import get_db
 from app.config.settings import get_settings
 from app.features.users.services.tasks.send_email_verification import (
@@ -12,12 +12,12 @@ from app.features.users.services.tasks.send_password_reset_email import (
     send_password_reset_email,
 )
 
-from celery.app.task import Task as CeleryTask
 
 logger = logging.getLogger(__name__)
+user_task_registry = TaskRegistry()
 
 
-@shared_async_task("send_email_verification")
+@user_task_registry.background_task("send_email_verification")
 async def send_email_verification_task(raw_task_input: str):
     logger.info("Starting send_email_verification_task")
     settings = get_settings()
@@ -28,7 +28,7 @@ async def send_email_verification_task(raw_task_input: str):
         return result.model_dump_json()
 
 
-@shared_async_task("send_password_reset_email")
+@user_task_registry.background_task("send_password_reset_email")
 async def send_password_reset_email_task(raw_task_input: str):
     logger.info("Starting send_password_reset_email_task")
     settings = get_settings()
@@ -41,6 +41,6 @@ async def send_password_reset_email_task(raw_task_input: str):
         return result.model_dump_json()
 
 
-@shared_async_task("echo_task")
-async def echo_task(self: CeleryTask):
+@user_task_registry.periodic_task("echo_task", schedule=60)
+async def echo_task():
     logger.info("Echo task executed")

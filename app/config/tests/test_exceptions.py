@@ -46,6 +46,10 @@ def test_app():
     return app
 
 
+# Custom exception handler tests
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 @pytest.mark.asyncio
 async def test_custom_http_exception_handler_logs_server_error(test_app: FastAPI, monkeypatch: MonkeyPatch):
     mock_logger = MagicMock()
