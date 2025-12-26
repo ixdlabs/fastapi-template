@@ -8,7 +8,9 @@ from app.config.settings import Settings
 from unittest.mock import MagicMock
 
 
-def test_setup_open_telemetry_disabled(db_engine_fixture: AsyncEngine, monkeypatch: MonkeyPatch):
+def test_setup_open_telemetry_skips_instrumentation_when_disabled(
+    db_engine_fixture: AsyncEngine, monkeypatch: MonkeyPatch
+):
     mock_intr = MagicMock()
     monkeypatch.setattr("app.config.otel.AsyncioInstrumentor", mock_intr)
 
@@ -17,7 +19,9 @@ def test_setup_open_telemetry_disabled(db_engine_fixture: AsyncEngine, monkeypat
     mock_intr.assert_not_called()
 
 
-def test_fastapi_instrumentation(db_engine_fixture: AsyncEngine, monkeypatch: MonkeyPatch):
+def test_setup_open_telemetry_instruments_fastapi_dependencies_when_enabled(
+    db_engine_fixture: AsyncEngine, monkeypatch: MonkeyPatch
+):
     mock_asyncio_intr = MagicMock()
     mock_logging_intr = MagicMock()
     mock_sqlalchemy_intr = MagicMock()
@@ -45,7 +49,9 @@ def test_fastapi_instrumentation(db_engine_fixture: AsyncEngine, monkeypatch: Mo
     mock_celery_intr().instrument.assert_not_called()
 
 
-def test_celery_instrumentation(db_engine_fixture: AsyncEngine, monkeypatch: MonkeyPatch):
+def test_setup_open_telemetry_instruments_celery_dependencies_when_enabled(
+    db_engine_fixture: AsyncEngine, monkeypatch: MonkeyPatch
+):
     mock_asyncio_intr = MagicMock()
     mock_logging_intr = MagicMock()
     mock_sqlalchemy_intr = MagicMock()

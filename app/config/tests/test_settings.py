@@ -2,7 +2,7 @@ from app.config import settings
 from pytest import MonkeyPatch
 
 
-def test_get_settings_respects_environment(monkeypatch: MonkeyPatch):
+def test_get_settings_reads_values_from_environment(monkeypatch: MonkeyPatch):
     settings.get_settings.cache_clear()
     monkeypatch.setenv("JWT_SECRET_KEY", "from-env")
 

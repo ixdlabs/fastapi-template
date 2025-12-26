@@ -36,12 +36,12 @@ async def user_fixture(db_fixture: AsyncSession):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_get_authenticator_returns_authenticator_instance(settings_fixture: Settings):
+def test_get_authenticator_returns_authenticator_configured_with_settings(settings_fixture: Settings):
     authenticator = get_authenticator(settings_fixture)
     assert isinstance(authenticator, Authenticator)
 
 
-def test_encode_without_requested_scopes_returns_tokens_with_default_scopes(
+def test_encode_defaults_to_user_and_customer_scopes_when_none_requested(
     authenticator_fixture: Authenticator, user_fixture: User
 ):
     access_token, refresh_token = authenticator_fixture.encode(user_fixture)
@@ -52,7 +52,9 @@ def test_encode_without_requested_scopes_returns_tokens_with_default_scopes(
     assert scopes == {"user", "customer"}
 
 
-def test_encode_with_requested_scopes_returns_tokens(authenticator_fixture: Authenticator, user_fixture: User):
+def test_encode_uses_requested_scopes_when_they_match_allowed_set(
+    authenticator_fixture: Authenticator, user_fixture: User
+):
     requested_scopes = {"user", "customer"}
     access_token, refresh_token = authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
 
@@ -62,7 +64,7 @@ def test_encode_with_requested_scopes_returns_tokens(authenticator_fixture: Auth
     assert scopes == {"user", "customer"}
 
 
-def test_encode_with_smaller_requested_scopes_returns_tokens(authenticator_fixture: Authenticator, user_fixture: User):
+def test_encode_accepts_subset_of_default_scopes(authenticator_fixture: Authenticator, user_fixture: User):
     requested_scopes = {"user"}
     access_token, refresh_token = authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
 
@@ -72,15 +74,13 @@ def test_encode_with_smaller_requested_scopes_returns_tokens(authenticator_fixtu
     assert scopes == {"user"}
 
 
-def test_encode_with_non_subset_requested_scopes_raises_auth_exception(
-    authenticator_fixture: Authenticator, user_fixture: User
-):
+def test_encode_rejects_requested_scopes_outside_default_set(authenticator_fixture: Authenticator, user_fixture: User):
     requested_scopes = {"admin", "user"}
     with pytest.raises(AuthException):
         authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
 
 
-def test_user_decodes_valid_access_token(authenticator_fixture: Authenticator, user_fixture: User):
+def test_user_parses_valid_access_token_into_auth_user_model(authenticator_fixture: Authenticator, user_fixture: User):
     access_token, _ = authenticator_fixture.encode(user_fixture)
     auth_user = authenticator_fixture.user(access_token)
 
@@ -91,7 +91,7 @@ def test_user_decodes_valid_access_token(authenticator_fixture: Authenticator, u
     assert auth_user.last_name == user_fixture.last_name
 
 
-def test_user_fails_with_unknown_token_type(authenticator_fixture: Authenticator, user_fixture: User):
+def test_user_raises_auth_exception_for_unknown_token_type(authenticator_fixture: Authenticator, user_fixture: User):
     current_time = datetime.now(timezone.utc)
     expiration = current_time + timedelta(minutes=5)
     payload = {"sub": str(user_fixture.id), "exp": expiration, "type": "unknown_type"}
@@ -100,7 +100,7 @@ def test_user_fails_with_unknown_token_type(authenticator_fixture: Authenticator
         authenticator_fixture.user(token)
 
 
-def test_sub_extracts_user_id(authenticator_fixture: Authenticator, user_fixture: User):
+def test_sub_returns_uuid_from_access_token(authenticator_fixture: Authenticator, user_fixture: User):
     access_token, _ = authenticator_fixture.encode(user_fixture)
     user_id = authenticator_fixture.sub(access_token)
 
@@ -108,17 +108,17 @@ def test_sub_extracts_user_id(authenticator_fixture: Authenticator, user_fixture
     assert user_id == user_fixture.id
 
 
-def test_user_invalid_token_raises_auth_exception(authenticator_fixture: Authenticator):
+def test_user_raises_auth_exception_for_malformed_jwt(authenticator_fixture: Authenticator):
     with pytest.raises(AuthException):
         authenticator_fixture.user("invalid.token.value")
 
 
-def test_sub_invalid_token_raises_auth_exception(authenticator_fixture: Authenticator):
+def test_sub_raises_auth_exception_for_malformed_jwt(authenticator_fixture: Authenticator):
     with pytest.raises(AuthException):
         authenticator_fixture.sub("invalid.token.value")
 
 
-def test_user_missing_user_payload_raises_auth_exception(
+def test_user_raises_auth_exception_when_user_payload_missing(
     authenticator_fixture: Authenticator, settings_fixture: Settings
 ):
     payload = {"sub": str(uuid.uuid4()), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
@@ -128,7 +128,7 @@ def test_user_missing_user_payload_raises_auth_exception(
         authenticator_fixture.user(token)
 
 
-def test_user_invalid_user_payload_raises_auth_exception(
+def test_user_raises_auth_exception_for_invalid_user_payload(
     authenticator_fixture: Authenticator, settings_fixture: Settings
 ):
     payload = {
@@ -142,7 +142,9 @@ def test_user_invalid_user_payload_raises_auth_exception(
         authenticator_fixture.user(token)
 
 
-def test_sub_missing_sub_claim_raises_auth_exception(authenticator_fixture: Authenticator, settings_fixture: Settings):
+def test_sub_raises_auth_exception_when_sub_claim_missing(
+    authenticator_fixture: Authenticator, settings_fixture: Settings
+):
     payload = {"exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
@@ -150,7 +152,9 @@ def test_sub_missing_sub_claim_raises_auth_exception(authenticator_fixture: Auth
         authenticator_fixture.sub(token)
 
 
-def test_sub_invalid_uuid_raises_auth_exception(authenticator_fixture: Authenticator, settings_fixture: Settings):
+def test_sub_raises_auth_exception_for_non_uuid_sub_claim(
+    authenticator_fixture: Authenticator, settings_fixture: Settings
+):
     payload = {"sub": "not-a-uuid", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
@@ -158,7 +162,7 @@ def test_sub_invalid_uuid_raises_auth_exception(authenticator_fixture: Authentic
         authenticator_fixture.sub(token)
 
 
-def test_expired_token_raises_auth_exception(
+def test_user_raises_auth_exception_for_expired_token(
     authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
 ):
     payload = {
@@ -179,7 +183,7 @@ def test_expired_token_raises_auth_exception(
         authenticator_fixture.user(expired_token)
 
 
-def test_missing_user_payload_raises_auth_exception(
+def test_user_raises_auth_exception_when_user_payload_not_provided(
     authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
 ):
     payload = {
@@ -193,7 +197,7 @@ def test_missing_user_payload_raises_auth_exception(
         authenticator_fixture.user(token)
 
 
-def test_unexpected_user_payload_raises_auth_exception(
+def test_user_raises_auth_exception_for_unexpected_payload_fields(
     authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
 ):
     payload = {
@@ -208,7 +212,9 @@ def test_unexpected_user_payload_raises_auth_exception(
         authenticator_fixture.user(token)
 
 
-def test_user_payload_succeeds(authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User):
+def test_user_returns_auth_user_when_payload_contains_expected_fields(
+    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+):
     payload = {
         "sub": str(user_fixture.id),
         "type": "access",
@@ -232,7 +238,7 @@ def test_user_payload_succeeds(authenticator_fixture: Authenticator, settings_fi
     assert auth_user.last_name == user_fixture.last_name
 
 
-def test_scope_extraction_from_token_with_no_scopes(
+def test_scopes_returns_empty_set_when_scope_claim_missing(
     authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
 ):
     payload = {
@@ -247,7 +253,7 @@ def test_scope_extraction_from_token_with_no_scopes(
     assert len(scopes) == 0
 
 
-def test_scope_extraction_from_token_with_scopes(
+def test_scopes_splits_space_delimited_scope_claim_into_set(
     authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
 ):
     payload = {
@@ -263,7 +269,7 @@ def test_scope_extraction_from_token_with_scopes(
     assert scopes == {"admin", "user", "customer"}
 
 
-def test_scope_extraction_from_token_with_empty_scope(
+def test_scopes_returns_empty_set_for_empty_scope_claim(
     authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
 ):
     payload = {
@@ -279,9 +285,7 @@ def test_scope_extraction_from_token_with_empty_scope(
     assert len(scopes) == 0
 
 
-def test_scope_extraction_from_invalid_token_raises_auth_exception(
-    authenticator_fixture: Authenticator,
-):
+def test_scopes_raises_auth_exception_for_malformed_token(authenticator_fixture: Authenticator):
     with pytest.raises(AuthException):
         authenticator_fixture.scopes("invalid.token.value")
 
@@ -290,12 +294,12 @@ def test_scope_extraction_from_invalid_token_raises_auth_exception(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_get_current_user_raises_401(authenticator_fixture: Authenticator):
+def test_get_current_user_raises_authentication_failed_for_invalid_token(authenticator_fixture: Authenticator):
     with pytest.raises(AuthenticationFailedException):
         get_current_user("invalid.token.value", authenticator_fixture)
 
 
-def test_get_current_user_returns_for_valid_access_token(authenticator_fixture: Authenticator, user_fixture: User):
+def test_get_current_user_returns_user_for_valid_access_token(authenticator_fixture: Authenticator, user_fixture: User):
     access_token, _ = authenticator_fixture.encode(user_fixture)
     user = get_current_user(access_token, authenticator_fixture)
 
@@ -305,7 +309,7 @@ def test_get_current_user_returns_for_valid_access_token(authenticator_fixture: 
     assert user.last_name == user_fixture.last_name
 
 
-def test_get_current_user_returns_for_valid_access_token_with_matching_scopes(
+def test_get_current_user_allows_access_when_token_scopes_include_requested_scopes(
     authenticator_fixture: Authenticator, user_fixture: User
 ):
     requested_scopes = {"user", "customer"}
@@ -318,7 +322,7 @@ def test_get_current_user_returns_for_valid_access_token_with_matching_scopes(
     assert user.last_name == user_fixture.last_name
 
 
-def test_get_current_user_raises_401_for_valid_access_token_with_non_matching_scopes(
+def test_get_current_user_raises_authorization_failed_when_scopes_do_not_match(
     authenticator_fixture: Authenticator, user_fixture: User
 ):
     requested_scopes = {"user"}
@@ -327,7 +331,7 @@ def test_get_current_user_raises_401_for_valid_access_token_with_non_matching_sc
         get_current_user(access_token, authenticator_fixture, security_scopes=SecurityScopes(scopes=["admin"]))
 
 
-def test_get_current_user_returns_for_valid_access_token_with_no_requested_scopes(
+def test_get_current_user_allows_access_when_no_scopes_requested(
     authenticator_fixture: Authenticator, user_fixture: User
 ):
     requested_scopes = {"user"}

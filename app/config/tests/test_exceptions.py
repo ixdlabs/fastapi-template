@@ -51,7 +51,9 @@ def test_app():
 
 
 @pytest.mark.asyncio
-async def test_custom_http_exception_handler_logs_server_error(test_app: FastAPI, monkeypatch: MonkeyPatch):
+async def test_custom_http_exception_handler_logs_and_returns_registered_server_error(
+    test_app: FastAPI, monkeypatch: MonkeyPatch
+):
     mock_logger = MagicMock()
     monkeypatch.setattr("app.config.exceptions.logger.error", mock_logger)
 
@@ -64,7 +66,7 @@ async def test_custom_http_exception_handler_logs_server_error(test_app: FastAPI
 
 
 @pytest.mark.asyncio
-async def test_custom_http_exception_handler_ignores_client_error_logging(test_app):
+async def test_custom_http_exception_handler_returns_registered_client_error_without_logging(test_app):
     client = TestClient(test_app)
     response = client.get("/client-error")
 
@@ -73,7 +75,9 @@ async def test_custom_http_exception_handler_ignores_client_error_logging(test_a
 
 
 @pytest.mark.asyncio
-async def test_custom_exception_handler_logs_unexpected_error(test_app: FastAPI, monkeypatch: MonkeyPatch):
+async def test_custom_exception_handler_logs_unhandled_exceptions_as_server_error(
+    test_app: FastAPI, monkeypatch: MonkeyPatch
+):
     mock_logger = MagicMock()
     monkeypatch.setattr("app.config.exceptions.logger.error", mock_logger)
 
@@ -88,7 +92,7 @@ async def test_custom_exception_handler_logs_unexpected_error(test_app: FastAPI,
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_raises_adds_metadata_to_function():
+def test_raises_decorator_attaches_exception_metadata_to_function():
     @raises(Sample400Exception)
     def foo():
         return 123
@@ -100,7 +104,7 @@ def test_raises_adds_metadata_to_function():
     assert foo.__raises__[status.HTTP_400_BAD_REQUEST] == [Sample400Exception]
 
 
-def test_raises_accumulates_multiple_status_codes():
+def test_raises_decorator_accumulates_multiple_status_codes():
     @raises(Sample400Exception)
     @raises(Sample404Exception)
     def foo():
@@ -110,7 +114,7 @@ def test_raises_accumulates_multiple_status_codes():
     assert set(foo.__raises__.keys()) == {status.HTTP_400_BAD_REQUEST, status.HTTP_404_NOT_FOUND}
 
 
-def test_raises_returns_same_function_object():
+def test_raises_decorator_returns_original_function_instance():
     def foo():
         return 123
 

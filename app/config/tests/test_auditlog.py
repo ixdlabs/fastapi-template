@@ -46,7 +46,7 @@ async def fetch_single_audit_log(db_fixture: AsyncSession) -> AuditLog:
 
 
 @pytest.mark.asyncio
-async def test_audit_logger_value_error_when_resource_has_no_id(
+async def test_audit_logger_raises_value_error_when_resource_missing_id(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
     logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
@@ -57,7 +57,7 @@ async def test_audit_logger_value_error_when_resource_has_no_id(
 
 
 @pytest.mark.asyncio
-async def test_audit_logger_create_anonymous_records_metadata_and_new_value(
+async def test_audit_logger_create_records_anonymous_actor_and_request_metadata(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
     logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
@@ -85,7 +85,7 @@ async def test_audit_logger_create_anonymous_records_metadata_and_new_value(
 
 
 @pytest.mark.asyncio
-async def test_audit_logger_delete_anonymous_records_old_value(
+async def test_audit_logger_delete_records_anonymous_actor_and_old_value(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
     logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
@@ -112,7 +112,9 @@ async def test_audit_logger_delete_anonymous_records_old_value(
 
 
 @pytest.mark.asyncio
-async def test_audit_logger_user_actor_when_token_valid(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
+async def test_audit_logger_uses_user_actor_when_token_is_valid(
+    db_fixture: AsyncSession, authenticator_fixture: Authenticator
+):
     user: User = UserFactory.build(id=uuid.uuid4())
     token, _ = authenticator_fixture.encode(user)
     request = make_request_with_token(token)
@@ -140,7 +142,7 @@ async def test_audit_logger_user_actor_when_token_valid(db_fixture: AsyncSession
 
 
 @pytest.mark.asyncio
-async def test_audit_logger_falls_back_to_anonymous_when_token_invalid(
+async def test_audit_logger_defaults_to_anonymous_actor_when_token_invalid(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator
 ):
     request = make_request_with_token("invalid-token")
@@ -167,7 +169,7 @@ async def test_audit_logger_falls_back_to_anonymous_when_token_invalid(
 
 
 @pytest.mark.asyncio
-async def test_audit_logger_update_records_old_new_and_changed_value_after_track(
+async def test_audit_logger_update_records_old_new_and_changed_values_after_track(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
     logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)

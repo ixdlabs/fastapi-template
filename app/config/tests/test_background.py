@@ -10,13 +10,13 @@ from pytest import MonkeyPatch
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_get_background_returns_background_instance(settings_fixture: Settings):
+def test_get_background_returns_configured_background_instance(settings_fixture: Settings):
     background = get_background(settings_fixture)
     assert isinstance(background, Background)
 
 
 @pytest.mark.asyncio
-async def test_submit_rejects_non_celery_task(settings_fixture: Settings):
+async def test_submit_raises_value_error_for_non_celery_task(settings_fixture: Settings):
     bg = Background(settings_fixture)
 
     async def not_a_task():
@@ -28,7 +28,7 @@ async def test_submit_rejects_non_celery_task(settings_fixture: Settings):
 
 
 @pytest.mark.asyncio
-async def test_submit_calls_apply_async(settings_fixture: Settings, monkeypatch: MonkeyPatch):
+async def test_submit_delegates_apply_async_with_args_and_kwargs(settings_fixture: Settings, monkeypatch: MonkeyPatch):
     bg = Background(settings_fixture)
 
     task = MagicMock(spec=CeleryTask)
@@ -47,7 +47,7 @@ async def test_submit_calls_apply_async(settings_fixture: Settings, monkeypatch:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_task_registry_background_task_runs_out_of_event_loop():
+def test_background_task_runs_synchronously_when_event_loop_missing():
     registry = TaskRegistry()
 
     @registry.background_task("test_task")
@@ -59,7 +59,7 @@ def test_task_registry_background_task_runs_out_of_event_loop():
 
 
 @pytest.mark.asyncio
-async def test_task_registry_background_task_runs_within_event_loop():
+async def test_background_task_runs_as_coroutine_when_event_loop_present():
     registry = TaskRegistry()
 
     @registry.background_task("test_task_1")
@@ -71,7 +71,7 @@ async def test_task_registry_background_task_runs_within_event_loop():
 
 
 @pytest.mark.asyncio
-async def test_task_registry_background_task_error_propagation():
+async def test_background_task_propagates_errors_from_wrapped_coroutine():
     registry = TaskRegistry()
 
     @registry.background_task("test_task_error")
@@ -82,7 +82,7 @@ async def test_task_registry_background_task_error_propagation():
         error_task()
 
 
-def test_task_registry_background_task_registers_beat_schedule():
+def test_background_task_with_schedule_registers_beat_entry():
     registry = TaskRegistry()
 
     @registry.background_task("test_task_2", schedule=120)
@@ -95,7 +95,7 @@ def test_task_registry_background_task_registers_beat_schedule():
     assert schedule_entry["schedule"] == 120
 
 
-def test_task_registry_background_task_without_schedule_does_not_register_beat_schedule():
+def test_background_task_without_schedule_skips_beat_registration():
     registry = TaskRegistry()
 
     @registry.background_task("test_task_3")
@@ -106,7 +106,7 @@ def test_task_registry_background_task_without_schedule_does_not_register_beat_s
     assert "test_task_3" not in registry.beat_schedule
 
 
-def test_task_registry_include_registry_merges_beat_schedules():
+def test_include_registry_merges_beat_schedules_from_other_registry():
     registry1 = TaskRegistry()
     registry2 = TaskRegistry()
 

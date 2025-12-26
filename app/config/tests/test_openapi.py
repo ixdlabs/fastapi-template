@@ -14,14 +14,14 @@ client = TestClient(app)
 
 
 @pytest.mark.asyncio
-async def test_openapi_schema_endpoint_returns_200():
+async def test_openapi_endpoint_serves_schema_successfully():
     response = client.get("/api/openapi.json")
     assert response.status_code == 200
     assert "openapi" in response.json()
 
 
 @pytest.mark.asyncio
-async def test_apidoc_endpoint_returns_200():
+async def test_apidoc_endpoint_serves_swagger_ui_successfully():
     response = client.get("/api/docs")
     assert response.status_code == 200
 
@@ -48,7 +48,7 @@ class SampleException(ServiceException):
     detail = "This is a sample error"
 
 
-def test_add_service_exception_documentation_adds_new_response(app_fixture: FastAPI):
+def test_add_service_exception_documentation_injects_exception_response_when_missing(app_fixture: FastAPI):
     openapi_schema = get_openapi(title=app_fixture.title, version=app_fixture.version, routes=app_fixture.routes)
     route: BaseRoute = next(r for r in app_fixture.routes if getattr(r, "path") == "/items")
     openapi.add_service_exception_documentation(route, openapi_schema, status_code=400, exceptions=[SampleException])
@@ -60,7 +60,7 @@ def test_add_service_exception_documentation_adds_new_response(app_fixture: Fast
     assert response["content"]["application/json"]["examples"]["sample/error"]["value"]["type"] == "sample/error"
 
 
-def test_add_service_exception_documentation_does_not_override_existing_response(app_fixture: FastAPI):
+def test_add_service_exception_documentation_retains_existing_response(app_fixture: FastAPI):
     openapi_schema = get_openapi(title=app_fixture.title, version=app_fixture.version, routes=app_fixture.routes)
     route: BaseRoute = next(r for r in app_fixture.routes if getattr(r, "path") == "/items")
     openapi_schema["paths"]["/items"]["get"]["responses"]["400"] = {"description": "Existing"}
@@ -69,14 +69,14 @@ def test_add_service_exception_documentation_does_not_override_existing_response
     assert openapi_schema["paths"]["/items"]["get"]["responses"]["400"]["description"] == "Existing"
 
 
-def test_custom_returns_cached_openapi_schema():
+def test_custom_openapi_builder_returns_existing_schema_when_cached():
     test_app = FastAPI()
     test_app.openapi_schema = {"cached": True}
     result = openapi.custom(test_app)()
     assert result == {"cached": True}
 
 
-def test_custom_adds_raises_metadata_to_openapi():
+def test_custom_openapi_builder_includes_raises_metadata_in_schema():
     test_app = FastAPI()
 
     @raises(SampleException)
@@ -92,7 +92,7 @@ def test_custom_adds_raises_metadata_to_openapi():
     assert "sample/error" in responses["400"]["content"]["application/json"]["examples"]
 
 
-def test_custom_ignores_routes_not_in_schema():
+def test_custom_openapi_builder_skips_routes_excluded_from_schema():
     test_app = FastAPI()
 
     @raises(SampleException)
@@ -106,7 +106,7 @@ def test_custom_ignores_routes_not_in_schema():
     assert "/hidden" not in schema["paths"]
 
 
-def test_custom_calls_add_service_exception_documentation(monkeypatch):
+def test_custom_openapi_builder_calls_add_service_exception_documentation(monkeypatch):
     test_app = FastAPI()
 
     @raises(SampleException)

@@ -19,7 +19,7 @@ async def test_user_cannot_login_with_invalid_username():
 
 
 @pytest.mark.asyncio
-async def test__user_cannot_login_with_invalid_password(db_fixture: AsyncSession):
+async def test_user_cannot_login_with_invalid_password(db_fixture: AsyncSession):
     user: User = UserFactory.build(password__raw="correctpassword")
     db_fixture.add(user)
     await db_fixture.commit()

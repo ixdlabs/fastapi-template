@@ -31,11 +31,11 @@ def cache_fixture(request_fixture: Request, cache_backend_fixture: BaseCache) ->
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_default_cache_key(cache_fixture: CacheDep):
+def test_cache_initializes_with_default_key(cache_fixture: CacheDep):
     assert cache_fixture.key == "cache"
 
 
-def test_vary_adds_hashed_component(cache_fixture: CacheDep):
+def test_vary_appends_hashed_component_to_cache_key(cache_fixture: CacheDep):
     value = "example"
     expected_hash = md5(value.encode()).hexdigest()
 
@@ -44,7 +44,7 @@ def test_vary_adds_hashed_component(cache_fixture: CacheDep):
     assert cache_fixture.key == f"cache:[custom:{expected_hash}]"
 
 
-def test_vary_on_path(cache_fixture: CacheDep, request_fixture: Request):
+def test_vary_on_path_uses_request_path_hash_in_key(cache_fixture: CacheDep, request_fixture: Request):
     expected_hash = md5(request_fixture.url.path.encode()).hexdigest()
 
     cache_fixture.vary_on_path()
@@ -52,7 +52,7 @@ def test_vary_on_path(cache_fixture: CacheDep, request_fixture: Request):
     assert cache_fixture.key == f"cache:[path:{expected_hash}]"
 
 
-def test_vary_on_auth(cache_fixture: CacheDep, request_fixture: Request):
+def test_vary_on_auth_uses_authorization_header_hash_in_key(cache_fixture: CacheDep, request_fixture: Request):
     auth_header = request_fixture.headers.get("Authorization")
     assert auth_header is not None
     expected_hash = md5(auth_header.encode()).hexdigest()
@@ -62,7 +62,7 @@ def test_vary_on_auth(cache_fixture: CacheDep, request_fixture: Request):
     assert cache_fixture.key == f"cache:[auth:{expected_hash}]"
 
 
-def test_vary_on_query(cache_fixture: CacheDep, request_fixture: Request):
+def test_vary_on_query_uses_sorted_query_params_hash_in_key(cache_fixture: CacheDep, request_fixture: Request):
     query_str = str(sorted(request_fixture.query_params.items()))
     expected_hash = md5(query_str.encode()).hexdigest()
 
@@ -71,7 +71,7 @@ def test_vary_on_query(cache_fixture: CacheDep, request_fixture: Request):
     assert cache_fixture.key == f"cache:[query:{expected_hash}]"
 
 
-def test_chained_vary_calls(cache_fixture: CacheDep, request_fixture: Request):
+def test_vary_chains_components_in_cache_key(cache_fixture: CacheDep, request_fixture: Request):
     path_hash = md5(request_fixture.url.path.encode()).hexdigest()
     auth_hash = md5(request_fixture.headers["Authorization"].encode()).hexdigest()
 
@@ -85,7 +85,7 @@ def test_chained_vary_calls(cache_fixture: CacheDep, request_fixture: Request):
 
 
 @pytest.mark.asyncio
-async def test_set_and_get_value(cache_fixture: CacheDep):
+async def test_set_stores_value_and_get_retrieves_it_from_backend(cache_fixture: CacheDep):
     value = {"a": 1}
     ttl = 10
 
@@ -97,7 +97,9 @@ async def test_set_and_get_value(cache_fixture: CacheDep):
 
 
 @pytest.mark.asyncio
-async def test_different_keys_do_not_collide(cache_backend_fixture: BaseCache, request_fixture: Request):
+async def test_distinct_cache_instances_do_not_collide_on_different_keys(
+    cache_backend_fixture: BaseCache, request_fixture: Request
+):
     cache1 = Cache(backend=cache_backend_fixture, request=request_fixture).vary_on_path()
     cache2 = Cache(backend=cache_backend_fixture, request=request_fixture).vary_on_auth()
 
@@ -112,14 +114,16 @@ async def test_different_keys_do_not_collide(cache_backend_fixture: BaseCache, r
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_get_cache_backend_is_singleton():
+def test_get_cache_backend_returns_singleton_instance():
     backend1 = get_cache_backend()
     backend2 = get_cache_backend()
 
     assert backend1 is backend2
 
 
-def test_get_cache_dependency_returns_cache_instance(cache_backend_fixture: BaseCache, request_fixture: Request):
+def test_get_cache_dependency_returns_cache_with_injected_backend_and_request(
+    cache_backend_fixture: BaseCache, request_fixture: Request
+):
     cache = get_cache(request=request_fixture, cache_backend=cache_backend_fixture)
 
     assert isinstance(cache, Cache)

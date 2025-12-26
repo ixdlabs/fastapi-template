@@ -35,32 +35,32 @@ class Child(Base):
     parent: Mapped[Parent] = relationship(back_populates="children")
 
 
-def test_class_properties():
+def test_parent_model_exposes_columns_relations_and_hybrid_attributes():
     assert set(Parent.columns) == {"id", "name"}
     assert Parent.relations == ["children"]
     assert Parent.hybrid_properties == ["name_upper"]
 
 
 @pytest.mark.asyncio
-async def test_to_dict_basic():
+async def test_to_dict_serializes_basic_model_fields_by_default():
     parent = Parent(name="alice")
     data = parent.to_dict()
     assert data == {"id": parent.id, "name": "alice"}
 
 
-def test_to_dict_exclude():
+def test_to_dict_excludes_specified_fields_when_requested():
     parent = Parent(name="alice")
     data = parent.to_dict(exclude=["id"])
     assert data == {"name": "alice"}
 
 
-def test_to_dict_with_hybrid_properties():
+def test_to_dict_includes_hybrid_attributes_when_enabled():
     parent = Parent(name="alice")
     data = parent.to_dict(hybrid_attributes=True)
     assert data["name_upper"] == "ALICE"
 
 
-def test_to_dict_nested_list_relationships():
+def test_to_dict_serializes_list_relationships_when_nested_option_enabled():
     parent = Parent(name="alice")
     child1 = Child(value="a", parent=parent)
     child2 = Child(value="b", parent=parent)
@@ -73,7 +73,7 @@ def test_to_dict_nested_list_relationships():
     assert data["children"][0]["value"] in {"a", "b"}
 
 
-def test_to_dict_nested_single_relationship():
+def test_to_dict_serializes_single_relationship_when_nested_option_enabled():
     child = Child(value="x")
     parent = Parent(name="bob")
     child.parent = parent
@@ -84,7 +84,7 @@ def test_to_dict_nested_single_relationship():
     assert data["parent"]["name"] == "bob"
 
 
-def test_to_dict_nested_with_hybrids():
+def test_to_dict_includes_nested_relations_and_hybrid_attributes_when_enabled():
     parent = Parent(name="alice")
     child = Child(value="x", parent=parent)
     parent.children = [child]
@@ -95,7 +95,7 @@ def test_to_dict_nested_with_hybrids():
     assert data["children"][0]["value"] == "x"
 
 
-def test_to_dict_with_uuid_sub_classes():
+def test_to_dict_serializes_uuid_subclasses_as_strings():
     class CustomUUID(uuid.UUID):
         pass
 
@@ -113,7 +113,7 @@ def test_to_dict_with_uuid_sub_classes():
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_create_db_engine_is_cached(monkeypatch: MonkeyPatch):
+def test_create_db_engine_caches_connections_per_url_and_debug_flag(monkeypatch: MonkeyPatch):
     create_db_engine.cache_clear()
 
     monkeypatch.setattr("app.config.database.create_async_engine", lambda url, echo: {"url": url, "echo": echo})
@@ -131,14 +131,14 @@ def test_create_db_engine_is_cached(monkeypatch: MonkeyPatch):
 
 
 @pytest.mark.asyncio
-async def test_get_db_session_provides_session():
+async def test_get_db_session_yields_async_session_bound_to_given_url():
     test_settings = Settings.model_construct(database_url="sqlite+aiosqlite:///:memory:", debug=True)
     async for db in get_db_session(test_settings):
         assert str(db.bind.url) == "sqlite+aiosqlite:///:memory:"
 
 
 @pytest.mark.asyncio
-async def test_get_db_provides_session():
+async def test_get_db_context_manager_provides_async_session_bound_to_given_url():
     test_settings = Settings.model_construct(database_url="sqlite+aiosqlite:///:memory:", debug=True)
     async with get_db(test_settings) as db:
         assert str(db.bind.url) == "sqlite+aiosqlite:///:memory:"

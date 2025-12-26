@@ -25,7 +25,7 @@ def make_request(path: str = "/test", client_host: str | None = "127.0.0.1") -> 
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_key_generation_with_client_ip():
+def test_rate_limit_key_includes_path_and_client_ip_when_present():
     request = make_request("/api/resource", "10.0.0.1")
     strategy = get_rate_limit_strategy()
 
@@ -34,7 +34,7 @@ def test_key_generation_with_client_ip():
     assert rate_limit.key() == "/api/resource:10.0.0.1"
 
 
-def test_key_generation_without_client():
+def test_rate_limit_key_defaults_to_unknown_when_client_missing():
     request = make_request("/api/resource", None)
     strategy = get_rate_limit_strategy()
 
@@ -48,7 +48,7 @@ def test_key_generation_without_client():
 
 
 @pytest.mark.asyncio
-async def test_limit_allows_first_request():
+async def test_rate_limit_allows_first_request_within_window():
     with time_machine.travel("2025-01-01 00:00:00"):
         request = make_request()
         strategy = get_rate_limit_strategy()
@@ -59,7 +59,7 @@ async def test_limit_allows_first_request():
 
 
 @pytest.mark.asyncio
-async def test_limit_blocks_when_exceeded():
+async def test_rate_limit_blocks_second_request_in_same_window_and_returns_headers():
     with time_machine.travel("2025-01-01 00:00:00"):
         request = make_request()
         strategy = get_rate_limit_strategy()
@@ -79,7 +79,7 @@ async def test_limit_blocks_when_exceeded():
 
 
 @pytest.mark.asyncio
-async def test_limit_resets_after_window():
+async def test_rate_limit_allows_request_after_window_resets():
     with time_machine.travel("2025-01-01 00:00:00"):
         request = make_request()
         strategy = get_rate_limit_strategy()
@@ -97,7 +97,7 @@ async def test_limit_resets_after_window():
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_reset_header_is_correct():
+async def test_rate_limit_sets_reset_header_within_window_bounds():
     with time_machine.travel("2025-01-01 00:00:00"):
         request = make_request()
         strategy = get_rate_limit_strategy()
