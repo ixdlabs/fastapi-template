@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
 import uuid
 import typing
@@ -50,7 +50,12 @@ class User(Base):
 
     first_name: Mapped[str] = mapped_column(String)
     last_name: Mapped[str] = mapped_column(String)
+
+    # Password is stored as a hashed value using Argon2
+    # The timestamp of when the password was last set is also stored to
+    # enforce password policies (if needed) and refresh token expirations.
     hashed_password: Mapped[str] = mapped_column(String)
+    password_set_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now)
 
     joined_at: Mapped[datetime] = mapped_column(DateTimeUTC)
     created_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now)
@@ -64,6 +69,7 @@ class User(Base):
     def set_password(self, password: str):
         password_hasher = PasswordHasher()
         self.hashed_password = password_hasher.hash(password)
+        self.password_set_at = datetime.now(timezone.utc)
 
     def check_password(self, password: str) -> bool:
         password_hasher = PasswordHasher()

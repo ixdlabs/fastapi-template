@@ -14,6 +14,7 @@ class UserFactory(factory.Factory):
     type = UserType.CUSTOMER
     email = factory.Faker("email")
     joined_at = factory.Faker("date_time_this_decade", tzinfo=timezone.utc)
+    password_set_at = factory.Faker("past_datetime", tzinfo=timezone.utc)
 
     @factory.post_generation
     def password(self, create, extracted, **kwargs):

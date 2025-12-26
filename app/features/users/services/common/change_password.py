@@ -63,7 +63,7 @@ async def change_password(
     """
     Change the password for the current user using the old password for verification.
     The new password must be different from the old password.
-    Previously issued refresh tokens will be invalidated (not implemented yet).
+    Previously issued refresh tokens will be invalidated.
     """
     # Fetch the current user from the database
     stmt = select(User).where(User.id == current_user.id)

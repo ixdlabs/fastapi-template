@@ -56,7 +56,7 @@ async def reset_password_confirm(
 ) -> ResetPasswordConfirmOutput:
     """
     Reset a user's password using a valid action token.
-    Previously issued refresh tokens will be invalidated (not implemented yet).
+    Previously issued refresh tokens will be invalidated.
     """
     # Fetch action by ID
     stmt = (

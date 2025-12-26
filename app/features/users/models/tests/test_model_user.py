@@ -7,9 +7,11 @@ from app.fixtures.user_factory import UserFactory
 @pytest.mark.asyncio
 async def test_password_is_hashed_when_set():
     user: User = UserFactory.build()
+    password_set_at_prev = user.password_set_at
     raw_password = "SecurePassword123!"
     user.set_password(raw_password)
     assert user.hashed_password != raw_password
+    assert user.password_set_at > password_set_at_prev
     assert user.check_password(raw_password)
 
 

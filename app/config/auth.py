@@ -73,9 +73,10 @@ class Authenticator:
         )
 
         # Create JWT tokens
+        user_id = str(user.id)
         user_dump = auth_user.model_dump_json()
-        access_payload = {"type": "access", "sub": str(user.id), "exp": access_exp, "user": user_dump, "scope": scope}
-        refresh_payload = {"type": "refresh", "sub": str(user.id), "exp": refresh_exp, "scope": scope}
+        access_payload = {"type": "access", "sub": user_id, "exp": access_exp, "user": user_dump, "scope": scope}
+        refresh_payload = {"type": "refresh", "sub": user_id, "iat": current_time, "exp": refresh_exp, "scope": scope}
 
         access_token = jwt.encode(algorithm="HS256", key=self.settings.jwt_secret_key, payload=access_payload)
         refresh_token = jwt.encode(algorithm="HS256", key=self.settings.jwt_secret_key, payload=refresh_payload)
@@ -129,6 +130,19 @@ class Authenticator:
             raise AuthException("Invalid JWT access token (Invalid UUID format for user ID)") from e
 
         return user_id
+
+    def iat(self, token: str) -> datetime:
+        """Extract the issued-at time from the given JWT token."""
+        try:
+            payload: dict[str, Any] = jwt.decode(token, self.settings.jwt_secret_key, algorithms=["HS256"])
+        except jwt.PyJWTError as e:
+            raise AuthException("JWT decode error") from e
+
+        iat_timestamp = payload.get("iat")
+        if iat_timestamp is None or not isinstance(iat_timestamp, (int, float)):
+            raise AuthException("Invalid JWT token (missing issued-at time)")
+
+        return datetime.fromtimestamp(iat_timestamp, tz=timezone.utc)
 
 
 def get_authenticator(settings: SettingsDep) -> Authenticator:

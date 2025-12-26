@@ -5,6 +5,7 @@ import jwt
 import pytest
 import pytest_asyncio
 from fastapi.security import SecurityScopes
+import time_machine
 
 from app.config.auth import (
     AuthUser,
@@ -39,6 +40,10 @@ async def user_fixture(db_fixture: AsyncSession):
 def test_get_authenticator_returns_authenticator_configured_with_settings(settings_fixture: Settings):
     authenticator = get_authenticator(settings_fixture)
     assert isinstance(authenticator, Authenticator)
+
+
+# JWT Encode Tests
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 def test_encode_defaults_to_user_and_customer_scopes_when_none_requested(
@@ -80,6 +85,10 @@ def test_encode_rejects_requested_scopes_outside_default_set(authenticator_fixtu
         authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
 
 
+# JWT User Tests
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 def test_user_parses_valid_access_token_into_auth_user_model(authenticator_fixture: Authenticator, user_fixture: User):
     access_token, _ = authenticator_fixture.encode(user_fixture)
     auth_user = authenticator_fixture.user(access_token)
@@ -100,22 +109,9 @@ def test_user_raises_auth_exception_for_unknown_token_type(authenticator_fixture
         authenticator_fixture.user(token)
 
 
-def test_sub_returns_uuid_from_access_token(authenticator_fixture: Authenticator, user_fixture: User):
-    access_token, _ = authenticator_fixture.encode(user_fixture)
-    user_id = authenticator_fixture.sub(access_token)
-
-    assert isinstance(user_id, uuid.UUID)
-    assert user_id == user_fixture.id
-
-
 def test_user_raises_auth_exception_for_malformed_jwt(authenticator_fixture: Authenticator):
     with pytest.raises(AuthException):
         authenticator_fixture.user("invalid.token.value")
-
-
-def test_sub_raises_auth_exception_for_malformed_jwt(authenticator_fixture: Authenticator):
-    with pytest.raises(AuthException):
-        authenticator_fixture.sub("invalid.token.value")
 
 
 def test_user_raises_auth_exception_when_user_payload_missing(
@@ -140,26 +136,6 @@ def test_user_raises_auth_exception_for_invalid_user_payload(
 
     with pytest.raises(AuthException):
         authenticator_fixture.user(token)
-
-
-def test_sub_raises_auth_exception_when_sub_claim_missing(
-    authenticator_fixture: Authenticator, settings_fixture: Settings
-):
-    payload = {"exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
-    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
-
-    with pytest.raises(AuthException):
-        authenticator_fixture.sub(token)
-
-
-def test_sub_raises_auth_exception_for_non_uuid_sub_claim(
-    authenticator_fixture: Authenticator, settings_fixture: Settings
-):
-    payload = {"sub": "not-a-uuid", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
-    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
-
-    with pytest.raises(AuthException):
-        authenticator_fixture.sub(token)
 
 
 def test_user_raises_auth_exception_for_expired_token(
@@ -236,6 +212,93 @@ def test_user_returns_auth_user_when_payload_contains_expected_fields(
     assert auth_user.username == user_fixture.username
     assert auth_user.first_name == user_fixture.first_name
     assert auth_user.last_name == user_fixture.last_name
+
+
+# JWT sub Tests
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def test_sub_raises_auth_exception_for_malformed_jwt(authenticator_fixture: Authenticator):
+    with pytest.raises(AuthException):
+        authenticator_fixture.sub("invalid.token.value")
+
+
+def test_sub_returns_uuid_from_access_token(authenticator_fixture: Authenticator, user_fixture: User):
+    access_token, _ = authenticator_fixture.encode(user_fixture)
+    user_id = authenticator_fixture.sub(access_token)
+
+    assert isinstance(user_id, uuid.UUID)
+    assert user_id == user_fixture.id
+
+
+def test_sub_raises_auth_exception_when_sub_claim_missing(
+    authenticator_fixture: Authenticator, settings_fixture: Settings
+):
+    payload = {"exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
+    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+
+    with pytest.raises(AuthException):
+        authenticator_fixture.sub(token)
+
+
+def test_sub_raises_auth_exception_for_non_uuid_sub_claim(
+    authenticator_fixture: Authenticator, settings_fixture: Settings
+):
+    payload = {"sub": "not-a-uuid", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
+    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+
+    with pytest.raises(AuthException):
+        authenticator_fixture.sub(token)
+
+
+# JWT iat Tests
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def test_iat_raises_auth_exception_when_iat_claim_missing(
+    authenticator_fixture: Authenticator, settings_fixture: Settings
+):
+    payload = {"sub": str(uuid.uuid4()), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
+    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+
+    with pytest.raises(AuthException):
+        authenticator_fixture.iat(token)
+
+
+def test_iat_raises_auth_exception_for_malformed_iat_claim(
+    authenticator_fixture: Authenticator, settings_fixture: Settings
+):
+    payload = {
+        "sub": str(uuid.uuid4()),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "iat": "not-a-timestamp",
+    }
+    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+    with pytest.raises(AuthException):
+        authenticator_fixture.iat(token)
+
+
+def test_iat_returns_issued_at_datetime_from_token(
+    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+):
+    with time_machine.travel("2025-01-01 00:00:00"):
+        issued_at = datetime.now(timezone.utc)
+        expiration = issued_at + timedelta(minutes=5)
+        payload = {"sub": str(user_fixture.id), "exp": expiration, "iat": int(issued_at.timestamp())}
+        token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+
+        iat = authenticator_fixture.iat(token)
+        assert isinstance(iat, datetime)
+        assert iat == issued_at
+
+
+def test_iat_raises_auth_exception_for_malformed_jwt(authenticator_fixture: Authenticator):
+    with pytest.raises(AuthException):
+        authenticator_fixture.iat("invalid.token.value")
+
+
+# JWT scopes Tests
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 def test_scopes_returns_empty_set_when_scope_claim_missing(

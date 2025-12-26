@@ -54,7 +54,11 @@ class InvalidRefreshTokenException(ServiceException):
 @raises(InvalidRefreshTokenException)
 @router.post("/refresh")
 async def refresh_tokens(form: RefreshInput, db: DbDep, authenticator: AuthenticatorDep) -> RefreshOutput:
-    """Refresh the user's tokens using refresh token and return new access and refresh tokens."""
+    """
+    Refresh the user's tokens using refresh token and return new access and refresh tokens.
+
+    If the user has changed their password since the refresh token was issued, the refresh token is invalidated.
+    """
     # Validate refresh token
     try:
         user_id = authenticator.sub(form.refresh_token)
@@ -62,11 +66,21 @@ async def refresh_tokens(form: RefreshInput, db: DbDep, authenticator: Authentic
         logger.warning("token validation failed", exc_info=True)
         raise InvalidRefreshTokenException() from e
 
+    # Check if the refresh token has expired
+    try:
+        iat = authenticator.iat(form.refresh_token)
+    except AuthException as e:
+        logger.warning("token iat extraction failed", exc_info=True)
+        raise InvalidRefreshTokenException() from e
+
     # Fetch user by ID
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is None:
+        raise InvalidRefreshTokenException()
+
+    if user.password_set_at > iat:
         raise InvalidRefreshTokenException()
 
     # Generate new tokens
