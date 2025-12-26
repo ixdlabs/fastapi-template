@@ -72,11 +72,11 @@ class User(Base):
         except Argon2Error:
             return False
 
-    def get_oauth2_scopes(self) -> list[str]:
+    def get_oauth2_scopes(self) -> set[str]:
         """Return the OAuth2 scopes associated with this user based on their type."""
         if self.type == UserType.ADMIN:
-            return ["admin", "user"]
+            return {"admin", "user"}
         elif self.type == UserType.CUSTOMER:
-            return ["customer", "user"]
+            return {"customer", "user"}
         else:
-            return ["user"]
+            return {"user"}

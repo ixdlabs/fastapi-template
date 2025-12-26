@@ -50,7 +50,7 @@ class Authenticator:
         refresh_exp = current_time + timedelta(minutes=self.settings.jwt_refresh_expiration_minutes)
 
         # Determine user scopes
-        user_scopes = set(user.get_oauth2_scopes())
+        user_scopes = user.get_oauth2_scopes()
         if requested_scopes is not None:
             if not requested_scopes.issubset(user_scopes):
                 raise AuthException("Requested scopes are not a subset of user scopes")
