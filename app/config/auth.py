@@ -51,15 +51,14 @@ class Authenticator:
 
         # Determine user scopes
         user_scopes = user.get_oauth2_scopes()
-        if requested_scopes is not None:
-            if not requested_scopes.issubset(user_scopes):
-                raise AuthException("Requested scopes are not a subset of user scopes")
-            user_scopes = requested_scopes
-
         # In debug mode, admin users get the "task" scope
         # This allows admins to execute background tasks via REST API
         if self.settings.debug and user.type == UserType.ADMIN:
             user_scopes.add("task")
+        if requested_scopes is not None:
+            if not requested_scopes.issubset(user_scopes):
+                raise AuthException("Requested scopes are not a subset of user scopes")
+            user_scopes = requested_scopes
 
         scope = " ".join(sorted(user_scopes))
 

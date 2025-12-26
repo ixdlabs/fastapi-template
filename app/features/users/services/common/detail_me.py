@@ -45,7 +45,7 @@ class UserNotFoundException(ServiceException):
 @raises(AuthenticationFailedException)
 @raises(UserNotFoundException)
 @router.get("/me")
-async def detail_user(db: DbDep, current_user: CurrentUserDep) -> DetailMeOutput:
+async def detail_me(db: DbDep, current_user: CurrentUserDep) -> DetailMeOutput:
     """Get detailed information about the currently authenticated user."""
     # Fetch user from database
     stmt = select(User).where(User.id == current_user.id)
