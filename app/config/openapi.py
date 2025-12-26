@@ -38,6 +38,7 @@ async def scalar(request: Request):
         url: "%s",
         "theme": "bluePlanet",
         persistAuth: true,
+        tagsSorter: "alpha",
       })
     </script>
   </body>

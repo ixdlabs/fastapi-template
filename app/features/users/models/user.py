@@ -16,7 +16,7 @@ from app.config.timezone import DateTimeUTC, utc_now
 
 if typing.TYPE_CHECKING:
     from app.features.users.models.user_action import UserAction
-    from app.features.notifications.models import Notification
+    from app.features.notifications.models.notification import Notification
 
 
 # User

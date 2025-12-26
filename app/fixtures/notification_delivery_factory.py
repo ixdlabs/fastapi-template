@@ -1,22 +1,11 @@
 import factory
 
-from app.fixtures.user_factory import UserFactory
-from app.features.notifications.models import (
-    Notification,
+from app.features.notifications.models.notification_delivery import (
     NotificationChannel,
     NotificationDelivery,
     NotificationStatus,
-    NotificationType,
 )
-
-
-class NotificationFactory(factory.Factory):
-    class Meta:
-        model = Notification
-
-    user = factory.SubFactory(UserFactory)
-    type = factory.Iterator(NotificationType)
-    data = factory.LazyFunction(dict)
+from app.fixtures.notification_factory import NotificationFactory
 
 
 class NotificationDeliveryFactory(factory.Factory):
