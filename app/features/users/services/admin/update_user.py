@@ -61,13 +61,13 @@ class EmailExistsException(ServiceException):
 @raises(EmailExistsException)
 @router.put("/{user_id}")
 async def update_user(
-    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_admin: CurrentAdminDep, audit_logger: AuditLoggerDep
+    user_id: uuid.UUID, form: UserUpdateInput, db: DbDep, current_user: CurrentAdminDep, audit_logger: AuditLoggerDep
 ) -> UserUpdateOutput:
     """
     Update a user's information.
     The authenticated user must be an admin.
     """
-    assert current_admin.type == UserType.ADMIN
+    assert current_user.type == UserType.ADMIN
 
     # Fetch user from database
     stmt = select(User).where(User.id == user_id)

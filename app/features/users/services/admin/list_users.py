@@ -45,7 +45,7 @@ class UserListOutput(BaseModel):
 async def list_users(
     db: DbDep,
     query: Annotated[UserFilterInput, Query()],
-    current_admin: CurrentAdminDep,
+    current_user: CurrentAdminDep,
     rate_limit: RateLimitDep,
     cache: CacheDep,
 ) -> Page[UserListOutput]:
@@ -55,7 +55,7 @@ async def list_users(
 
     This endpoint is rate-limited and cached for demonstration purposes.
     """
-    assert current_admin.type == UserType.ADMIN
+    assert current_user.type == UserType.ADMIN
 
     # Rate limiting
     await rate_limit.limit("10/minute")

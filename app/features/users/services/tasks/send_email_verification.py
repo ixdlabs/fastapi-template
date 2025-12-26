@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
-from app.config.auth import TaskRunnerDep
+from app.config.auth import CurrentTaskRunnerDep
 from app.config.database import DbDep
 from app.config.settings import SettingsDep
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
@@ -36,15 +36,13 @@ class SendEmailVerificationOutput(BaseModel):
 
 @router.post("/send-email-verification-email")
 async def send_email_verification(
-    task_input: SendEmailVerificationInput, task_runner: TaskRunnerDep, settings: SettingsDep, db: DbDep
+    task_input: SendEmailVerificationInput, current_user: CurrentTaskRunnerDep, settings: SettingsDep, db: DbDep
 ) -> SendEmailVerificationOutput:
     """
     Sends an email verification email to the user by creating a new email verification action.
     This invalidates any existing pending email verification actions for the user.
-
-    In the REST API, this endpoint is only reachable in debug mode to allow testing.
     """
-    logger.info("Task initiated by runner_id=%s", task_runner.id)
+    logger.info("Task initiated by runner_id=%s", current_user.id)
 
     # Invalidate existing pending email verification actions
     update_stmt = (

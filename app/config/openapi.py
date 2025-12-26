@@ -77,6 +77,21 @@ def custom(app: FastAPI):
                     exceptions = [exc for exc in exceptions if exc is not None]
                     add_service_exception_documentation(route, openapi_schema, status_code, exceptions)
 
+        # Add security scope badges to operations
+        for _, methods in openapi_schema["paths"].items():
+            for _, operation in methods.items():
+                operation_security = operation.get("security", [])
+                if operation_security:
+                    scopes = []
+                    for security_requirement in operation_security:
+                        for scheme_scopes in dict(security_requirement).values():
+                            scopes.extend(scheme_scopes)
+                    for scope in scopes:
+                        tag_name = f"auth:{scope}"
+                        if "x-badges" not in operation:
+                            operation["x-badges"] = []
+                        operation["x-badges"].append({"name": tag_name})
+
         app.openapi_schema = openapi_schema
         return app.openapi_schema
 

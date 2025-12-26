@@ -76,5 +76,4 @@ class RateLimitExceededException(ServiceException):
     detail = "You have exceeded your rate limit"
 
     def __init__(self, reset_time: int):
-        super().__init__()
-        self.headers = {"X-RateLimit-Reset": str(reset_time)}
+        super().__init__(headers={"X-RateLimit-Reset": str(reset_time)})

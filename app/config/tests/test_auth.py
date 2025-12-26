@@ -1,17 +1,18 @@
 from datetime import datetime, timedelta, timezone
+import json
 import uuid
 import jwt
 import pytest
 import pytest_asyncio
+from fastapi.security import SecurityScopes
 
 from app.config.auth import (
     AuthUser,
     AuthException,
     AuthenticationFailedException,
-    TaskRunningPermissionDeniedException,
+    AuthorizationFailedException,
     get_current_user,
     get_authenticator,
-    get_task_user,
 )
 from app.config.auth import Authenticator
 from app.config.settings import Settings
@@ -40,11 +41,43 @@ def test_get_authenticator_returns_authenticator_instance(settings_fixture: Sett
     assert isinstance(authenticator, Authenticator)
 
 
-def test_encode_returns_access_and_refresh_tokens(authenticator_fixture: Authenticator, user_fixture: User):
+def test_encode_without_requested_scopes_returns_tokens_with_default_scopes(
+    authenticator_fixture: Authenticator, user_fixture: User
+):
     access_token, refresh_token = authenticator_fixture.encode(user_fixture)
 
     assert isinstance(access_token, str)
     assert isinstance(refresh_token, str)
+    scopes = authenticator_fixture.scopes(access_token)
+    assert scopes == {"user", "customer"}
+
+
+def test_encode_with_requested_scopes_returns_tokens(authenticator_fixture: Authenticator, user_fixture: User):
+    requested_scopes = {"user", "customer"}
+    access_token, refresh_token = authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
+
+    assert isinstance(access_token, str)
+    assert isinstance(refresh_token, str)
+    scopes = authenticator_fixture.scopes(access_token)
+    assert scopes == {"user", "customer"}
+
+
+def test_encode_with_smaller_requested_scopes_returns_tokens(authenticator_fixture: Authenticator, user_fixture: User):
+    requested_scopes = {"user"}
+    access_token, refresh_token = authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
+
+    assert isinstance(access_token, str)
+    assert isinstance(refresh_token, str)
+    scopes = authenticator_fixture.scopes(access_token)
+    assert scopes == {"user"}
+
+
+def test_encode_with_non_subset_requested_scopes_raises_auth_exception(
+    authenticator_fixture: Authenticator, user_fixture: User
+):
+    requested_scopes = {"admin", "user"}
+    with pytest.raises(AuthException):
+        authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
 
 
 def test_user_decodes_valid_access_token(authenticator_fixture: Authenticator, user_fixture: User):
@@ -101,7 +134,7 @@ def test_user_invalid_user_payload_raises_auth_exception(
     payload = {
         "sub": str(uuid.uuid4()),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
-        "user": {"id": "not-a-uuid"},
+        "user": json.dumps({"id": "not-a-uuid"}),
     }
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
@@ -131,12 +164,14 @@ def test_expired_token_raises_auth_exception(
     payload = {
         "sub": str(user_fixture.id),
         "exp": datetime.now(timezone.utc) - timedelta(minutes=1),
-        "user": {
-            "id": str(user_fixture.id),
-            "username": user_fixture.username,
-            "first_name": user_fixture.first_name,
-            "last_name": user_fixture.last_name,
-        },
+        "user": json.dumps(
+            {
+                "id": str(user_fixture.id),
+                "username": user_fixture.username,
+                "first_name": user_fixture.first_name,
+                "last_name": user_fixture.last_name,
+            }
+        ),
     }
     expired_token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
@@ -165,12 +200,90 @@ def test_unexpected_user_payload_raises_auth_exception(
         "sub": str(user_fixture.id),
         "type": "access",
         "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
-        "user": {"unexpected_field": "unexpected_value"},
+        "user": json.dumps({"unexpected_field": "unexpected_value"}),
     }
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
     with pytest.raises(AuthException):
         authenticator_fixture.user(token)
+
+
+def test_user_payload_succeeds(authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User):
+    payload = {
+        "sub": str(user_fixture.id),
+        "type": "access",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "user": json.dumps(
+            {
+                "id": str(user_fixture.id),
+                "username": user_fixture.username,
+                "first_name": user_fixture.first_name,
+                "last_name": user_fixture.last_name,
+            }
+        ),
+    }
+    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+
+    auth_user = authenticator_fixture.user(token)
+    assert isinstance(auth_user, AuthUser)
+    assert auth_user.id == user_fixture.id
+    assert auth_user.username == user_fixture.username
+    assert auth_user.first_name == user_fixture.first_name
+    assert auth_user.last_name == user_fixture.last_name
+
+
+def test_scope_extraction_from_token_with_no_scopes(
+    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+):
+    payload = {
+        "sub": str(user_fixture.id),
+        "type": "access",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+    }
+    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+
+    scopes = authenticator_fixture.scopes(token)
+    assert isinstance(scopes, set)
+    assert len(scopes) == 0
+
+
+def test_scope_extraction_from_token_with_scopes(
+    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+):
+    payload = {
+        "sub": str(user_fixture.id),
+        "type": "access",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "scope": "admin user customer",
+    }
+    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+
+    scopes = authenticator_fixture.scopes(token)
+    assert isinstance(scopes, set)
+    assert scopes == {"admin", "user", "customer"}
+
+
+def test_scope_extraction_from_token_with_empty_scope(
+    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+):
+    payload = {
+        "sub": str(user_fixture.id),
+        "type": "access",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "scope": "",
+    }
+    token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
+
+    scopes = authenticator_fixture.scopes(token)
+    assert isinstance(scopes, set)
+    assert len(scopes) == 0
+
+
+def test_scope_extraction_from_invalid_token_raises_auth_exception(
+    authenticator_fixture: Authenticator,
+):
+    with pytest.raises(AuthException):
+        authenticator_fixture.scopes("invalid.token.value")
 
 
 # Tests for get_current_user
@@ -183,7 +296,7 @@ def test_get_current_user_raises_401(authenticator_fixture: Authenticator):
 
 
 def test_get_current_user_returns_for_valid_access_token(authenticator_fixture: Authenticator, user_fixture: User):
-    access_token, refresh_token = authenticator_fixture.encode(user_fixture)
+    access_token, _ = authenticator_fixture.encode(user_fixture)
     user = get_current_user(access_token, authenticator_fixture)
 
     assert user.id == user_fixture.id
@@ -192,15 +305,36 @@ def test_get_current_user_returns_for_valid_access_token(authenticator_fixture: 
     assert user.last_name == user_fixture.last_name
 
 
-# Tests for get_tasl_user
-# ----------------------------------------------------------------------------------------------------------------------
+def test_get_current_user_returns_for_valid_access_token_with_matching_scopes(
+    authenticator_fixture: Authenticator, user_fixture: User
+):
+    requested_scopes = {"user", "customer"}
+    access_token, _ = authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
+    user = get_current_user(access_token, authenticator_fixture, security_scopes=SecurityScopes(scopes=["user"]))
+
+    assert user.id == user_fixture.id
+    assert user.username == user_fixture.username
+    assert user.first_name == user_fixture.first_name
+    assert user.last_name == user_fixture.last_name
 
 
-def test_get_task_user_returns_user_in_debug_mode(settings_fixture: Settings):
-    user = get_task_user(settings_fixture.model_copy(update={"debug": True}))
-    assert user.id == "api-debug-mode"
+def test_get_current_user_raises_401_for_valid_access_token_with_non_matching_scopes(
+    authenticator_fixture: Authenticator, user_fixture: User
+):
+    requested_scopes = {"user"}
+    access_token, _ = authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
+    with pytest.raises(AuthorizationFailedException):
+        get_current_user(access_token, authenticator_fixture, security_scopes=SecurityScopes(scopes=["admin"]))
 
 
-def test_get_task_user_raises_exception_in_production_mode(settings_fixture: Settings):
-    with pytest.raises(TaskRunningPermissionDeniedException):
-        get_task_user(settings_fixture.model_copy(update={"debug": False}))
+def test_get_current_user_returns_for_valid_access_token_with_no_requested_scopes(
+    authenticator_fixture: Authenticator, user_fixture: User
+):
+    requested_scopes = {"user"}
+    access_token, _ = authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
+    user = get_current_user(access_token, authenticator_fixture)
+
+    assert user.id == user_fixture.id
+    assert user.username == user_fixture.username
+    assert user.first_name == user_fixture.first_name
+    assert user.last_name == user_fixture.last_name

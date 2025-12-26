@@ -30,13 +30,13 @@ class UserNotFoundException(ServiceException):
 @raises(UserNotFoundException)
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
-    user_id: uuid.UUID, db: DbDep, current_admin: CurrentAdminDep, audit_logger: AuditLoggerDep
+    user_id: uuid.UUID, db: DbDep, current_user: CurrentAdminDep, audit_logger: AuditLoggerDep
 ) -> None:
     """
     Delete a user from the system.
     The authenticated user must be an admin.
     """
-    assert current_admin.type == UserType.ADMIN
+    assert current_user.type == UserType.ADMIN
 
     # Fetch user from database
     stmt = select(User).where(User.id == user_id)

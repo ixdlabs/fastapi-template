@@ -3,8 +3,8 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.config.auth import AuthUser
 
-from app.config.auth import TaskRunner
 from app.config.settings import Settings
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 from app.features.users.services.tasks.send_password_reset_email import (
@@ -22,7 +22,7 @@ def fake_settings():
 
 @pytest.mark.asyncio
 async def test_send_password_reset_email_creates_action_and_invalidates_previous(
-    db_fixture: AsyncSession, task_runner_fixture: TaskRunner
+    db_fixture: AsyncSession, authenticated_task_runner_fixture: AuthUser
 ):
     user_id = uuid.uuid4()
     email = "reset@example.com"
@@ -44,7 +44,10 @@ async def test_send_password_reset_email_creates_action_and_invalidates_previous
     before_call = datetime.now(timezone.utc)
 
     await send_password_reset_email(
-        task_input=task_input, task_runner=task_runner_fixture, settings=fake_settings(), db=db_fixture
+        current_user=authenticated_task_runner_fixture,
+        task_input=task_input,
+        settings=fake_settings(),
+        db=db_fixture,
     )
 
     after_call = datetime.now(timezone.utc)

@@ -11,7 +11,7 @@ from typing import Annotated, Any
 import uuid
 
 from fastapi import Depends, Security, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 import jwt
 from pydantic import BaseModel, ValidationError
 
@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 
 class AuthUser(BaseModel):
     id: uuid.UUID
-    type: UserType
-    username: str
-    first_name: str
-    last_name: str
+    type: UserType | None = None
+    username: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 class AuthException(BaseException):
@@ -43,12 +43,21 @@ class Authenticator:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    def encode(self, user: User) -> tuple[str, str]:
+    def encode(self, user: User, requested_scopes: set[str] | None = None) -> tuple[str, str]:
         """Encode a JWT access token + refresh token for the given user."""
         current_time = datetime.now(timezone.utc)
-        access_expiration = current_time + timedelta(minutes=self.settings.jwt_access_expiration_minutes)
-        refresh_expiration = current_time + timedelta(minutes=self.settings.jwt_refresh_expiration_minutes)
+        access_exp = current_time + timedelta(minutes=self.settings.jwt_access_expiration_minutes)
+        refresh_exp = current_time + timedelta(minutes=self.settings.jwt_refresh_expiration_minutes)
 
+        # Determine user scopes
+        user_scopes = set(user.get_oauth2_scopes())
+        if requested_scopes is not None:
+            if not requested_scopes.issubset(user_scopes):
+                raise AuthException("Requested scopes are not a subset of user scopes")
+            user_scopes = requested_scopes
+        scope = " ".join(sorted(user_scopes))
+
+        # User object to be included in the token
         auth_user = AuthUser(
             id=user.id,
             type=user.type,
@@ -56,12 +65,14 @@ class Authenticator:
             first_name=user.first_name,
             last_name=user.last_name,
         )
-        user_dump = auth_user.model_dump_json()
-        access_payload = {"sub": str(user.id), "exp": access_expiration, "user": user_dump, "type": "access"}
-        refresh_payload = {"sub": str(user.id), "exp": refresh_expiration, "type": "refresh"}
 
-        access_token = jwt.encode(payload=access_payload, key=self.settings.jwt_secret_key, algorithm="HS256")
-        refresh_token = jwt.encode(payload=refresh_payload, key=self.settings.jwt_secret_key, algorithm="HS256")
+        # Create JWT tokens
+        user_dump = auth_user.model_dump_json()
+        access_payload = {"type": "access", "sub": str(user.id), "exp": access_exp, "user": user_dump, "scope": scope}
+        refresh_payload = {"type": "refresh", "sub": str(user.id), "exp": refresh_exp, "scope": scope}
+
+        access_token = jwt.encode(algorithm="HS256", key=self.settings.jwt_secret_key, payload=access_payload)
+        refresh_token = jwt.encode(algorithm="HS256", key=self.settings.jwt_secret_key, payload=refresh_payload)
         return access_token, refresh_token
 
     def user(self, access_token: str) -> AuthUser:
@@ -84,6 +95,16 @@ class Authenticator:
             raise AuthException("AuthUser validation error") from e
 
         return user
+
+    def scopes(self, token: str) -> set[str]:
+        """Extract the scopes from the given JWT token."""
+        try:
+            payload: dict[str, Any] = jwt.decode(token, self.settings.jwt_secret_key, algorithms=["HS256"])
+        except jwt.PyJWTError as e:
+            raise AuthException("JWT decode error") from e
+
+        scope_str = str(payload.get("scope", ""))
+        return set(scope_str.split()) if scope_str else set()
 
     def sub(self, token: str) -> uuid.UUID:
         """Extract the subject (user ID) from the given JWT token."""
@@ -120,11 +141,23 @@ class AuthenticationFailedException(ServiceException):
     type = "auth/authentication-failed"
     detail = "Authentication failed, please login again"
 
+    def __init__(self, authenticate_value: str | None = None) -> None:
+        headers: dict[str, str] | None = None
+        if authenticate_value:
+            headers = {"WWW-Authenticate": authenticate_value}
+        super().__init__(headers=headers)
+
 
 class AuthorizationFailedException(ServiceException):
     status_code = status.HTTP_403_FORBIDDEN
     type = "auth/authorization-failed"
     detail = "You do not have permission to access this resource"
+
+    def __init__(self, authenticate_value: str | None = None) -> None:
+        headers: dict[str, str] | None = None
+        if authenticate_value:
+            headers = {"WWW-Authenticate": authenticate_value}
+        super().__init__(headers=headers)
 
 
 class TaskRunningPermissionDeniedException(ServiceException):
@@ -137,51 +170,46 @@ class TaskRunningPermissionDeniedException(ServiceException):
 # ----------------------------------------------------------------------------------------------------------------------
 
 oauth2_scheme = OAuth2PasswordBearer(
+    scheme_name="JWT",
     tokenUrl="/api/auth/oauth2/token",
     refreshUrl="/api/auth/refresh",
-    scheme_name="JWT",
+    scopes={
+        "user": "Authenticated user access",
+        "customer": "Customer access",
+        "admin": "Administrator access",
+        "task": "Task runner access",
+    },
 )
 
-TokenDep = Annotated[str, Depends(oauth2_scheme)]
 
+def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    authenticator: AuthenticatorDep,
+    security_scopes: SecurityScopes = SecurityScopes(scopes=[]),
+) -> AuthUser:
+    if security_scopes is None:
+        security_scopes = SecurityScopes(scopes=[])
 
-def get_current_user(token: TokenDep, authenticator: AuthenticatorDep) -> AuthUser:
+    if security_scopes.scopes:
+        authenticate_value = f'Bearer scope="{security_scopes.scope_str}"'
+    else:
+        authenticate_value = "Bearer"
+
     try:
-        return authenticator.user(token)
+        user = authenticator.user(token)
+        scopes = authenticator.scopes(token)
     except AuthException as e:
         logger.warning("token validation failed", exc_info=True)
-        raise AuthenticationFailedException() from e
+        raise AuthenticationFailedException(authenticate_value) from e
 
+    if not set(security_scopes.scopes).issubset(scopes):
+        logger.warning("authorization failed: required scopes=%s, token scopes=%s", security_scopes.scopes, scopes)
+        raise AuthorizationFailedException(authenticate_value)
 
-CurrentUserDep = Annotated[AuthUser, Security(get_current_user)]
-
-
-# Dependency to get the current authenticated admin
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-def get_current_admin(token: TokenDep, authenticator: AuthenticatorDep) -> AuthUser:
-    user = get_current_user(token, authenticator)
-    if user.type != UserType.ADMIN:
-        raise AuthorizationFailedException()
     return user
 
 
-CurrentAdminDep = Annotated[AuthUser, Security(get_current_admin)]
-
-
-# Dependency to only authenticate tasks (only authenticates if debug mode is on)
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class TaskRunner(BaseModel):
-    id: str | None
-
-
-def get_task_user(settings: SettingsDep) -> TaskRunner:
-    if settings.debug:
-        return TaskRunner(id="api-debug-mode")
-    raise TaskRunningPermissionDeniedException()
-
-
-TaskRunnerDep = Annotated[TaskRunner, Security(get_task_user)]
+CurrentUserDep = Annotated[AuthUser, Security(get_current_user, scopes=["user"])]
+CurrentAdminDep = Annotated[AuthUser, Security(get_current_user, scopes=["admin"])]
+CurrentCustomerDep = Annotated[AuthUser, Security(get_current_user, scopes=["customer"])]
+CurrentTaskRunnerDep = Annotated[AuthUser, Security(get_current_user, scopes=["task"])]

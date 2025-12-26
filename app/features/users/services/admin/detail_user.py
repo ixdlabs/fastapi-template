@@ -48,7 +48,7 @@ class UserNotFoundException(ServiceException):
 @raises(UserNotFoundException)
 @router.get("/{user_id}")
 async def detail_user(
-    user_id: uuid.UUID, db: DbDep, current_admin: CurrentAdminDep, cache: CacheDep
+    user_id: uuid.UUID, db: DbDep, current_user: CurrentAdminDep, cache: CacheDep
 ) -> UserDetailOutput:
     """
     Get detailed information about a specific user.
@@ -56,7 +56,7 @@ async def detail_user(
 
     This endpoint is cached for demonstration purposes.
     """
-    assert current_admin.type == UserType.ADMIN
+    assert current_user.type == UserType.ADMIN
 
     # Check and return from cache
     cache.vary_on_path().vary_on_auth()

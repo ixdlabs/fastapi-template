@@ -29,8 +29,8 @@ class ServiceException(abc.ABC, HTTPException):
     type: str
     detail: str
 
-    def __init__(self):
-        super().__init__(status_code=self.status_code, detail=self.detail)
+    def __init__(self, headers: dict[str, str] | None = None) -> None:
+        super().__init__(status_code=self.status_code, detail=self.detail, headers=headers)
 
     def to_rfc7807(self) -> dict:
         with tracer.start_as_current_span("rfc7807") as span:

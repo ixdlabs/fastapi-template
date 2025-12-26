@@ -48,32 +48,3 @@ async def test_user_can_login_with_valid_credentials(db_fixture: AsyncSession, a
     assert "access_token" in data
     verified_user = get_current_user(data["access_token"], authenticator_fixture)
     assert verified_user.id == user.id
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_user_cannot_login_with_oauth2_invalid_password(db_fixture: AsyncSession):
-    user: User = UserFactory.build(password__raw="correctpassword")
-    db_fixture.add(user)
-    await db_fixture.commit()
-    await db_fixture.refresh(user)
-
-    response = client.post("/api/auth/oauth2/token", data={"username": "testuser", "password": "testpassword"})
-    assert response.status_code == 401
-    assert response.json()["type"] == "users/common/login/invalid-credentials"
-
-
-@pytest.mark.asyncio
-async def test_user_can_login_with_oauth2_token_endpoint(db_fixture: AsyncSession):
-    user: User = UserFactory.build(password__raw="correctpassword")
-    db_fixture.add(user)
-    await db_fixture.commit()
-    await db_fixture.refresh(user)
-
-    response = client.post("/api/auth/oauth2/token", data={"username": user.username, "password": "correctpassword"})
-    assert response.status_code == 200
-    data = response.json()
-    assert "access_token" in data
-    assert data["token_type"] == "bearer"

@@ -4,13 +4,13 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config.auth import AuthUser
 from app.config.settings import Settings
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 from app.features.users.services.tasks.send_email_verification import (
     SendEmailVerificationInput,
     send_email_verification,
 )
-from app.config.auth import TaskRunner
 
 
 def fake_settings():
@@ -22,7 +22,7 @@ def fake_settings():
 
 @pytest.mark.asyncio
 async def test_send_email_verification_creates_action_and_invalidates_previous(
-    db_fixture: AsyncSession, task_runner_fixture: TaskRunner
+    db_fixture: AsyncSession, authenticated_task_runner_fixture: AuthUser
 ):
     user_id = uuid.uuid4()
     email = "new@example.com"
@@ -45,7 +45,10 @@ async def test_send_email_verification_creates_action_and_invalidates_previous(
     before_call = datetime.now(timezone.utc)
 
     await send_email_verification(
-        task_input=task_input, task_runner=task_runner_fixture, settings=fake_settings(), db=db_fixture
+        current_user=authenticated_task_runner_fixture,
+        task_input=task_input,
+        settings=fake_settings(),
+        db=db_fixture,
     )
     after_call = datetime.now(timezone.utc)
 

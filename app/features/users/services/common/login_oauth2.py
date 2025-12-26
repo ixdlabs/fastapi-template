@@ -1,12 +1,12 @@
-import uuid
-from fastapi import APIRouter, status
+from typing import Annotated
+from fastapi import APIRouter, status, Form
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.config.auth import AuthenticatorDep
 from app.config.database import DbDep
-from app.config.exceptions import ServiceException, raises
-from app.features.users.models.user import User, UserType
+from app.config.exceptions import ServiceException
+from app.features.users.models.user import User
 
 
 router = APIRouter()
@@ -19,20 +19,12 @@ router = APIRouter()
 class LoginInput(BaseModel):
     username: str = Field(..., min_length=3, max_length=64)
     password: str = Field(..., min_length=1, max_length=128)
+    scope: str | None = Field(None, min_length=1, max_length=256)
 
 
-class LoginOutput(BaseModel):
+class OAuth2TokenResponse(BaseModel):
     access_token: str
-    refresh_token: str
-    user: "LoginOutputUser"
-
-
-class LoginOutputUser(BaseModel):
-    id: uuid.UUID
-    type: UserType
-    username: str
-    first_name: str
-    last_name: str
+    token_type: str = "bearer"
 
 
 # Exceptions
@@ -41,19 +33,19 @@ class LoginOutputUser(BaseModel):
 
 class InvalidUsernameOrPasswordException(ServiceException):
     status_code = status.HTTP_401_UNAUTHORIZED
-    type = "users/common/login/invalid-credentials"
+    type = "users/common/login-oauth2/invalid-credentials"
     detail = "Invalid username or password, please check your credentials and try again"
 
 
-# Login endpoint
+# Token endpoint (for OAuth2 compatibility)
+# This in only implemented to support authentication in Swagger UI itself.
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@raises(InvalidUsernameOrPasswordException)
-@router.post("/login")
-async def login(form: LoginInput, db: DbDep, authenticator: AuthenticatorDep) -> LoginOutput:
-    """Login a user and return access and refresh tokens."""
-    # Fetch user by username
+@router.post("/oauth2/token", include_in_schema=False)
+async def login_oauth2(
+    form: Annotated[LoginInput, Form()], db: DbDep, authenticator: AuthenticatorDep
+) -> OAuth2TokenResponse:
     stmt = select(User).where(User.username == form.username)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
@@ -66,15 +58,6 @@ async def login(form: LoginInput, db: DbDep, authenticator: AuthenticatorDep) ->
         raise InvalidUsernameOrPasswordException()
 
     # Generate tokens
-    access_token, refresh_token = authenticator.encode(user)
-    return LoginOutput(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user=LoginOutputUser(
-            id=user.id,
-            type=user.type,
-            username=user.username,
-            first_name=user.first_name,
-            last_name=user.last_name,
-        ),
-    )
+    requested_scopes = set(form.scope.split()) if form.scope else None
+    access_token, _ = authenticator.encode(user, requested_scopes)
+    return OAuth2TokenResponse(access_token=access_token)

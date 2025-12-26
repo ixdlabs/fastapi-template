@@ -71,3 +71,12 @@ class User(Base):
             return password_hasher.verify(self.hashed_password, password)
         except Argon2Error:
             return False
+
+    def get_oauth2_scopes(self) -> list[str]:
+        """Return the OAuth2 scopes associated with this user based on their type."""
+        if self.type == UserType.ADMIN:
+            return ["admin", "user"]
+        elif self.type == UserType.CUSTOMER:
+            return ["customer", "user"]
+        else:
+            return ["user"]

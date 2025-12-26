@@ -10,9 +10,7 @@ from app.features.notifications.services.common import (
 )
 
 
-common_notification_router = APIRouter(
-    prefix="/api/v1/common/notifications", tags=["Auth:Admin", "Auth:Customer", "Resource:Notifications"]
-)
+common_notification_router = APIRouter(prefix="/api/v1/common/notifications", tags=["Notifications"])
 common_notification_router.include_router(get_notification_summary.router)
 common_notification_router.include_router(list_notifications.router)
 common_notification_router.include_router(detail_notification.router)

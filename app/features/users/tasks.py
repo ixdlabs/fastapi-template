@@ -1,5 +1,8 @@
 import logging
-from app.config.auth import TaskRunner
+import uuid
+
+from pydantic import BaseModel
+from app.config.auth import AuthUser
 from app.config.background import TaskRegistry
 from app.config.database import get_db
 from app.config.settings import get_settings
@@ -22,9 +25,11 @@ async def send_email_verification_task(raw_task_input: str):
     logger.info("Starting send_email_verification_task")
     settings = get_settings()
     async with get_db(settings) as db:
-        task_runner = TaskRunner(id="worker")
+        current_user = AuthUser(id=uuid.uuid4())
         task_input = SendEmailVerificationInput.model_validate_json(raw_task_input)
-        result = await send_email_verification(task_input=task_input, task_runner=task_runner, settings=settings, db=db)
+        result: BaseModel = await send_email_verification(
+            task_input=task_input, current_user=current_user, settings=settings, db=db
+        )
         return result.model_dump_json()
 
 
@@ -33,10 +38,10 @@ async def send_password_reset_email_task(raw_task_input: str):
     logger.info("Starting send_password_reset_email_task")
     settings = get_settings()
     async with get_db(settings) as db:
-        task_runner = TaskRunner(id="worker")
+        current_user = AuthUser(id=uuid.uuid4())
         task_input = SendPasswordResetInput.model_validate_json(raw_task_input)
-        result = await send_password_reset_email(
-            task_input=task_input, task_runner=task_runner, settings=settings, db=db
+        result: BaseModel = await send_password_reset_email(
+            task_input=task_input, current_user=current_user, settings=settings, db=db
         )
         return result.model_dump_json()
 
