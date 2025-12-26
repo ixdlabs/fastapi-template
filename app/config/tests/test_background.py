@@ -49,7 +49,7 @@ async def test_submit_calls_apply_async(settings_fixture: Settings, monkeypatch:
 
 
 def test_shared_async_task_no_event_loop():
-    async def async_fn(_, x, y):
+    async def async_fn(x, y):
         return x + y
 
     task = shared_async_task("fn1")(async_fn)
@@ -59,7 +59,7 @@ def test_shared_async_task_no_event_loop():
 
 @pytest.mark.asyncio
 async def test_shared_async_task_with_running_loop():
-    async def async_fn(_):
+    async def async_fn():
         await asyncio.sleep(0.01)
         return "ok"
 
@@ -69,7 +69,7 @@ async def test_shared_async_task_with_running_loop():
 
 
 def test_shared_async_task_exception_no_loop():
-    async def async_fn(_):
+    async def async_fn():
         raise RuntimeError("boom")
 
     task = shared_async_task("fn3")(async_fn)
@@ -79,7 +79,7 @@ def test_shared_async_task_exception_no_loop():
 
 @pytest.mark.asyncio
 async def test_shared_async_task_exception_with_loop():
-    async def async_fn(_):
+    async def async_fn():
         raise ValueError("bad")
 
     task = shared_async_task("fn4")(async_fn)
@@ -88,7 +88,7 @@ async def test_shared_async_task_exception_with_loop():
 
 
 def test_shared_async_task_returns_celery_task():
-    async def async_fn(_):
+    async def async_fn():
         return 123
 
     task = shared_async_task("fn5")(async_fn)
