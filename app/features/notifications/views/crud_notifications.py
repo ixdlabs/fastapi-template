@@ -8,7 +8,6 @@ from sqlalchemy import select
 
 from app.config.auth import CurrentUserDep
 from app.config.database import DbDep
-from app.config.exceptions import raises
 from app.config.pagination import Page, paginate
 from app.features.notifications.models import (
     Notification,
@@ -95,7 +94,7 @@ async def get_notifications(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@raises(status.HTTP_404_NOT_FOUND, "Notification not found")
+# @raises(status.HTTP_404_NOT_FOUND, "Notification not found")
 @router.get("/{notification_id}")
 async def get_notification(notification_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep):
     """Return a specific notification"""

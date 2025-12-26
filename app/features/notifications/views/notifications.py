@@ -7,7 +7,6 @@ from sqlalchemy import select, update, func
 
 from app.config.auth import CurrentUserDep
 from app.config.database import DbDep
-from app.config.exceptions import raises
 from app.features.notifications.models import (
     Notification,
     NotificationDelivery,
@@ -67,7 +66,7 @@ async def read_all_notifications(current_user: CurrentUserDep, db: DbDep):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@raises(status.HTTP_404_NOT_FOUND, "Notification not found")
+# @raises(status.HTTP_404_NOT_FOUND, "Notification not found")
 @router.post("/{notification_id}/read")
 async def read_notification(notification_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep):
     """Read a specific sent notification"""
@@ -93,7 +92,7 @@ async def read_notification(notification_id: uuid.UUID, current_user: CurrentUse
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@raises(status.HTTP_404_NOT_FOUND, "Notification not found")
+# @raises(status.HTTP_404_NOT_FOUND, "Notification not found")
 @router.post("/{notification_id}/unread")
 async def unread_notification(notification_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep):
     """Unread a specific sent notification"""

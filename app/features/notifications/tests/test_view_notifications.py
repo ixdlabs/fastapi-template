@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app
 
-from app.features.users.models import User
-from app.features.users.tests.fixtures import UserFactory
+from app.features.users.models.user import User
+from app.fixtures.user_factory import UserFactory
 from app.features.notifications.models import NotificationChannel, NotificationStatus
 from app.features.notifications.tests.fixtures import NotificationFactory, NotificationDeliveryFactory
 
@@ -15,8 +15,8 @@ client = TestClient(app)
 
 
 @pytest.mark.asyncio
-async def test_get_summary_counts_only_unread_inapp(db_fixture: AsyncSession, logged_in_user_fixture: User):
-    current_user = logged_in_user_fixture
+async def test_get_summary_counts_only_unread_inapp(db_fixture: AsyncSession, authenticated_user_fixture: User):
+    current_user = authenticated_user_fixture
 
     notification = NotificationFactory.build(user=current_user)
     db_fixture.add(notification)
@@ -44,8 +44,8 @@ async def test_get_summary_counts_only_unread_inapp(db_fixture: AsyncSession, lo
 
 
 @pytest.mark.asyncio
-async def test_read_all_updates_status(db_fixture: AsyncSession, logged_in_user_fixture: User):
-    current_user = logged_in_user_fixture
+async def test_read_all_updates_status(db_fixture: AsyncSession, authenticated_user_fixture: User):
+    current_user = authenticated_user_fixture
 
     notification = NotificationFactory.build(user=current_user)
     db_fixture.add(notification)
@@ -70,7 +70,7 @@ async def test_read_all_updates_status(db_fixture: AsyncSession, logged_in_user_
 
 
 @pytest.mark.asyncio
-async def test_cannot_access_other_users_notification(db_fixture: AsyncSession, logged_in_user_fixture: User):
+async def test_cannot_access_other_users_notification(db_fixture: AsyncSession, authenticated_user_fixture: User):
     other_user: User = UserFactory.build()
     db_fixture.add(other_user)
     await db_fixture.commit()
@@ -93,8 +93,8 @@ async def test_cannot_access_other_users_notification(db_fixture: AsyncSession, 
 
 
 @pytest.mark.asyncio
-async def test_mark_single_notification_as_read(db_fixture: AsyncSession, logged_in_user_fixture: User):
-    current_user = logged_in_user_fixture
+async def test_mark_single_notification_as_read(db_fixture: AsyncSession, authenticated_user_fixture: User):
+    current_user = authenticated_user_fixture
 
     notification = NotificationFactory.build(user=current_user)
     db_fixture.add(notification)
@@ -115,8 +115,8 @@ async def test_mark_single_notification_as_read(db_fixture: AsyncSession, logged
 
 
 @pytest.mark.asyncio
-async def test_mark_single_notification_as_unread(db_fixture: AsyncSession, logged_in_user_fixture: User):
-    current_user = logged_in_user_fixture
+async def test_mark_single_notification_as_unread(db_fixture: AsyncSession, authenticated_user_fixture: User):
+    current_user = authenticated_user_fixture
 
     notification = NotificationFactory.build(user=current_user)
     db_fixture.add(notification)

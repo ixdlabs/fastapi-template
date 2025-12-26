@@ -6,21 +6,20 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker, AsyncSession
-from types import SimpleNamespace
 
 from alembic import command, config
 
-from app.config.auth import Authenticator, get_authenticator, get_current_user
+from app.config.auth import AuthUser, Authenticator, TaskRunner, get_authenticator, get_current_user
 from app.config.background import Background, get_background
 from app.config.cache import get_cache_backend
 from app.config.database import get_db_session
 from app.config.logging import setup_logging
 from app.config.rate_limit import get_rate_limit_strategy
-from app.features.users.tests.fixtures import UserFactory
-from app.features.users.models import User
+from app.fixtures.user_factory import UserFactory
 from limits.aio.storage import MemoryStorage
 from limits.aio.strategies import MovingWindowRateLimiter, RateLimiter
 from app.config.settings import Settings, get_settings
+from app.features.users.models.user import UserType, User
 from app.main import app
 from aiocache import SimpleMemoryCache, BaseCache
 
@@ -165,13 +164,44 @@ def override_dependencies(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@pytest_asyncio.fixture
-async def logged_in_user_fixture(db_fixture: AsyncSession):
+@pytest_asyncio.fixture(scope="function")
+async def authenticated_user_fixture(db_fixture: AsyncSession):
     user: User = UserFactory.build()
     db_fixture.add(user)
     await db_fixture.commit()
     await db_fixture.refresh(user)
-    mock_user = SimpleNamespace(id=user.id, username=user.username)
-    app.dependency_overrides[get_current_user] = lambda: mock_user
+    auth_user = AuthUser(
+        id=user.id,
+        type=user.type,
+        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
+    )
+    app.dependency_overrides[get_current_user] = lambda: auth_user
+
     yield user
     del app.dependency_overrides[get_current_user]
+
+
+@pytest_asyncio.fixture(scope="function")
+async def authenticated_admin_fixture(db_fixture: AsyncSession):
+    user: User = UserFactory.build(type=UserType.ADMIN)
+    db_fixture.add(user)
+    await db_fixture.commit()
+    await db_fixture.refresh(user)
+    auth_user = AuthUser(
+        id=user.id,
+        type=user.type,
+        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
+    )
+    app.dependency_overrides[get_current_user] = lambda: auth_user
+
+    yield user
+    del app.dependency_overrides[get_current_user]
+
+
+@pytest.fixture(scope="function")
+def task_runner_fixture():
+    return TaskRunner(id="tests")

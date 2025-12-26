@@ -13,7 +13,7 @@ from typing import Any
 from app.config.timezone import DateTimeUTC, utc_now
 
 if typing.TYPE_CHECKING:
-    from app.features.users.models import User
+    from app.features.users.models.user import User
 
 
 class NotificationType(enum.Enum):

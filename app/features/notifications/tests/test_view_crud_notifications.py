@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app
 
-from app.features.users.models import User
+from app.features.users.models.user import User
 from app.features.notifications.models import NotificationChannel, NotificationStatus
 from app.features.notifications.tests.fixtures import NotificationFactory, NotificationDeliveryFactory
 
@@ -12,8 +12,8 @@ client = TestClient(app)
 
 
 @pytest.mark.asyncio
-async def test_get_notifications_list_returns_correct_data(db_fixture: AsyncSession, logged_in_user_fixture: User):
-    current_user = logged_in_user_fixture
+async def test_get_notifications_list_returns_correct_data(db_fixture: AsyncSession, authenticated_user_fixture: User):
+    current_user = authenticated_user_fixture
     notification = NotificationFactory.build(user=current_user)
     db_fixture.add(notification)
     await db_fixture.flush()
@@ -41,8 +41,8 @@ async def test_get_notifications_list_returns_correct_data(db_fixture: AsyncSess
 
 
 @pytest.mark.asyncio
-async def test_get_specific_notification_details(db_fixture: AsyncSession, logged_in_user_fixture: User):
-    current_user = logged_in_user_fixture
+async def test_get_specific_notification_details(db_fixture: AsyncSession, authenticated_user_fixture: User):
+    current_user = authenticated_user_fixture
 
     notification = NotificationFactory.build(user=current_user, data={"key": "value"})
     db_fixture.add(notification)

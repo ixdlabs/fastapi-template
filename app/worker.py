@@ -7,8 +7,8 @@ from app.config.logging import setup_logging
 from app.config.otel import setup_open_telemetry
 from app.config.settings import get_settings
 
-from app.features import model_registry  # noqa: F401,E402
-from app.features import task_registry
+from app.features import models  # noqa: F401,E402
+from app.features import tasks
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ app.conf.imports = ("app.features.task_registry",)
 
 # Register periodic tasks from the task registry.
 # https://docs.celeryq.dev/en/main/userguide/periodic-tasks.html
-app.conf.beat_schedule = task_registry.periodic_tasks
+app.conf.beat_schedule = tasks.periodic_tasks
 
 
 @worker_process_init.connect(weak=False)

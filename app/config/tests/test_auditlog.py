@@ -9,8 +9,9 @@ from starlette.datastructures import Headers
 
 from app.config.audit_log import AuditLogger
 from app.features.audit_log.models import ActorType, AuditLog
-from app.features.users.models import User
-from app.features.users.tests.fixtures import UserFactory
+
+from app.features.users.models.user import User
+from app.fixtures.user_factory import UserFactory
 
 
 def make_request_with_token(token: str | None) -> Request:

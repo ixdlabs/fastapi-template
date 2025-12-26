@@ -10,8 +10,8 @@ from app.config.settings import Settings
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.users.models import User
-from app.features.users.tests.fixtures import UserFactory
+from app.features.users.models.user import User
+from app.fixtures.user_factory import UserFactory
 
 
 @pytest_asyncio.fixture

@@ -1,6 +1,6 @@
 import factory
 
-from app.features.users.tests.fixtures import UserFactory
+from app.fixtures.user_factory import UserFactory
 from app.features.notifications.models import (
     Notification,
     NotificationChannel,

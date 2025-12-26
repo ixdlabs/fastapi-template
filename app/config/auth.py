@@ -17,7 +17,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.config.exceptions import ServiceException
 from app.config.settings import Settings, SettingsDep
-from app.features.users.models import User, UserType
+from app.features.users.models.user import User, UserType
 
 logger = logging.getLogger(__name__)
 

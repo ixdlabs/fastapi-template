@@ -22,7 +22,7 @@ from app.config.logging import setup_logging
 from app.config.settings import get_settings
 from app.config.timezone import DateTimeUTC
 
-from app.features import model_registry  # noqa: F401
+from app.features import models  # noqa: F401
 
 
 # Run migrations in 'offline' mode
