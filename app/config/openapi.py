@@ -84,13 +84,13 @@ def custom(app: FastAPI):
                 if operation_security:
                     scopes = []
                     for security_requirement in operation_security:
-                        for scheme_scopes in dict(security_requirement).values():
-                            scopes.extend(scheme_scopes)
+                        for scheme_key, scheme_scopes in dict(security_requirement).items():
+                            for scheme_scope in scheme_scopes:
+                                scopes.append(f"{scheme_key}:{scheme_scope}")
                     for scope in scopes:
-                        tag_name = f"auth:{scope}"
                         if "x-badges" not in operation:
                             operation["x-badges"] = []
-                        operation["x-badges"].append({"name": tag_name})
+                        operation["x-badges"].append({"name": scope})
 
         app.openapi_schema = openapi_schema
         return app.openapi_schema
