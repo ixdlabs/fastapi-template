@@ -55,8 +55,6 @@ async def list_users(
 
     This endpoint is rate-limited and cached for demonstration purposes.
     """
-    assert current_user.type == UserType.ADMIN
-
     # Rate limiting
     await rate_limit.limit("10/minute")
 

@@ -172,7 +172,7 @@ async def get_auth_user(type: UserType, db_fixture: AsyncSession) -> tuple[User,
     await db_fixture.refresh(user)
     return user, AuthUser(
         id=user.id,
-        type=user.type,
+        type=user.type.value,
         username=user.username,
         first_name=user.first_name,
         last_name=user.last_name,
@@ -199,4 +199,4 @@ async def authenticated_admin_fixture(db_fixture: AsyncSession):
 
 @pytest_asyncio.fixture(scope="function")
 async def authenticated_task_runner_fixture():
-    return AuthUser(id=uuid.uuid4())
+    return AuthUser(id=uuid.uuid4(), type="task_runner")

@@ -67,8 +67,6 @@ async def update_user(
     Update a user's information.
     The authenticated user must be an admin.
     """
-    assert current_user.type == UserType.ADMIN
-
     # Fetch user from database
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)

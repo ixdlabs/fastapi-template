@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-import json
 import uuid
 import jwt
 import pytest
@@ -130,7 +129,7 @@ def test_user_raises_auth_exception_for_invalid_user_payload(
     payload = {
         "sub": str(uuid.uuid4()),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
-        "user": json.dumps({"id": "not-a-uuid"}),
+        "user": {"id": "not-a-uuid"},
     }
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
@@ -144,14 +143,12 @@ def test_user_raises_auth_exception_for_expired_token(
     payload = {
         "sub": str(user_fixture.id),
         "exp": datetime.now(timezone.utc) - timedelta(minutes=1),
-        "user": json.dumps(
-            {
-                "id": str(user_fixture.id),
-                "username": user_fixture.username,
-                "first_name": user_fixture.first_name,
-                "last_name": user_fixture.last_name,
-            }
-        ),
+        "user": {
+            "id": str(user_fixture.id),
+            "username": user_fixture.username,
+            "first_name": user_fixture.first_name,
+            "last_name": user_fixture.last_name,
+        },
     }
     expired_token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
@@ -180,7 +177,7 @@ def test_user_raises_auth_exception_for_unexpected_payload_fields(
         "sub": str(user_fixture.id),
         "type": "access",
         "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
-        "user": json.dumps({"unexpected_field": "unexpected_value"}),
+        "user": {"unexpected_field": "unexpected_value"},
     }
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 
@@ -195,14 +192,13 @@ def test_user_returns_auth_user_when_payload_contains_expected_fields(
         "sub": str(user_fixture.id),
         "type": "access",
         "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
-        "user": json.dumps(
-            {
-                "id": str(user_fixture.id),
-                "username": user_fixture.username,
-                "first_name": user_fixture.first_name,
-                "last_name": user_fixture.last_name,
-            }
-        ),
+        "user": {
+            "id": str(user_fixture.id),
+            "type": "admin",
+            "username": user_fixture.username,
+            "first_name": user_fixture.first_name,
+            "last_name": user_fixture.last_name,
+        },
     }
     token = jwt.encode(payload, settings_fixture.jwt_secret_key, algorithm="HS256")
 

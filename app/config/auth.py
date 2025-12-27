@@ -6,8 +6,9 @@ Docs: https://fastapi.tiangolo.com/tutorial/security/
 """
 
 from datetime import datetime, timedelta, timezone
+import json
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 import uuid
 
 from fastapi import Depends, Security, status
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class AuthUser(BaseModel):
     id: uuid.UUID
-    type: UserType | None = None
+    type: Literal["admin", "customer", "task_runner"]
     username: str | None = None
     first_name: str | None = None
     last_name: str | None = None
@@ -65,7 +66,7 @@ class Authenticator:
         # User object to be included in the token
         auth_user = AuthUser(
             id=user.id,
-            type=user.type,
+            type=user.type.value,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,
@@ -73,7 +74,7 @@ class Authenticator:
 
         # Create JWT tokens
         user_id = str(user.id)
-        user_dump = auth_user.model_dump_json()
+        user_dump = json.loads(auth_user.model_dump_json())
         access_payload = {"type": "access", "sub": user_id, "exp": access_exp, "user": user_dump, "scope": scope}
         refresh_payload = {"type": "refresh", "sub": user_id, "iat": current_time, "exp": refresh_exp, "scope": scope}
 
@@ -96,7 +97,7 @@ class Authenticator:
             raise AuthException("Invalid JWT access token (missing user data)")
 
         try:
-            user = AuthUser.model_validate_json(user_data)
+            user = AuthUser.model_validate(user_data)
         except ValidationError as e:
             raise AuthException("AuthUser validation error") from e
 

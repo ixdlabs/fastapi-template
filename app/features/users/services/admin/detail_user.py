@@ -56,8 +56,6 @@ async def detail_user(
 
     This endpoint is cached for demonstration purposes.
     """
-    assert current_user.type == UserType.ADMIN
-
     # Check and return from cache
     cache.vary_on_path().vary_on_auth()
     if cache_result := await cache.get():

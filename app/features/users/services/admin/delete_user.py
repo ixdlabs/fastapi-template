@@ -6,7 +6,7 @@ from app.config.audit_log import AuditLoggerDep
 from app.config.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
 from app.config.database import DbDep
 from app.config.exceptions import ServiceException, raises
-from app.features.users.models.user import UserType, User
+from app.features.users.models.user import User
 
 router = APIRouter()
 
@@ -36,8 +36,6 @@ async def delete_user(
     Delete a user from the system.
     The authenticated user must be an admin.
     """
-    assert current_user.type == UserType.ADMIN
-
     # Fetch user from database
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
