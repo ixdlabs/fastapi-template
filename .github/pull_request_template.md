@@ -10,8 +10,7 @@
 - [ ] No breaking changes introduced, or breaking changes clearly documented
 - [ ] Database migrations applied (if applicable)
 - [ ] Secrets and configuration handled securely (no secrets committed)
-- [ ] Formatting and linting checks passed (pre-commit)
-- [ ] Type checks passed (mypy)
+- [ ] Formatting, linting, and type checks passed (pre-commit)
 - [ ] Tests ran locally and verified
 
 ## Screenshots

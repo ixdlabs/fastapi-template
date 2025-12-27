@@ -26,15 +26,13 @@ Copy `.env.example` to `.env` (create one if missing) and adjust values as neede
 
 ## 🧹 Code Formatting & Linting
 
-This project uses [pre-commit](https://pre-commit.com/) hooks and [mypy](https://mypy-lang.org/).
+This project uses [pre-commit](https://pre-commit.com/) hooks with [ruff](https://docs.astral.sh/ruff/) and [pyright](https://microsoft.github.io/pyright/#/) strict mode.
 
 ```bash
 # Install pre-commit hooks
 uv run pre-commit install
-# Run formatting checks
+# Run formatting and type checks
 uv run pre-commit --all-files
-# Type checking
-uv run mypy .
 ```
 
 ## ✅ Running Tests
