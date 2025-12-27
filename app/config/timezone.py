@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional
+from typing import override
 
 from sqlalchemy import DateTime
 from sqlalchemy.engine import Dialect
@@ -24,17 +24,20 @@ class DateTimeUTC(TypeDecorator[datetime.datetime]):
     cache_ok = True
 
     @property
+    @override
     def python_type(self) -> type[datetime.datetime]:
         return datetime.datetime
 
-    def process_bind_param(self, value: Optional[datetime.datetime], dialect: Dialect) -> Optional[datetime.datetime]:
+    @override
+    def process_bind_param(self, value: datetime.datetime | None, dialect: Dialect) -> datetime.datetime | None:
         if value is None:
             return value
         if not value.tzinfo:
             raise TypeError("tzinfo is required")
         return value.astimezone(datetime.timezone.utc)
 
-    def process_result_value(self, value: Optional[datetime.datetime], dialect: Dialect) -> Optional[datetime.datetime]:
+    @override
+    def process_result_value(self, value: datetime.datetime | None, dialect: Dialect) -> datetime.datetime | None:
         if value is None:
             return value
         if value.tzinfo is None:

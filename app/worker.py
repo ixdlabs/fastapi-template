@@ -30,7 +30,7 @@ app.conf.beat_schedule = tasks.task_registry.beat_schedule
 
 
 @worker_process_init.connect(weak=False)
-def init_celery_tracing(*args, **kwargs):
+def init_celery_tracing(*args: object, **kwargs: object) -> None:
     db_engine = create_db_engine_from_settings(settings)
     setup_open_telemetry(app, db_engine, settings)
 

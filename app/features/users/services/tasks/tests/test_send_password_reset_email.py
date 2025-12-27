@@ -43,7 +43,7 @@ async def test_send_password_reset_email_creates_action_and_invalidates_previous
     task_input = SendPasswordResetInput(user_id=user_id, email=email)
     before_call = datetime.now(timezone.utc)
 
-    await send_password_reset_email(
+    _ = await send_password_reset_email(
         current_user=authenticated_task_runner_fixture,
         task_input=task_input,
         settings=fake_settings(),

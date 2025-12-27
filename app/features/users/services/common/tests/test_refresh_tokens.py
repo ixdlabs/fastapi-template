@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
 import time_machine
 
+from fastapi.security import SecurityScopes
 from app.config.auth import Authenticator, get_current_user
 from app.features.users.models.user import User
 from app.fixtures.user_factory import UserFactory
@@ -54,7 +55,7 @@ async def test_user_can_refresh_token_after_some_time(db_fixture: AsyncSession, 
         data = response.json()
         assert "access_token" in data
         assert "refresh_token" in data
-        verified_user = get_current_user(data["access_token"], authenticator_fixture)
+        verified_user = get_current_user(data["access_token"], authenticator_fixture, SecurityScopes(scopes=[]))
         assert verified_user.id == user.id
         assert authenticator_fixture.sub(data["access_token"]) == user.id
         assert authenticator_fixture.sub(data["refresh_token"]) == user.id

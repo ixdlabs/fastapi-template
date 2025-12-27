@@ -8,8 +8,8 @@ from app.features.notifications.models.notification_delivery import (
 from app.fixtures.notification_factory import NotificationFactory
 
 
-class NotificationDeliveryFactory(factory.Factory):
-    class Meta:
+class NotificationDeliveryFactory(factory.Factory[NotificationDelivery]):
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = NotificationDelivery
 
     notification = factory.SubFactory(NotificationFactory)

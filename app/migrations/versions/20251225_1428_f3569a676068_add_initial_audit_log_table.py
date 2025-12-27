@@ -6,17 +6,15 @@ Revises: 81e7b404e9d7
 Create Date: 2025-12-25 14:28:08.678184
 """
 
-from typing import Sequence, Union
-
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "f3569a676068"
-down_revision: Union[str, Sequence[str], None] = "81e7b404e9d7"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "f3569a676068"
+down_revision = "81e7b404e9d7"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

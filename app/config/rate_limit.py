@@ -24,6 +24,7 @@ from app.config.exceptions import ServiceException
 
 class RateLimit:
     def __init__(self, strategy: RateLimiter, request: Request):
+        super().__init__()
         self.strategy = strategy
         self.request = request
 

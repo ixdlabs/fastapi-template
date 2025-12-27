@@ -1,4 +1,3 @@
-from typing import Any
 import uuid
 
 from fastapi import APIRouter, status
@@ -25,7 +24,7 @@ router = APIRouter()
 
 class NotificationDeliveryOutputNotification(BaseModel):
     type: NotificationType
-    data: dict[str, Any]
+    data: dict[str, object]
 
 
 class NotificationDeliveryOutput(BaseModel):

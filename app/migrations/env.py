@@ -7,7 +7,7 @@ Important: This file
 """
 
 import asyncio
-from typing import Any, Literal
+from typing import Literal
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -60,8 +60,8 @@ async def run_async_migrations() -> None:
     if connectable is None:
         connectable = create_async_engine(url=settings.database_url, poolclass=pool.NullPool)
     async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
+        _ = await connection.run_sync(do_run_migrations)
+    _ = await connectable.dispose()
 
 
 def run_migrations_online() -> None:
@@ -75,7 +75,7 @@ config = context.config
 target_metadata = Base.metadata
 
 
-def render_item(type_: str, col: Any, autogen_context: AutogenContext) -> str | Literal[False]:
+def render_item(type_: str, col: object, autogen_context: AutogenContext) -> str | Literal[False]:
     """Render custom types for autogenerate."""
     if type_ == "type" and isinstance(col, DateTimeUTC):
         return "sa.DateTime(timezone=True)"

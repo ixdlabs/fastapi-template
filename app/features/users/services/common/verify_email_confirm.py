@@ -80,14 +80,15 @@ async def verify_email_confirm(form: VerifyEmailInput, db: DbDep, audit_logger: 
         raise InvalidActionTokenException()
     if not action.is_valid(form.token):
         raise InvalidActionTokenException()
-    if action.data is None or "email" not in action.data:
+    if action.data is None or "email" not in action.data or not isinstance(action.data["email"], str):
         raise InvalidActionTokenException()
     action_email = action.data["email"]
 
     user = action.user
+    user_id = user.id
 
     # Check if email is already used by another user
-    email_other_stmt = select(User).where(User.email == action_email).where(User.id != user.id)
+    email_other_stmt = select(User).where(User.email == action_email).where(User.id != user_id)
     email_other_result = await db.execute(email_other_stmt)
     email_other_user = email_other_result.scalar_one_or_none()
     if email_other_user is not None:
@@ -101,6 +102,5 @@ async def verify_email_confirm(form: VerifyEmailInput, db: DbDep, audit_logger: 
     # Finalize
     await audit_logger.record("verify_email", user)
     await db.commit()
-    await db.refresh(user)
 
-    return VerifyEmailOutput(user_id=user.id, email=user.email)
+    return VerifyEmailOutput(user_id=user_id, email=action_email)

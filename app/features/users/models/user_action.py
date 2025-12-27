@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 import enum
 import uuid
 import typing
-from typing import Any
 
 from argon2 import PasswordHasher
 from argon2.exceptions import Argon2Error
@@ -43,7 +42,7 @@ class UserAction(Base):
     state: Mapped[UserActionState] = mapped_column(Enum(UserActionState), default=UserActionState.PENDING)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
 
-    data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    data: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     hashed_token: Mapped[str] = mapped_column(String)
 
     expires_at: Mapped[datetime] = mapped_column(DateTimeUTC)

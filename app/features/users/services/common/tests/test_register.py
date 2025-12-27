@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
 
-from app.conftest import NoOpBackground
+from app.conftest import NoOpTaskTrackingBackground
 from app.features.users.models.user import User
 from app.fixtures.user_factory import UserFactory
 from app.main import app
@@ -13,7 +13,9 @@ url = "/api/auth/register"
 
 
 @pytest.mark.asyncio
-async def test_user_can_register_with_valid_data(db_fixture: AsyncSession, background_fixture: NoOpBackground):
+async def test_user_can_register_with_valid_data(
+    db_fixture: AsyncSession, background_fixture: NoOpTaskTrackingBackground
+):
     user_data = {
         "username": "newuser",
         "first_name": "New",

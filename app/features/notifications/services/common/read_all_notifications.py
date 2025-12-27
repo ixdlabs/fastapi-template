@@ -43,6 +43,6 @@ async def read_all_notifications(current_user: CurrentUserDep, db: DbDep) -> Rea
         .where(NotificationDelivery.read_at.is_(None))
         .values(read_at=datetime.now(timezone.utc))
     )
-    await db.execute(stmt)
+    _ = await db.execute(stmt)
     await db.commit()
     return ReadAllNotificationsOutput()

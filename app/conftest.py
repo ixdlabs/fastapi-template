@@ -1,7 +1,5 @@
-from collections import defaultdict
 import logging
 from pathlib import Path
-from typing import Any
 import uuid
 import pytest
 import pytest_asyncio
@@ -11,7 +9,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 from alembic import command, config
 
 from app.config.auth import AuthUser, Authenticator, get_authenticator, get_current_user
-from app.config.background import Background, get_background
+from app.config.background import Background, NoOpTaskTrackingBackground, get_background
 from app.config.cache import get_cache_backend
 from app.config.database import get_db_session
 from app.config.logging import setup_logging
@@ -99,22 +97,9 @@ def authenticator_fixture(settings_fixture: Settings):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NoOpBackground(Background):
-    called_tasks: dict[str, list[tuple[tuple[Any, ...], dict[str, Any]]]]
-
-    def __init__(self, settings: Settings):
-        super().__init__(settings)
-        self.called_tasks = defaultdict(list)
-
-    async def submit(self, fn, *args, **kwargs):
-        if fn.__name__ not in self.called_tasks:
-            self.called_tasks[fn.__name__] = []
-        self.called_tasks[fn.__name__].append((args, kwargs))
-
-
 @pytest.fixture(scope="function")
 def background_fixture(settings_fixture: Settings):
-    return NoOpBackground(settings_fixture)
+    return NoOpTaskTrackingBackground(settings_fixture)
 
 
 # Rate limiting strategy for tests using in-memory storage

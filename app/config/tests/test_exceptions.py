@@ -32,15 +32,15 @@ def test_app():
     register_exception_handlers(app)
 
     @app.get("/server-error")
-    async def raise_server_error():
+    async def _():
         raise Sample500Exception()
 
     @app.get("/client-error")
-    async def raise_client_error():
+    async def _():
         raise Sample404Exception()
 
     @app.get("/unexpected-error")
-    async def raise_unexpected_error():
+    async def _():
         _ = 1 / 0
 
     return app
@@ -66,7 +66,7 @@ async def test_custom_http_exception_handler_logs_and_returns_registered_server_
 
 
 @pytest.mark.asyncio
-async def test_custom_http_exception_handler_returns_registered_client_error_without_logging(test_app):
+async def test_custom_http_exception_handler_returns_registered_client_error_without_logging(test_app: FastAPI):
     client = TestClient(test_app)
     response = client.get("/client-error")
 
@@ -83,7 +83,7 @@ async def test_custom_exception_handler_logs_unhandled_exceptions_as_server_erro
 
     client = TestClient(test_app)
     with pytest.raises(ZeroDivisionError):
-        client.get("/unexpected-error")
+        _ = client.get("/unexpected-error")
 
     mock_logger.assert_called_once_with("server error", extra={"path": "/unexpected-error"}, exc_info=ANY)
 
@@ -99,9 +99,10 @@ def test_raises_decorator_attaches_exception_metadata_to_function():
 
     assert foo() == 123
     assert hasattr(foo, "__raises__")
-    assert isinstance(foo.__raises__, dict)
-    assert status.HTTP_400_BAD_REQUEST in foo.__raises__
-    assert foo.__raises__[status.HTTP_400_BAD_REQUEST] == [Sample400Exception]
+    raises_value = getattr(foo, "__raises__")
+    assert isinstance(raises_value, dict)
+    assert status.HTTP_400_BAD_REQUEST in raises_value
+    assert raises_value[status.HTTP_400_BAD_REQUEST] == [Sample400Exception]
 
 
 def test_raises_decorator_accumulates_multiple_status_codes():
@@ -111,7 +112,9 @@ def test_raises_decorator_accumulates_multiple_status_codes():
         return 123
 
     assert foo() == 123
-    assert set(foo.__raises__.keys()) == {status.HTTP_400_BAD_REQUEST, status.HTTP_404_NOT_FOUND}
+    raises_value = getattr(foo, "__raises__")
+    assert isinstance(raises_value, dict)
+    assert set(raises_value.keys()) == {status.HTTP_400_BAD_REQUEST, status.HTTP_404_NOT_FOUND}
 
 
 def test_raises_decorator_returns_original_function_instance():

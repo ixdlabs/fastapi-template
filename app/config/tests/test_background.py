@@ -34,7 +34,6 @@ async def test_submit_delegates_apply_async_with_args_and_kwargs(settings_fixtur
     task = MagicMock(spec=CeleryTask)
     task.apply_async = MagicMock()
 
-    # noinspection PyTypeChecker
     await bg.submit(task, 1, 2, foo="bar")
 
     task.apply_async.assert_called_once_with(

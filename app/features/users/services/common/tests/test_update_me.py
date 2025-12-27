@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.testclient import TestClient
-from app.conftest import NoOpBackground
+from app.conftest import NoOpTaskTrackingBackground
 from app.features.users.models.user import User
 from app.fixtures.user_factory import UserFactory
 
@@ -31,7 +31,7 @@ async def test_user_can_update_own_profile(db_fixture: AsyncSession, authenticat
 
 @pytest.mark.asyncio
 async def test_user_can_update_email_triggers_verification(
-    authenticated_user_fixture: User, background_fixture: NoOpBackground
+    authenticated_user_fixture: User, background_fixture: NoOpTaskTrackingBackground
 ):
     update_data = {"first_name": "NewFirst", "last_name": "NewLast", "email": "newemail@example.com"}
     response = client.put(url, json=update_data)

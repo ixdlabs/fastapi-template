@@ -8,7 +8,7 @@ Docs: https://fastapi.tiangolo.com/tutorial/security/
 from datetime import datetime, timedelta, timezone
 import json
 import logging
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 import uuid
 
 from fastapi import Depends, Security, status
@@ -42,7 +42,18 @@ class AuthException(BaseException):
 
 class Authenticator:
     def __init__(self, settings: Settings):
+        super().__init__()
         self.settings = settings
+
+    def jwt_encode(self, payload: dict[str, object]) -> str:
+        return jwt.encode(  # pyright: ignore[reportUnknownMemberType]
+            algorithm="HS256", key=self.settings.jwt_secret_key, payload=payload
+        )
+
+    def jwt_decode(self, token: str) -> dict[str, object]:
+        return jwt.decode(  # pyright: ignore[reportUnknownMemberType]
+            token, self.settings.jwt_secret_key, algorithms=["HS256"]
+        )
 
     def encode(self, user: User, requested_scopes: set[str] | None = None) -> tuple[str, str]:
         """Encode a JWT access token + refresh token for the given user."""
@@ -73,19 +84,32 @@ class Authenticator:
         )
 
         # Create JWT tokens
-        user_id = str(user.id)
         user_dump = json.loads(auth_user.model_dump_json())
-        access_payload = {"type": "access", "sub": user_id, "exp": access_exp, "user": user_dump, "scope": scope}
-        refresh_payload = {"type": "refresh", "sub": user_id, "iat": current_time, "exp": refresh_exp, "scope": scope}
+        access_token = self.jwt_encode(
+            payload={
+                "type": "access",
+                "sub": str(user.id),
+                "exp": access_exp,
+                "user": user_dump,
+                "scope": scope,
+            }
+        )
+        refresh_token = self.jwt_encode(
+            payload={
+                "type": "refresh",
+                "sub": str(user.id),
+                "iat": current_time,
+                "exp": refresh_exp,
+                "scope": scope,
+            }
+        )
 
-        access_token = jwt.encode(algorithm="HS256", key=self.settings.jwt_secret_key, payload=access_payload)
-        refresh_token = jwt.encode(algorithm="HS256", key=self.settings.jwt_secret_key, payload=refresh_payload)
         return access_token, refresh_token
 
     def user(self, access_token: str) -> AuthUser:
         """Extract the user information from the given JWT access token."""
         try:
-            payload: dict[str, Any] = jwt.decode(access_token, self.settings.jwt_secret_key, algorithms=["HS256"])
+            payload: dict[str, object] = self.jwt_decode(access_token)
         except jwt.PyJWTError as e:
             raise AuthException("JWT decode error") from e
 
@@ -106,7 +130,7 @@ class Authenticator:
     def scopes(self, token: str) -> set[str]:
         """Extract the scopes from the given JWT token."""
         try:
-            payload: dict[str, Any] = jwt.decode(token, self.settings.jwt_secret_key, algorithms=["HS256"])
+            payload: dict[str, object] = self.jwt_decode(token)
         except jwt.PyJWTError as e:
             raise AuthException("JWT decode error") from e
 
@@ -116,16 +140,16 @@ class Authenticator:
     def sub(self, token: str) -> uuid.UUID:
         """Extract the subject (user ID) from the given JWT token."""
         try:
-            payload: dict[str, Any] = jwt.decode(token, self.settings.jwt_secret_key, algorithms=["HS256"])
+            payload: dict[str, object] = self.jwt_decode(token)
         except jwt.PyJWTError as e:
             raise AuthException("JWT decode error") from e
 
-        user_id = payload.get("sub")
-        if user_id is None:
-            raise AuthException("Invalid JWT access token (missing user ID)")
+        sub = payload.get("sub")
+        if sub is None or not isinstance(sub, str):
+            raise AuthException("Invalid JWT token (missing subject)")
 
         try:
-            user_id = uuid.UUID(user_id)
+            user_id = uuid.UUID(sub)
         except ValueError as e:
             raise AuthException("Invalid JWT access token (Invalid UUID format for user ID)") from e
 
@@ -134,7 +158,7 @@ class Authenticator:
     def iat(self, token: str) -> datetime:
         """Extract the issued-at time from the given JWT token."""
         try:
-            payload: dict[str, Any] = jwt.decode(token, self.settings.jwt_secret_key, algorithms=["HS256"])
+            payload: dict[str, object] = self.jwt_decode(token)
         except jwt.PyJWTError as e:
             raise AuthException("JWT decode error") from e
 
@@ -205,11 +229,8 @@ oauth2_scheme = OAuth2PasswordBearer(
 def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     authenticator: AuthenticatorDep,
-    security_scopes: SecurityScopes = SecurityScopes(scopes=[]),
+    security_scopes: SecurityScopes,
 ) -> AuthUser:
-    if security_scopes is None:
-        security_scopes = SecurityScopes(scopes=[])
-
     if security_scopes.scopes:
         authenticate_value = f'Bearer scope="{security_scopes.scope_str}"'
     else:

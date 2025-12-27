@@ -53,7 +53,7 @@ def setup_open_telemetry(app: FastAPI | Celery, db_engine: AsyncEngine, settings
 
     if isinstance(app, FastAPI):
         FastAPIInstrumentor.instrument_app(app)
-    elif isinstance(app, Celery):
+    else:
         CeleryInstrumentor().instrument()
 
     # Resource

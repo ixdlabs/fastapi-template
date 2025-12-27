@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 import uuid
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
@@ -59,9 +59,8 @@ async def list_users(
     await rate_limit.limit("10/minute")
 
     # Check and return from cache
-    cache.vary_on_path().vary_on_query().vary_on_auth()
-    if cache_result := await cache.get():
-        return cache_result
+    if cache_result := await cache.vary_on_path().vary_on_query().vary_on_auth().get():
+        return cast(Page[UserListOutput], cache_result)
 
     # Build query with filters
     stmt = select(User)

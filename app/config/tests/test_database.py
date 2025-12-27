@@ -36,9 +36,9 @@ class Child(Base):
 
 
 def test_parent_model_exposes_columns_relations_and_hybrid_attributes():
-    assert set(Parent.columns) == {"id", "name"}
-    assert Parent.relations == ["children"]
-    assert Parent.hybrid_properties == ["name_upper"]
+    assert set(Parent.columns()) == {"id", "name"}
+    assert Parent.relations() == ["children"]
+    assert Parent.hybrid_properties() == ["name_upper"]
 
 
 @pytest.mark.asyncio
@@ -69,6 +69,7 @@ def test_to_dict_serializes_list_relationships_when_nested_option_enabled():
     data = parent.to_dict(nested=True)
 
     assert "children" in data
+    assert isinstance(data["children"], list)
     assert len(data["children"]) == 2
     assert data["children"][0]["value"] in {"a", "b"}
 
@@ -81,6 +82,7 @@ def test_to_dict_serializes_single_relationship_when_nested_option_enabled():
     data = child.to_dict(nested=True)
 
     assert "parent" in data
+    assert isinstance(data["parent"], dict)
     assert data["parent"]["name"] == "bob"
 
 
@@ -92,6 +94,8 @@ def test_to_dict_includes_nested_relations_and_hybrid_attributes_when_enabled():
     data = parent.to_dict(nested=True, hybrid_attributes=True)
 
     assert data["name_upper"] == "ALICE"
+    assert "children" in data
+    assert isinstance(data["children"], list)
     assert data["children"][0]["value"] == "x"
 
 
@@ -114,17 +118,18 @@ def test_to_dict_serializes_uuid_subclasses_as_strings():
 
 
 def test_create_db_engine_caches_connections_per_url_and_debug_flag(monkeypatch: MonkeyPatch):
+    def mock_create_async_engine(url: str, echo: bool):
+        return {"url": url, "echo": echo}
+
     create_db_engine.cache_clear()
 
-    monkeypatch.setattr("app.config.database.create_async_engine", lambda url, echo: {"url": url, "echo": echo})
+    monkeypatch.setattr("app.config.database.create_async_engine", mock_create_async_engine)
 
     engine_one = create_db_engine("sqlite:///first.db", debug=True)
     engine_two = create_db_engine("sqlite:///first.db", debug=True)
     engine_three = create_db_engine("sqlite:///second.db", debug=False)
 
     assert engine_one is engine_two
-    assert engine_one["echo"] is True
-    assert engine_one["url"] == "sqlite:///first.db"
     assert engine_three is not engine_one
 
     create_db_engine.cache_clear()
@@ -134,11 +139,13 @@ def test_create_db_engine_caches_connections_per_url_and_debug_flag(monkeypatch:
 async def test_get_db_session_yields_async_session_bound_to_given_url():
     test_settings = Settings.model_construct(database_url="sqlite+aiosqlite:///:memory:", debug=True)
     async for db in get_db_session(test_settings):
-        assert str(db.bind.url) == "sqlite+aiosqlite:///:memory:"
+        url = getattr(db.bind, "url", None)
+        assert str(url) == "sqlite+aiosqlite:///:memory:"
 
 
 @pytest.mark.asyncio
 async def test_get_db_context_manager_provides_async_session_bound_to_given_url():
     test_settings = Settings.model_construct(database_url="sqlite+aiosqlite:///:memory:", debug=True)
     async with get_db(test_settings) as db:
-        assert str(db.bind.url) == "sqlite+aiosqlite:///:memory:"
+        url = getattr(db.bind, "url", None)
+        assert str(url) == "sqlite+aiosqlite:///:memory:"

@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 import uuid
 
 from fastapi import APIRouter, Query
@@ -32,7 +32,7 @@ class NotificationListInput(BaseModel):
 
 class NotificationDeliveryOutputNotification(BaseModel):
     type: NotificationType
-    data: dict[str, Any]
+    data: dict[str, object]
 
 
 class NotificationDeliveryOutput(BaseModel):

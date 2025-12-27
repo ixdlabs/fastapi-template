@@ -1,3 +1,4 @@
+from typing import cast
 import uuid
 from fastapi import APIRouter, status
 from pydantic import AwareDatetime, BaseModel, EmailStr
@@ -57,9 +58,8 @@ async def detail_user(
     This endpoint is cached for demonstration purposes.
     """
     # Check and return from cache
-    cache.vary_on_path().vary_on_auth()
-    if cache_result := await cache.get():
-        return cache_result
+    if cache_result := await cache.vary_on_path().vary_on_auth().get():
+        return cast(UserDetailOutput, cache_result)
 
     # Fetch user from database
     stmt = select(User).where(User.id == user_id)
@@ -80,5 +80,4 @@ async def detail_user(
         updated_at=user.updated_at,
     )
 
-    await cache.set(response, ttl=60)
-    return response
+    return await cache.set(response, ttl=60)

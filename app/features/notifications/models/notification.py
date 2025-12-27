@@ -8,7 +8,6 @@ from app.config.database import Base
 from sqlalchemy.types import Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import UUID, JSON, ForeignKey
-from typing import Any
 
 from app.config.timezone import DateTimeUTC, utc_now
 
@@ -32,7 +31,7 @@ class Notification(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     type: Mapped[NotificationType] = mapped_column(Enum(NotificationType))
-    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    data: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
 
     created_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTimeUTC, default=utc_now, onupdate=utc_now)

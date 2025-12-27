@@ -52,7 +52,7 @@ async def send_password_reset_email(
         .where(UserAction.type == UserActionType.PASSWORD_RESET)
         .values(state=UserActionState.OBSOLETE)
     )
-    await db.execute(update_stmt)
+    _ = await db.execute(update_stmt)
 
     # Create a new password reset action
     token = str(uuid.uuid4())

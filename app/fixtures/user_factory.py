@@ -4,8 +4,8 @@ import factory
 from app.features.users.models.user import UserType, User
 
 
-class UserFactory(factory.Factory):
-    class Meta:
+class UserFactory(factory.Factory[User]):
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = User
 
     username = factory.Faker("user_name")
@@ -17,7 +17,7 @@ class UserFactory(factory.Factory):
     password_set_at = factory.Faker("past_datetime", tzinfo=timezone.utc)
 
     @factory.post_generation
-    def password(self, create, extracted, **kwargs):
-        raw_password = kwargs.get("raw", "testpassword")
+    def password(self, create: object, extracted: object, **kwargs: object):
+        raw_password = str(kwargs.get("raw", "testpassword"))
         assert isinstance(self, User), "sanity check failed"
         self.set_password(raw_password)

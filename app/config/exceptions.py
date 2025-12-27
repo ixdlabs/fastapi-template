@@ -5,9 +5,10 @@ Currently, it includes a handler for HTTP exceptions that logs server errors.
 
 import abc
 from collections import defaultdict
+from collections.abc import Callable
 import logging
+from typing import ParamSpec, TypeVar
 from opentelemetry import trace
-from typing import Callable
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 import http
@@ -32,12 +33,12 @@ class ServiceException(abc.ABC, HTTPException):
     def __init__(self, headers: dict[str, str] | None = None) -> None:
         super().__init__(status_code=self.status_code, detail=self.detail, headers=headers)
 
-    def to_rfc7807(self) -> dict:
+    def to_rfc7807(self) -> dict[str, object]:
         with tracer.start_as_current_span("rfc7807") as span:
             return self.build_problem_details(trace_id=f"{span.get_span_context().trace_id:032x}")
 
     @classmethod
-    def build_problem_details(cls, trace_id: str = "00000000000000000000000000000000") -> dict:
+    def build_problem_details(cls, trace_id: str = "00000000000000000000000000000000") -> dict[str, object]:
         """Build a RFC 7807 compliant problem details dictionary."""
         http_status = http.HTTPStatus(cls.status_code)
         return {
@@ -72,18 +73,21 @@ async def custom_exception_handler(request: Request, exc: Exception):
 
 
 def register_exception_handlers(app: FastAPI):
-    app.exception_handler(HTTPException)(custom_http_exception_handler)
-    app.exception_handler(Exception)(custom_exception_handler)
+    _ = app.exception_handler(HTTPException)(custom_http_exception_handler)
+    _ = app.exception_handler(Exception)(custom_exception_handler)
 
 
 # Decorator to collect possible HTTP exceptions for documentation.
 # ----------------------------------------------------------------------------------------------------------------------
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
 
 def raises(exc: type[ServiceException]):
     """Decorator to collect possible HTTP exceptions for documentation."""
 
-    def wrapper(func: Callable):
+    def wrapper(func: Callable[P, R]) -> Callable[P, R]:
         raising_causes: dict[int, list[type[ServiceException]]] = getattr(func, "__raises__", defaultdict(list))
         raising_causes[exc.status_code].append(exc)
         setattr(func, "__raises__", raising_causes)

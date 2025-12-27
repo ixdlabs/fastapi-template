@@ -52,7 +52,7 @@ async def send_email_verification(
         .where(UserAction.type == UserActionType.EMAIL_VERIFICATION)
         .values(state=UserActionState.OBSOLETE)
     )
-    await db.execute(update_stmt)
+    _ = await db.execute(update_stmt)
 
     # Create a new email verification action
     token = str(uuid.uuid4())

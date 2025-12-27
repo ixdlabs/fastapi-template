@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytest
+from fastapi.security import SecurityScopes
 
 from app.config.auth import Authenticator, get_current_user
 from app.features.users.models.user import User
@@ -46,5 +47,5 @@ async def test_user_can_login_with_valid_credentials(db_fixture: AsyncSession, a
     assert data["user"]["first_name"] == user.first_name
     assert data["user"]["last_name"] == user.last_name
     assert "access_token" in data
-    verified_user = get_current_user(data["access_token"], authenticator_fixture)
+    verified_user = get_current_user(data["access_token"], authenticator_fixture, SecurityScopes(scopes=[]))
     assert verified_user.id == user.id

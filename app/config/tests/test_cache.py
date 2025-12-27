@@ -39,7 +39,7 @@ def test_vary_appends_hashed_component_to_cache_key(cache_fixture: CacheDep):
     value = "example"
     expected_hash = md5(value.encode()).hexdigest()
 
-    cache_fixture.vary("custom", value)
+    _ = cache_fixture.vary("custom", value)
 
     assert cache_fixture.key == f"cache:[custom:{expected_hash}]"
 
@@ -47,7 +47,7 @@ def test_vary_appends_hashed_component_to_cache_key(cache_fixture: CacheDep):
 def test_vary_on_path_uses_request_path_hash_in_key(cache_fixture: CacheDep, request_fixture: Request):
     expected_hash = md5(request_fixture.url.path.encode()).hexdigest()
 
-    cache_fixture.vary_on_path()
+    _ = cache_fixture.vary_on_path()
 
     assert cache_fixture.key == f"cache:[path:{expected_hash}]"
 
@@ -57,7 +57,7 @@ def test_vary_on_auth_uses_authorization_header_hash_in_key(cache_fixture: Cache
     assert auth_header is not None
     expected_hash = md5(auth_header.encode()).hexdigest()
 
-    cache_fixture.vary_on_auth()
+    _ = cache_fixture.vary_on_auth()
 
     assert cache_fixture.key == f"cache:[auth:{expected_hash}]"
 
@@ -66,7 +66,7 @@ def test_vary_on_query_uses_sorted_query_params_hash_in_key(cache_fixture: Cache
     query_str = str(sorted(request_fixture.query_params.items()))
     expected_hash = md5(query_str.encode()).hexdigest()
 
-    cache_fixture.vary_on_query()
+    _ = cache_fixture.vary_on_query()
 
     assert cache_fixture.key == f"cache:[query:{expected_hash}]"
 
@@ -75,7 +75,7 @@ def test_vary_chains_components_in_cache_key(cache_fixture: CacheDep, request_fi
     path_hash = md5(request_fixture.url.path.encode()).hexdigest()
     auth_hash = md5(request_fixture.headers["Authorization"].encode()).hexdigest()
 
-    cache_fixture.vary_on_path().vary_on_auth()
+    _ = cache_fixture.vary_on_path().vary_on_auth()
 
     assert cache_fixture.key == f"cache:[path:{path_hash}]:[auth:{auth_hash}]"
 
@@ -103,8 +103,8 @@ async def test_distinct_cache_instances_do_not_collide_on_different_keys(
     cache1 = Cache(backend=cache_backend_fixture, request=request_fixture).vary_on_path()
     cache2 = Cache(backend=cache_backend_fixture, request=request_fixture).vary_on_auth()
 
-    await cache1.set("path-value", ttl=10)
-    await cache2.set("auth-value", ttl=10)
+    _ = await cache1.set("path-value", ttl=10)
+    _ = await cache2.set("auth-value", ttl=10)
 
     assert await cache1.get() == "path-value"
     assert await cache2.get() == "auth-value"

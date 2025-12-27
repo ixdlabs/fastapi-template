@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class Cache:
     def __init__(self, backend: BaseCache, request: Request):
+        super().__init__()
         self.backend = backend
         self.request = request
         self.key = "cache"
@@ -40,12 +41,12 @@ class Cache:
 
     async def set[T](self, value: T, ttl: int) -> T:
         """Set a value in the cache with the specified TTL."""
-        await self.backend.set(self.key, value, ttl)
+        await self.backend.set(self.key, value, ttl)  # pyright: ignore[reportUnknownMemberType]
         return value
 
-    async def get(self):
+    async def get(self) -> object:
         """Get a value from the cache."""
-        return await self.backend.get(self.key)
+        return await self.backend.get(self.key)  # pyright: ignore[reportUnknownMemberType]
 
 
 # Cache Backend used for caching.

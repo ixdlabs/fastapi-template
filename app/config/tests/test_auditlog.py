@@ -197,6 +197,7 @@ async def test_audit_logger_update_records_old_new_and_changed_values_after_trac
     assert audit.old_value["id"] == str(resource.id)
     assert audit.changed_value is not None
     assert "values_changed" in audit.changed_value
+    assert isinstance(audit.changed_value["values_changed"], dict)
     assert audit.changed_value["values_changed"]["root['email']"] == {
         "old_value": "user@example.com",
         "new_value": "newuser@example.com",

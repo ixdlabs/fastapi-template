@@ -2,13 +2,13 @@ from http import HTTPStatus
 from unittest.mock import MagicMock
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
-from fastapi.routing import BaseRoute
 import pytest
 
 from fastapi.testclient import TestClient
 from app.config import openapi
 from app.config.exceptions import ServiceException, raises
 from app.main import app
+from pytest import MonkeyPatch
 
 client = TestClient(app)
 
@@ -50,7 +50,7 @@ class SampleException(ServiceException):
 
 def test_add_service_exception_documentation_injects_exception_response_when_missing(app_fixture: FastAPI):
     openapi_schema = get_openapi(title=app_fixture.title, version=app_fixture.version, routes=app_fixture.routes)
-    route: BaseRoute = next(r for r in app_fixture.routes if getattr(r, "path") == "/items")
+    route = next(r for r in app_fixture.routes if getattr(r, "path") == "/items")
     openapi.add_service_exception_documentation(route, openapi_schema, status_code=400, exceptions=[SampleException])
     response = openapi_schema["paths"]["/items"]["get"]["responses"]["400"]
 
@@ -62,7 +62,7 @@ def test_add_service_exception_documentation_injects_exception_response_when_mis
 
 def test_add_service_exception_documentation_retains_existing_response(app_fixture: FastAPI):
     openapi_schema = get_openapi(title=app_fixture.title, version=app_fixture.version, routes=app_fixture.routes)
-    route: BaseRoute = next(r for r in app_fixture.routes if getattr(r, "path") == "/items")
+    route = next(r for r in app_fixture.routes if getattr(r, "path") == "/items")
     openapi_schema["paths"]["/items"]["get"]["responses"]["400"] = {"description": "Existing"}
     openapi.add_service_exception_documentation(route, openapi_schema, status_code=400, exceptions=[SampleException])
 
@@ -87,6 +87,8 @@ def test_custom_openapi_builder_includes_raises_metadata_in_schema():
     assert get_items() == "items"
 
     schema = openapi.custom(test_app)()
+    assert isinstance(schema, dict)
+    assert isinstance(schema["paths"], dict)
     responses = schema["paths"]["/items"]["get"]["responses"]
     assert "400" in responses
     assert "sample/error" in responses["400"]["content"]["application/json"]["examples"]
@@ -103,10 +105,12 @@ def test_custom_openapi_builder_skips_routes_excluded_from_schema():
     assert hidden() == "hidden"
 
     schema = openapi.custom(test_app)()
+    assert isinstance(schema, dict)
+    assert isinstance(schema["paths"], dict)
     assert "/hidden" not in schema["paths"]
 
 
-def test_custom_openapi_builder_calls_add_service_exception_documentation(monkeypatch):
+def test_custom_openapi_builder_calls_add_service_exception_documentation(monkeypatch: MonkeyPatch):
     test_app = FastAPI()
 
     @raises(SampleException)
@@ -118,5 +122,5 @@ def test_custom_openapi_builder_calls_add_service_exception_documentation(monkey
 
     spy = MagicMock()
     monkeypatch.setattr("app.config.openapi.add_service_exception_documentation", spy)
-    openapi.custom(test_app)()
+    _ = openapi.custom(test_app)()
     spy.assert_called_once()

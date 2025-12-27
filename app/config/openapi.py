@@ -10,7 +10,7 @@ import http
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.openapi.utils import get_openapi
-from fastapi.routing import BaseRoute
+from starlette.routing import BaseRoute
 
 from app.config.exceptions import ServiceException
 
@@ -57,7 +57,7 @@ async def scalar(request: Request):
 def custom(app: FastAPI):
     """Override the default FastAPI OpenAPI generation to include custom exception documentation."""
 
-    def wrapper() -> dict:
+    def wrapper() -> dict[str, object]:
         if app.openapi_schema:
             return app.openapi_schema
 
@@ -72,7 +72,7 @@ def custom(app: FastAPI):
         for route in app.routes:
             if getattr(route, "include_in_schema", None):
                 endpoint = getattr(route, "endpoint")
-                raises: dict[int, list[type[ServiceException]]] = getattr(endpoint, "__raises__", {})
+                raises: dict[int, list[type[ServiceException] | None]] = getattr(endpoint, "__raises__", {})
                 for status_code, exceptions in raises.items():
                     exceptions = [exc for exc in exceptions if exc is not None]
                     add_service_exception_documentation(route, openapi_schema, status_code, exceptions)
@@ -82,7 +82,7 @@ def custom(app: FastAPI):
             for _, operation in methods.items():
                 operation_security = operation.get("security", [])
                 if operation_security:
-                    scopes = []
+                    scopes: list[str] = []
                     for security_requirement in operation_security:
                         for scheme_key, scheme_scopes in dict(security_requirement).items():
                             for scheme_scope in scheme_scopes:
@@ -99,12 +99,16 @@ def custom(app: FastAPI):
 
 
 def add_service_exception_documentation(
-    route: BaseRoute, openapi_schema: dict, status_code: int, exceptions: list[type[ServiceException]]
+    route: BaseRoute, openapi_schema: dict[str, object], status_code: int, exceptions: list[type[ServiceException]]
 ):
     route_path: str = getattr(route, "path")
     route_methods: list[str] = getattr(route, "methods")
     route_methods = [method.lower() for method in route_methods]
     for method in route_methods:
+        assert isinstance(openapi_schema["paths"], dict)
+        assert isinstance(openapi_schema["paths"][route_path], dict)
+        assert isinstance(openapi_schema["paths"][route_path][method], dict)
+        assert isinstance(openapi_schema["paths"][route_path][method]["responses"], dict)
         if str(status_code) in openapi_schema["paths"][route_path][method]["responses"]:
             continue
         openapi_schema["paths"][route_path][method]["responses"][str(status_code)] = {

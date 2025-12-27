@@ -32,9 +32,6 @@ jobs:
       - name: Run pre-commit
         run: uv run pre-commit run --all-files --show-diff-on-failure
 
-      - name: Run mypy
-        run: uv run mypy .
-
       - name: Run tests
         run: uv run pytest --cov=app --cov-report=xml:coverage.xml --junit-xml=pytest.xml
 

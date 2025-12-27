@@ -31,6 +31,7 @@ async def test_user_can_verify_email_confirm(db_fixture: AsyncSession):
     assert response.status_code == 200
 
     data = response.json()
+    await db_fixture.refresh(user)
     assert data["user_id"] == str(user.id)
     assert data["email"] == "new@example.com"
 
