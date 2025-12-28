@@ -45,7 +45,7 @@ class EmailSender(abc.ABC):
 
     def render(self, template: str, data: dict[str, str] | None) -> str:
         jinja_template: Template = Template(template)
-        return jinja_template.render(title="Users", users=data or {})
+        return jinja_template.render(data or {})
 
 
 # A simple local email sender that logs emails instead of sending them

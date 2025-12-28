@@ -105,10 +105,10 @@ EMAIL_VERIFICATION_HTML_TEMPLATE = """
 <html>
     <body>
         <p>Please verify your email address by clicking the link below:</p>
-        <a href="https://example.com/verify-email?token={token}">Verify Email</a>
+        <a href="https://example.com/verify-email?token={{ token }}">Verify Email</a>
     </body>
 </html>
 """
 EMAIL_VERIFICATION_TEXT_TEMPLATE = """
-Please verify your email address by visiting the following link: https://example.com/verify-email?token={token}
+Please verify your email address by visiting the following link: https://example.com/verify-email?token={{ token }}
 """
