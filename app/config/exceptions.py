@@ -85,7 +85,18 @@ R = TypeVar("R")
 
 
 def raises(exc: type[ServiceException]):
-    """Decorator to collect possible HTTP exceptions for documentation."""
+    """
+    Decorator to collect possible HTTP exceptions for documentation.
+
+    The decorator should come before the HTTP method decorator (e.g., `@router.get`).
+    Eg:
+    ```python
+    @raises(SomeException)
+    @router.get("/")
+    def some_route(...):
+        ...
+    ```
+    """
 
     def wrapper(func: Callable[P, R]) -> Callable[P, R]:
         raising_causes: dict[int, list[type[ServiceException]]] = getattr(

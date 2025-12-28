@@ -1,7 +1,15 @@
-from fastapi import Request
+from inspect import Parameter, Signature, signature
+from fastapi import APIRouter, Request
+from limits import parse
 import pytest
 
-from app.config.rate_limit import RateLimit, RateLimitExceededException, get_rate_limit_strategy
+from app.config.rate_limit import (
+    RateLimit,
+    RateLimitDep,
+    RateLimitExceededException,
+    get_rate_limit_strategy,
+    rate_limit,
+)
 import time_machine
 
 
@@ -112,3 +120,86 @@ async def test_rate_limit_sets_reset_header_within_window_bounds():
         assert "X-RateLimit-Reset" in exc.value.headers
         reset = int(exc.value.headers["X-RateLimit-Reset"])
         assert 0 < reset <= 60
+
+
+# Tests for decorator
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def test_rate_limit_decorator_adds_dependency_parameter():
+    router = APIRouter()
+
+    @router.get("/test")
+    @rate_limit("5/minute")
+    async def test_endpoint(param1: int):
+        return {"param1": param1}
+
+    sig = signature(test_endpoint)
+    params = list(sig.parameters.values())
+
+    assert any(param.annotation == RateLimitDep for param in params)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_reuses_existing_dependency_param():
+    dep_param = Parameter(
+        name="rate_limit",
+        annotation=RateLimitDep,
+        kind=Parameter.KEYWORD_ONLY,
+    )
+
+    sig = Signature(parameters=[dep_param])
+
+    async def handler():
+        return "ok"
+
+    setattr(handler, "__signature__", sig)
+    wrapped = rate_limit("10/second")(handler)
+
+    wrapped_signature = getattr(wrapped, "__signature__")
+    assert isinstance(wrapped_signature, Signature)
+    params = wrapped_signature.parameters
+    assert "rate_limit" in params
+    assert "__rate_limit_dependency" not in params
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_calls_limit():
+    request = make_request()
+    strategy = get_rate_limit_strategy()
+    rate_limit_obj = RateLimit(strategy=strategy, request=request)
+
+    @rate_limit("3/minute")
+    async def handler(x: int):
+        return "ok"
+
+    result = await handler(x=1, __rate_limit_dependency=rate_limit_obj)  # pyright: ignore[reportCallIssue]
+
+    assert result == "ok"
+    parsed_limit = parse("3/minute")
+    stats = await rate_limit_obj.strategy.get_window_stats(parsed_limit, rate_limit_obj.key())
+    assert stats.remaining == 2
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_strips_dependency_kwarg():
+    request = make_request()
+    strategy = get_rate_limit_strategy()
+    limiter = RateLimit(strategy=strategy, request=request)
+
+    @rate_limit("1/second")
+    async def handler():
+        return "ok"
+
+    result = await handler(__rate_limit_dependency=limiter)  # pyright: ignore[reportCallIssue]
+    assert result == "ok"
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_raises_when_dependency_missing():
+    @rate_limit("5/minute")
+    async def handler():
+        return "ok"
+
+    with pytest.raises(AssertionError, match="RateLimit dependency injection failed"):
+        _ = await handler()

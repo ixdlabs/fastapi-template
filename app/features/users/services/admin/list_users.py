@@ -9,7 +9,7 @@ from app.config.cache import CacheDep
 from app.config.database import DbDep
 from app.config.exceptions import raises
 from app.config.pagination import Page, paginate
-from app.config.rate_limit import RateLimitDep, RateLimitExceededException
+from app.config.rate_limit import RateLimitExceededException, rate_limit
 from app.features.users.models.user import UserType, User
 
 
@@ -42,11 +42,11 @@ class UserListOutput(BaseModel):
 @raises(AuthorizationFailedException)
 @raises(RateLimitExceededException)
 @router.get("/")
+@rate_limit("10/minute")
 async def list_users(
     db: DbDep,
     query: Annotated[UserFilterInput, Query()],
     current_user: CurrentAdminDep,
-    rate_limit: RateLimitDep,
     cache: CacheDep,
 ) -> Page[UserListOutput]:
     """
@@ -55,9 +55,6 @@ async def list_users(
 
     This endpoint is rate-limited and cached for demonstration purposes.
     """
-    # Rate limiting
-    await rate_limit.limit("10/minute")
-
     # Check and return from cache
     response_cache = cache.vary_on_path().vary_on_query().vary_on_auth().with_ttl(60).build()
     if cache_result := await response_cache.get(Page[UserListOutput]):

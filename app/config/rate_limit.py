@@ -6,15 +6,19 @@ https://limits.readthedocs.io/en/stable/
 
 """
 
-from functools import lru_cache
+from collections.abc import Awaitable, Callable
+from functools import lru_cache, wraps
+from inspect import Parameter
 import time
-from typing import Annotated
+from typing import Annotated, ParamSpec, TypeVar
 from fastapi import Depends, Request, status
 from limits.aio.storage import MemoryStorage
 from limits.aio.strategies import MovingWindowRateLimiter, RateLimiter
 from limits import parse
+from fastapi.dependencies.utils import get_typed_signature, get_typed_return_annotation
 
 from app.config.exceptions import ServiceException
+from app.config.helpers import inspect_locate_param
 
 
 # Rate Limiter Class that applies the rate limiting strategy.
@@ -78,3 +82,59 @@ class RateLimitExceededException(ServiceException):
 
     def __init__(self, reset_time: int):
         super().__init__(headers={"X-RateLimit-Reset": str(reset_time)})
+
+
+# Decorator
+# This will add a new parameter to the decorated function for RateLimit dependency injection.
+# This parameter will be used to enforce rate limiting.
+# ----------------------------------------------------------------------------------------------------------------------
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def rate_limit(limit: str):
+    """
+    Decorator to apply rate limiting to FastAPI route handlers.
+
+    The decorated function must be `async`.
+    The decorator should come before the HTTP method decorator (e.g., `@router.get`).
+    Eg:
+    ```python
+    @router.get("/")
+    @rate_limit("5/minute")
+    async def some_route(...):
+        ...
+    ```
+    """
+    injected_rate_limit = Parameter(
+        name="__rate_limit_dependency",
+        annotation=RateLimitDep,
+        kind=Parameter.KEYWORD_ONLY,
+    )
+
+    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+        wrapped_signature = get_typed_signature(func)
+        return_type = get_typed_return_annotation(func)
+        wrapped_signature._return_annotation = return_type
+
+        to_inject: list[Parameter] = []
+        rate_limit_param = inspect_locate_param(wrapped_signature, injected_rate_limit, to_inject)
+
+        @wraps(func)
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            rate_limit_instance = kwargs.pop(rate_limit_param.name, None)
+            assert isinstance(rate_limit_instance, RateLimit), "RateLimit dependency injection failed"
+            await rate_limit_instance.limit(limit)
+            return await func(*args, **kwargs)
+
+        # Inject the parameters to function signature
+        new_params = list(wrapped_signature.parameters.values())
+        new_params.extend(to_inject)
+
+        new_signature = wrapped_signature.replace(parameters=new_params)
+        setattr(wrapper, "__signature__", new_signature)
+
+        return wrapper
+
+    return decorator
