@@ -10,7 +10,7 @@ git clone https://github.com/ixdlabs/fastapi-template
 
 ## ⚙️ Environment Setup
 
-Requires Python 3.12+ and [uv](https://github.com/astral-sh/uv). uv manages the environment - no venv activation needed.
+Requires Python 3.14+ and [uv](https://github.com/astral-sh/uv). uv manages the environment - no venv activation needed.
 
 ### Install Dependencies
 
