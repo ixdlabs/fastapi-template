@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 import pytest
-from app.config.background import Background, TaskRegistry, get_background
-from app.config.settings import Settings
+from app.core.background import Background, TaskRegistry, get_background
+from app.core.settings import Settings
 from celery import Task as CeleryTask
 from pytest import MonkeyPatch
 

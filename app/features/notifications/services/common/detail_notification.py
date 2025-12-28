@@ -5,9 +5,9 @@ from pydantic import AwareDatetime, BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from app.config.auth import AuthenticationFailedException, CurrentUserDep
-from app.config.database import DbDep
-from app.config.exceptions import ServiceException, raises
+from app.core.auth import AuthenticationFailedException, CurrentUserDep
+from app.core.database import DbDep
+from app.core.exceptions import ServiceException, raises
 from app.features.notifications.models.notification import Notification, NotificationType
 from app.features.notifications.models.notification_delivery import (
     NotificationChannel,

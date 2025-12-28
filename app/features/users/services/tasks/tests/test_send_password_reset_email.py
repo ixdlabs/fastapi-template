@@ -3,9 +3,9 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.config.auth import AuthUser
+from app.core.auth import AuthUser
 
-from app.config.settings import Settings
+from app.core.settings import Settings
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 from app.features.users.services.tasks.send_password_reset_email import (
     SendPasswordResetInput,

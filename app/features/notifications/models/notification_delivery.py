@@ -3,13 +3,13 @@ import enum
 import uuid
 import typing
 
-from app.config.database import Base
+from app.core.database import Base
 
 from sqlalchemy.types import Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import UUID, String, ForeignKey
 
-from app.config.timezone import DateTimeUTC, utc_now
+from app.core.timezone import DateTimeUTC, utc_now
 
 if typing.TYPE_CHECKING:
     from app.features.notifications.models.notification import Notification

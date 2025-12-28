@@ -34,7 +34,7 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExport
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from sqlalchemy.ext.asyncio import AsyncEngine
-from app.config.settings import Settings
+from app.core.settings import Settings
 
 
 def setup_open_telemetry(app: FastAPI | Celery, db_engine: AsyncEngine, settings: Settings):

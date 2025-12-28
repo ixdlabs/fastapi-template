@@ -1,4 +1,4 @@
-from app.config.background import TaskRegistry
+from app.core.background import TaskRegistry
 from app.features.users.tasks import user_task_registry
 
 task_registry = TaskRegistry()

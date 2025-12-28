@@ -6,13 +6,13 @@ import typing
 from argon2 import PasswordHasher
 from argon2.exceptions import Argon2Error
 
-from app.config.database import Base
+from app.core.database import Base
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
 from sqlalchemy import JSON, UUID, Enum, ForeignKey, String
 
-from app.config.timezone import DateTimeUTC, utc_now
+from app.core.timezone import DateTimeUTC, utc_now
 
 if typing.TYPE_CHECKING:
     from app.features.users.models.user import User

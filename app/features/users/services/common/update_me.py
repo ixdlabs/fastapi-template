@@ -3,11 +3,11 @@ from fastapi import APIRouter, status
 from pydantic import AwareDatetime, BaseModel, EmailStr, Field
 from sqlalchemy import select
 
-from app.config.audit_log import AuditLoggerDep
-from app.config.auth import AuthenticationFailedException, CurrentUserDep
-from app.config.background import BackgroundDep
-from app.config.database import DbDep
-from app.config.exceptions import ServiceException, raises
+from app.core.audit_log import AuditLoggerDep
+from app.core.auth import AuthenticationFailedException, CurrentUserDep
+from app.core.background import BackgroundDep
+from app.core.database import DbDep
+from app.core.exceptions import ServiceException, raises
 from app.features.users.models.user import User, UserType
 from app.features.users.services.tasks.send_email_verification import SendEmailVerificationInput
 from app.features.users.tasks import send_email_verification_task

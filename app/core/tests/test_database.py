@@ -3,8 +3,8 @@ import pytest
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.config.database import Base, create_db_engine, get_db, get_db_session
-from app.config.settings import Settings
+from app.core.database import Base, create_db_engine, get_db, get_db_session
+from app.core.settings import Settings
 
 from pytest import MonkeyPatch
 
@@ -123,7 +123,7 @@ def test_create_db_engine_caches_connections_per_url_and_debug_flag(monkeypatch:
 
     create_db_engine.cache_clear()
 
-    monkeypatch.setattr("app.config.database.create_async_engine", mock_create_async_engine)
+    monkeypatch.setattr("app.core.database.create_async_engine", mock_create_async_engine)
 
     engine_one = create_db_engine("sqlite:///first.db", debug=True)
     engine_two = create_db_engine("sqlite:///first.db", debug=True)

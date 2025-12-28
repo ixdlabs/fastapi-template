@@ -7,7 +7,7 @@ from starlette.types import Scope
 
 from aiocache import BaseCache
 
-from app.config.cache import CacheBuilder, CacheDep, get_cache_backend, Cache, get_cache_builder
+from app.core.cache import CacheBuilder, CacheDep, get_cache_backend, Cache, get_cache_builder
 
 
 @pytest.fixture

@@ -5,9 +5,9 @@ from fastapi import APIRouter
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
-from app.config.auth import CurrentTaskRunnerDep
-from app.config.database import DbDep
-from app.config.settings import SettingsDep
+from app.core.auth import CurrentTaskRunnerDep
+from app.core.database import DbDep
+from app.core.settings import SettingsDep
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
 

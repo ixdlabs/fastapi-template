@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from app.config.audit_log import AuditLoggerDep
-from app.config.database import DbDep
-from app.config.exceptions import ServiceException, raises
+from app.core.audit_log import AuditLoggerDep
+from app.core.database import DbDep
+from app.core.exceptions import ServiceException, raises
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
 logger = logging.getLogger(__name__)

@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import ANY, MagicMock
 from pytest import MonkeyPatch
 
-from app.config.exceptions import ServiceException, raises, register_exception_handlers
+from app.core.exceptions import ServiceException, raises, register_exception_handlers
 from fastapi.testclient import TestClient
 
 
@@ -55,7 +55,7 @@ async def test_custom_http_exception_handler_logs_and_returns_registered_server_
     test_app: FastAPI, monkeypatch: MonkeyPatch
 ):
     mock_logger = MagicMock()
-    monkeypatch.setattr("app.config.exceptions.logger.error", mock_logger)
+    monkeypatch.setattr("app.core.exceptions.logger.error", mock_logger)
 
     client = TestClient(test_app)
     response = client.get("/server-error")
@@ -79,7 +79,7 @@ async def test_custom_exception_handler_logs_unhandled_exceptions_as_server_erro
     test_app: FastAPI, monkeypatch: MonkeyPatch
 ):
     mock_logger = MagicMock()
-    monkeypatch.setattr("app.config.exceptions.logger.error", mock_logger)
+    monkeypatch.setattr("app.core.exceptions.logger.error", mock_logger)
 
     client = TestClient(test_app)
     with pytest.raises(ZeroDivisionError):

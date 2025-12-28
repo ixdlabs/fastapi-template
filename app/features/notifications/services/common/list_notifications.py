@@ -6,10 +6,10 @@ from pydantic import AwareDatetime, BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from app.config.auth import AuthenticationFailedException, CurrentUserDep
-from app.config.database import DbDep
-from app.config.exceptions import raises
-from app.config.pagination import Page, paginate
+from app.core.auth import AuthenticationFailedException, CurrentUserDep
+from app.core.database import DbDep
+from app.core.exceptions import raises
+from app.core.pagination import Page, paginate
 from app.features.notifications.models.notification import Notification, NotificationType
 from app.features.notifications.models.notification_delivery import (
     NotificationChannel,

@@ -1,4 +1,4 @@
-from app.config import settings
+from app.core import settings
 from pytest import MonkeyPatch
 
 

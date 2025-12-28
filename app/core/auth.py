@@ -16,8 +16,8 @@ from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 import jwt
 from pydantic import BaseModel, ValidationError
 
-from app.config.exceptions import ServiceException
-from app.config.settings import Settings, SettingsDep
+from app.core.exceptions import ServiceException
+from app.core.settings import Settings, SettingsDep
 from app.features.users.models.user import User, UserType
 
 logger = logging.getLogger(__name__)

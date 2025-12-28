@@ -3,8 +3,8 @@ from fastapi import FastAPI
 from pytest import MonkeyPatch
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.config.otel import setup_open_telemetry
-from app.config.settings import Settings
+from app.core.otel import setup_open_telemetry
+from app.core.settings import Settings
 from unittest.mock import MagicMock
 
 
@@ -12,7 +12,7 @@ def test_setup_open_telemetry_skips_instrumentation_when_disabled(
     db_engine_fixture: AsyncEngine, monkeypatch: MonkeyPatch
 ):
     mock_intr = MagicMock()
-    monkeypatch.setattr("app.config.otel.AsyncioInstrumentor", mock_intr)
+    monkeypatch.setattr("app.core.otel.AsyncioInstrumentor", mock_intr)
 
     app = FastAPI()
     setup_open_telemetry(app, db_engine_fixture, Settings(otel_enabled=False))
@@ -28,14 +28,14 @@ def test_setup_open_telemetry_instruments_fastapi_dependencies_when_enabled(
     mock_fastapi_intr = MagicMock()
     mock_celery_intr = MagicMock()
 
-    monkeypatch.setattr("app.config.otel.AsyncioInstrumentor", mock_asyncio_intr)
-    monkeypatch.setattr("app.config.otel.LoggingInstrumentor", mock_logging_intr)
-    monkeypatch.setattr("app.config.otel.SQLAlchemyInstrumentor", mock_sqlalchemy_intr)
-    monkeypatch.setattr("app.config.otel.FastAPIInstrumentor", mock_fastapi_intr)
-    monkeypatch.setattr("app.config.otel.CeleryInstrumentor", mock_celery_intr)
-    monkeypatch.setattr("app.config.otel.set_logger_provider", MagicMock())
-    monkeypatch.setattr("app.config.otel.set_tracer_provider", MagicMock())
-    monkeypatch.setattr("app.config.otel.set_meter_provider", MagicMock())
+    monkeypatch.setattr("app.core.otel.AsyncioInstrumentor", mock_asyncio_intr)
+    monkeypatch.setattr("app.core.otel.LoggingInstrumentor", mock_logging_intr)
+    monkeypatch.setattr("app.core.otel.SQLAlchemyInstrumentor", mock_sqlalchemy_intr)
+    monkeypatch.setattr("app.core.otel.FastAPIInstrumentor", mock_fastapi_intr)
+    monkeypatch.setattr("app.core.otel.CeleryInstrumentor", mock_celery_intr)
+    monkeypatch.setattr("app.core.otel.set_logger_provider", MagicMock())
+    monkeypatch.setattr("app.core.otel.set_tracer_provider", MagicMock())
+    monkeypatch.setattr("app.core.otel.set_meter_provider", MagicMock())
 
     app = FastAPI()
     setup_open_telemetry(app, db_engine_fixture, Settings(otel_enabled=True))
@@ -58,14 +58,14 @@ def test_setup_open_telemetry_instruments_celery_dependencies_when_enabled(
     mock_fastapi_intr = MagicMock()
     mock_celery_intr = MagicMock()
 
-    monkeypatch.setattr("app.config.otel.AsyncioInstrumentor", mock_asyncio_intr)
-    monkeypatch.setattr("app.config.otel.LoggingInstrumentor", mock_logging_intr)
-    monkeypatch.setattr("app.config.otel.SQLAlchemyInstrumentor", mock_sqlalchemy_intr)
-    monkeypatch.setattr("app.config.otel.FastAPIInstrumentor", mock_fastapi_intr)
-    monkeypatch.setattr("app.config.otel.CeleryInstrumentor", mock_celery_intr)
-    monkeypatch.setattr("app.config.otel.set_logger_provider", MagicMock())
-    monkeypatch.setattr("app.config.otel.set_tracer_provider", MagicMock())
-    monkeypatch.setattr("app.config.otel.set_meter_provider", MagicMock())
+    monkeypatch.setattr("app.core.otel.AsyncioInstrumentor", mock_asyncio_intr)
+    monkeypatch.setattr("app.core.otel.LoggingInstrumentor", mock_logging_intr)
+    monkeypatch.setattr("app.core.otel.SQLAlchemyInstrumentor", mock_sqlalchemy_intr)
+    monkeypatch.setattr("app.core.otel.FastAPIInstrumentor", mock_fastapi_intr)
+    monkeypatch.setattr("app.core.otel.CeleryInstrumentor", mock_celery_intr)
+    monkeypatch.setattr("app.core.otel.set_logger_provider", MagicMock())
+    monkeypatch.setattr("app.core.otel.set_tracer_provider", MagicMock())
+    monkeypatch.setattr("app.core.otel.set_meter_provider", MagicMock())
 
     app = Celery()
     setup_open_telemetry(app, db_engine_fixture, Settings(otel_enabled=True))

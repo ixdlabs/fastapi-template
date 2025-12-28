@@ -3,8 +3,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 
-from app.config.background import BackgroundDep
-from app.config.database import DbDep
+from app.core.background import BackgroundDep
+from app.core.database import DbDep
 from app.features.users.models.user import User
 from app.features.users.services.tasks.send_password_reset_email import SendPasswordResetInput
 from app.features.users.tasks import send_password_reset_email_task

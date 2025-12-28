@@ -1,0 +1,6 @@
+FastAPI backend with feature-based modules.
+- Entry: `app/main.py` wires settings/logging/otel, registers exception handlers, and includes `app/features/api.py` routers. Domains live under `app/features/<domain>` (users, notifications, audit_logs).
+- Each domain exposes routers in `app/features/<domain>/api.py`, assembled by `app/features/api.py`. Domain models sit in `app/features/<domain>/models`.
+- Endpoint pattern: every endpoint lives in its own file under `app/features/<domain>/services/<area>/<endpoint>.py` (e.g., common/admin/tasks). Each file defines `router = APIRouter()`, Pydantic Input/Output models, typed exceptions inheriting `ServiceException` and decorated with `@raises`, and the endpoint function on the router. Tests sit alongside in `services/.../tests`.
+- Background tasks follow the same per-file pattern in `services/tasks/` and register via the domain `api.py` router include.
+- Important commands (uv handles env): `uv sync`; run API `uv run fastapi dev app/main.py`; tests `uv run pytest`; lint/format `uv run pre-commit --all-files`; migrations `uv run alembic upgrade head` / `uv run alembic revision --autogenerate -m "<msg>"`; background workers `uv run celery -A app.worker worker` and scheduler `uv run celery -A app.worker beat`; OTel-safe serve `uv run uvicorn app.main:app`.

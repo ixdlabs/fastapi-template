@@ -8,16 +8,16 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 
 from alembic import command, config
 
-from app.config.auth import AuthUser, Authenticator, get_authenticator, get_current_user
-from app.config.background import Background, NoOpTaskTrackingBackground, get_background
-from app.config.cache import get_cache_backend
-from app.config.database import get_db_session
-from app.config.logging import setup_logging
-from app.config.rate_limit import get_rate_limit_strategy
+from app.core.auth import AuthUser, Authenticator, get_authenticator, get_current_user
+from app.core.background import Background, NoOpTaskTrackingBackground, get_background
+from app.core.cache import get_cache_backend
+from app.core.database import get_db_session
+from app.core.logging import setup_logging
+from app.core.rate_limit import get_rate_limit_strategy
 from app.fixtures.user_factory import UserFactory
 from limits.aio.storage import MemoryStorage
 from limits.aio.strategies import MovingWindowRateLimiter, RateLimiter
-from app.config.settings import Settings, get_settings
+from app.core.settings import Settings, get_settings
 from app.features.users.models.user import UserType, User
 from app.main import app
 from aiocache import SimpleMemoryCache, BaseCache

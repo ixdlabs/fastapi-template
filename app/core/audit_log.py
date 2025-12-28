@@ -10,9 +10,9 @@ from opentelemetry import trace
 from opentelemetry.trace import SpanContext
 from deepdiff import DeepDiff
 import orjson
-from app.config.auth import AuthException, Authenticator, AuthenticatorDep
+from app.core.auth import AuthException, Authenticator, AuthenticatorDep
 from fastapi import Request, Depends
-from app.config.database import Base, DbDep
+from app.core.database import Base, DbDep
 from app.features.audit_logs.models.audit_log import ActorType, AuditLog
 
 logger = logging.getLogger(__name__)

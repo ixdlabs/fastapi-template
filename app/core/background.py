@@ -18,7 +18,7 @@ from celery.app.task import Task as CeleryTask
 
 from fastapi import Depends
 
-from app.config.settings import Settings, SettingsDep
+from app.core.settings import Settings, SettingsDep
 
 logger = logging.getLogger(__name__)
 P = ParamSpec("P")

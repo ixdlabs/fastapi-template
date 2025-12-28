@@ -2,10 +2,10 @@ import uuid
 from fastapi import APIRouter, status
 from sqlalchemy import select
 
-from app.config.audit_log import AuditLoggerDep
-from app.config.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
-from app.config.database import DbDep
-from app.config.exceptions import ServiceException, raises
+from app.core.audit_log import AuditLoggerDep
+from app.core.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
+from app.core.database import DbDep
+from app.core.exceptions import ServiceException, raises
 from app.features.users.models.user import User
 
 router = APIRouter()

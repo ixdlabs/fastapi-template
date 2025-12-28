@@ -3,11 +3,11 @@ from fastapi import Request
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.config.auth import Authenticator
+from app.core.auth import Authenticator
 from starlette.types import Scope
 from starlette.datastructures import Headers
 
-from app.config.audit_log import AuditLogger
+from app.core.audit_log import AuditLogger
 from app.features.audit_logs.models.audit_log import ActorType, AuditLog
 
 from app.features.users.models.user import User

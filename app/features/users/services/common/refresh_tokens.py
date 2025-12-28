@@ -4,9 +4,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 import logging
 
-from app.config.auth import AuthenticatorDep, AuthException
-from app.config.database import DbDep
-from app.config.exceptions import ServiceException, raises
+from app.core.auth import AuthenticatorDep, AuthException
+from app.core.database import DbDep
+from app.core.exceptions import ServiceException, raises
 from app.features.users.models.user import User, UserType
 
 logger = logging.getLogger(__name__)

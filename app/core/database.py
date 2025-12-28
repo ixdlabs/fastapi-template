@@ -21,7 +21,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapped, RelationshipProperty, attributes, mapped_column
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.config.settings import SettingsDep
+from app.core.settings import SettingsDep
 
 logger = logging.getLogger(__name__)
 

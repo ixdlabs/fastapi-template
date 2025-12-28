@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request
 from limits import parse
 import pytest
 
-from app.config.rate_limit import (
+from app.core.rate_limit import (
     RateLimit,
     RateLimitDep,
     RateLimitExceededException,

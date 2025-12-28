@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.users.models.user import User
 from app.fixtures.user_factory import UserFactory
-from app.config.auth import Authenticator
+from app.core.auth import Authenticator
 from fastapi.testclient import TestClient
 
 from app.main import app

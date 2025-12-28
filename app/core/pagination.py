@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pydantic import BaseModel
 from sqlalchemy import Select, func, select
 
-from app.config.database import DbDep
+from app.core.database import DbDep
 
 
 # A generic paginated response model

@@ -17,10 +17,10 @@ from alembic.autogenerate.api import AutogenContext
 from alembic import context
 import alembic_postgresql_enum  # noqa: F401
 
-from app.config.database import Base
-from app.config.logging import setup_logging
-from app.config.settings import get_settings
-from app.config.timezone import DateTimeUTC
+from app.core.database import Base
+from app.core.logging import setup_logging
+from app.core.settings import get_settings
+from app.core.timezone import DateTimeUTC
 
 from app.features import models  # noqa: F401
 

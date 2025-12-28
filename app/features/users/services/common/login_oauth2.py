@@ -3,9 +3,9 @@ from fastapi import APIRouter, status, Form
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from app.config.auth import AuthenticatorDep
-from app.config.database import DbDep
-from app.config.exceptions import ServiceException
+from app.core.auth import AuthenticatorDep
+from app.core.database import DbDep
+from app.core.exceptions import ServiceException
 from app.features.users.models.user import User
 
 

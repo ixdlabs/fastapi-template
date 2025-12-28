@@ -8,8 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Enum
 
 
-from app.config.database import Base
-from app.config.timezone import DateTimeUTC, utc_now
+from app.core.database import Base
+from app.core.timezone import DateTimeUTC, utc_now
 
 
 class ActorType(enum.Enum):

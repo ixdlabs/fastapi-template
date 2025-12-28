@@ -17,8 +17,8 @@ from limits.aio.strategies import MovingWindowRateLimiter, RateLimiter
 from limits import parse
 from fastapi.dependencies.utils import get_typed_signature, get_typed_return_annotation
 
-from app.config.exceptions import ServiceException
-from app.config.helpers import inspect_locate_param
+from app.core.exceptions import ServiceException
+from app.core.helpers import inspect_locate_param
 
 
 # Rate Limiter Class that applies the rate limiting strategy.

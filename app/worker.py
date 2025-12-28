@@ -2,10 +2,10 @@ import logging
 
 from celery import Celery
 from celery.signals import worker_process_init
-from app.config.database import create_db_engine_from_settings
-from app.config.logging import setup_logging
-from app.config.otel import setup_open_telemetry
-from app.config.settings import get_settings
+from app.core.database import create_db_engine_from_settings
+from app.core.logging import setup_logging
+from app.core.otel import setup_open_telemetry
+from app.core.settings import get_settings
 
 from app.features import models  # noqa: F401,E402
 from app.features import tasks

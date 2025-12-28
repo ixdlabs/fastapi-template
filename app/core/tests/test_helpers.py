@@ -1,6 +1,6 @@
 from inspect import Parameter, Signature
 
-from app.config.helpers import inspect_augment_signature, inspect_locate_param
+from app.core.helpers import inspect_augment_signature, inspect_locate_param
 
 # Tests for inspect_augment_signature
 # ----------------------------------------------------------------------------------------------------------------------

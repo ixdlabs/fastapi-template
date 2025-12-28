@@ -3,10 +3,10 @@ from fastapi import APIRouter, status
 from pydantic import AwareDatetime, BaseModel, EmailStr
 from sqlalchemy import select
 
-from app.config.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
-from app.config.cache import CacheDep
-from app.config.database import DbDep
-from app.config.exceptions import ServiceException, raises
+from app.core.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
+from app.core.cache import CacheDep
+from app.core.database import DbDep
+from app.core.exceptions import ServiceException, raises
 from app.features.users.models.user import UserType, User
 
 

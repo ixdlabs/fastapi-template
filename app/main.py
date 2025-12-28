@@ -4,12 +4,12 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.cors import CORSMiddleware
 
-from app.config import openapi
-from app.config.database import create_db_engine_from_settings
-from app.config.exceptions import register_exception_handlers
-from app.config.logging import setup_logging
-from app.config.otel import setup_open_telemetry
-from app.config.settings import get_settings
+from app.core import openapi
+from app.core.database import create_db_engine_from_settings
+from app.core.exceptions import register_exception_handlers
+from app.core.logging import setup_logging
+from app.core.otel import setup_open_telemetry
+from app.core.settings import get_settings
 
 from app.features import models  # noqa: F401
 from app.features import api

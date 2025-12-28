@@ -122,7 +122,7 @@ uv add --group=opentelemetry <package>
 # uv add --group=opentelemetry opentelemetry-instrumentation-sqlalchemy
 ```
 
-The instrumentations should be configured inside the `app/config/otel.py`.
+The instrumentations should be configured inside the `app/core/otel.py`.
 
 Once configured, traces, metrics, and logs are automatically exported via OTLP and data appears in SigNoz (or your chosen backend).
 
@@ -190,7 +190,7 @@ docker run --rm --env-file .env fastapi-template uv run alembic upgrade head
 ```
 app/
 ├── main.py                  # App entry point
-├── config/                  # Configuration (env, logging, otel, etc.)
+├── core/                    # Core configuration (env, logging, otel, etc.)
 ├── features/users/          # User domain logic
 ├── migrations/              # Alembic migrations
 uv.lock, pyproject.toml      # Dependency definitions

@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.openapi.utils import get_openapi
 from starlette.routing import BaseRoute
 
-from app.config.exceptions import ServiceException
+from app.core.exceptions import ServiceException
 
 router = APIRouter()
 

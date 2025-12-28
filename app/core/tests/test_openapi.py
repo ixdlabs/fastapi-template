@@ -5,8 +5,8 @@ from fastapi.openapi.utils import get_openapi
 import pytest
 
 from fastapi.testclient import TestClient
-from app.config import openapi
-from app.config.exceptions import ServiceException, raises
+from app.core import openapi
+from app.core.exceptions import ServiceException, raises
 from app.main import app
 from pytest import MonkeyPatch
 
@@ -121,6 +121,6 @@ def test_custom_openapi_builder_calls_add_service_exception_documentation(monkey
     assert get_items() == "items"
 
     spy = MagicMock()
-    monkeypatch.setattr("app.config.openapi.add_service_exception_documentation", spy)
+    monkeypatch.setattr("app.core.openapi.add_service_exception_documentation", spy)
     _ = openapi.custom(test_app)()
     spy.assert_called_once()

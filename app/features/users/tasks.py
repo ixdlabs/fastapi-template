@@ -2,10 +2,10 @@ import logging
 import uuid
 
 from pydantic import BaseModel
-from app.config.auth import AuthUser
-from app.config.background import TaskRegistry
-from app.config.database import get_db
-from app.config.settings import get_settings
+from app.core.auth import AuthUser
+from app.core.background import TaskRegistry
+from app.core.database import get_db
+from app.core.settings import get_settings
 from app.features.users.services.tasks.send_email_verification import (
     SendEmailVerificationInput,
     send_email_verification,

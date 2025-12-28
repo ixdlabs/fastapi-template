@@ -4,12 +4,12 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from app.config.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
-from app.config.cache import CacheDep
-from app.config.database import DbDep
-from app.config.exceptions import raises
-from app.config.pagination import Page, paginate
-from app.config.rate_limit import RateLimitExceededException, rate_limit
+from app.core.auth import AuthenticationFailedException, AuthorizationFailedException, CurrentAdminDep
+from app.core.cache import CacheDep
+from app.core.database import DbDep
+from app.core.exceptions import raises
+from app.core.pagination import Page, paginate
+from app.core.rate_limit import RateLimitExceededException, rate_limit
 from app.features.users.models.user import UserType, User
 
 

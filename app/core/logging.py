@@ -8,7 +8,7 @@ The `setup_logging` function will be called from various entry points (e.g., ser
 import logging
 import logging.config
 
-from app.config.settings import Settings
+from app.core.settings import Settings
 
 
 def setup_logging(settings: Settings):

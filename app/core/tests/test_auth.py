@@ -5,7 +5,7 @@ import pytest_asyncio
 from fastapi.security import SecurityScopes
 import time_machine
 
-from app.config.auth import (
+from app.core.auth import (
     AuthUser,
     AuthException,
     AuthenticationFailedException,
@@ -13,8 +13,8 @@ from app.config.auth import (
     get_current_user,
     get_authenticator,
 )
-from app.config.auth import Authenticator
-from app.config.settings import Settings
+from app.core.auth import Authenticator
+from app.core.settings import Settings
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
