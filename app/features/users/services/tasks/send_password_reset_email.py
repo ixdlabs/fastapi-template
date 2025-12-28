@@ -45,7 +45,7 @@ async def send_password_reset_email(
     Sends a password reset email to the user by creating a new password reset action.
     This invalidates any existing pending password reset actions for the user.
     """
-    logger.info("Task initiated by runner_id=%s", current_user.id)
+    logger.info("Task running in worker=%s", current_user.worker_id)
 
     # Invalidate existing pending password reset actions
     update_stmt = (

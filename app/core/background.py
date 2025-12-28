@@ -11,7 +11,7 @@ import uuid
 from fastapi.dependencies.utils import get_typed_signature
 
 from celery import shared_task
-
+from celery.app.task import Context
 from celery.app.task import Task as CeleryTask
 
 from pydantic import BaseModel
@@ -81,21 +81,21 @@ class TaskRegistry:
         assert task_input_param is not None and issubclass(task_input_param.annotation, BaseModel)
 
         # Async function that wraps the original function to handle dependency injection
-        async def async_func(raw_task_input: str, **kwargs: object) -> str:
+        async def async_func(ctx: Context, raw_task_input: str, **kwargs: object) -> str:
             settings = self.worker_get_settings()
             settings = get_settings()
             async for db in self.worker_get_db_session(settings):
-                current_user = AuthUser(id=uuid.uuid4(), type="task_runner")
+                current_user = AuthUser(id=uuid.uuid4(), type="task_runner", worker_id=ctx.id)
                 input_model: type[InT] = task_input_param.annotation
                 task_input = input_model.model_validate_json(raw_task_input)
-                result = run_as_sync(func, task_input, db=db, settings=settings, current_user=current_user)
+                result = await func(task_input, db=db, settings=settings, current_user=current_user)
                 return result.model_dump_json()
             raise RuntimeError("Failed to get database session for background task")
 
         # Wrapper function to convert async function to sync for Celery
         @functools.wraps(func)
-        def wrapper(raw_task_input: str, **kwargs: object) -> str:
-            return run_as_sync(async_func, raw_task_input, **kwargs)
+        def wrapper(self: "CeleryTask[[str], str]", raw_task_input: str, **kwargs: object) -> str:
+            return run_as_sync(async_func, self.request, raw_task_input, **kwargs)
 
         # If the schedule is provided, add it to the beat schedule
         # This will be picked up by Celery Beat to schedule periodic tasks
@@ -106,7 +106,7 @@ class TaskRegistry:
         # We do not use overrides here because overrides are meant for celery workers
         # But this will be called in the FastAPI context, we can directly get settings via dependency injection
         def task_factory(app_settings: SettingsDep) -> BackgroundTask:
-            task = shared_task(name=task_name)(wrapper)
+            task = shared_task(name=task_name, bind=True)(wrapper)
             return BackgroundTask(celery_task=task, settings=app_settings)
 
         return task_factory

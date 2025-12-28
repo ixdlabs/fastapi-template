@@ -32,6 +32,7 @@ class AuthUser(BaseModel):
     username: str | None = None
     first_name: str | None = None
     last_name: str | None = None
+    worker_id: str | None = None
 
 
 class AuthException(BaseException):

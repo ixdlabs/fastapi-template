@@ -45,7 +45,7 @@ async def send_email_verification(
     Sends an email verification email to the user by creating a new email verification action.
     This invalidates any existing pending email verification actions for the user.
     """
-    logger.info("Task initiated by runner_id=%s", current_user.id)
+    logger.info("Task running in worker=%s", current_user.worker_id)
 
     # Invalidate existing pending email verification actions
     update_stmt = (
