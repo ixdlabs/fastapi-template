@@ -98,8 +98,8 @@ def test_raises_decorator_attaches_exception_metadata_to_function():
         return 123
 
     assert foo() == 123
-    assert hasattr(foo, "__raises__")
-    raises_value = getattr(foo, "__raises__")
+    assert hasattr(foo, "__raised_service_exceptions")
+    raises_value = getattr(foo, "__raised_service_exceptions")
     assert isinstance(raises_value, dict)
     assert status.HTTP_400_BAD_REQUEST in raises_value
     assert raises_value[status.HTTP_400_BAD_REQUEST] == [Sample400Exception]
@@ -112,7 +112,7 @@ def test_raises_decorator_accumulates_multiple_status_codes():
         return 123
 
     assert foo() == 123
-    raises_value = getattr(foo, "__raises__")
+    raises_value = getattr(foo, "__raised_service_exceptions")
     assert isinstance(raises_value, dict)
     assert set(raises_value.keys()) == {status.HTTP_400_BAD_REQUEST, status.HTTP_404_NOT_FOUND}
 

@@ -72,7 +72,9 @@ def custom(app: FastAPI):
         for route in app.routes:
             if getattr(route, "include_in_schema", None):
                 endpoint = getattr(route, "endpoint")
-                raises: dict[int, list[type[ServiceException] | None]] = getattr(endpoint, "__raises__", {})
+                raises: dict[int, list[type[ServiceException] | None]] = getattr(
+                    endpoint, "__raised_service_exceptions", {}
+                )
                 for status_code, exceptions in raises.items():
                     exceptions = [exc for exc in exceptions if exc is not None]
                     add_service_exception_documentation(route, openapi_schema, status_code, exceptions)

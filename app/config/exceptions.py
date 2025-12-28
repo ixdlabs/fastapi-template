@@ -88,9 +88,11 @@ def raises(exc: type[ServiceException]):
     """Decorator to collect possible HTTP exceptions for documentation."""
 
     def wrapper(func: Callable[P, R]) -> Callable[P, R]:
-        raising_causes: dict[int, list[type[ServiceException]]] = getattr(func, "__raises__", defaultdict(list))
+        raising_causes: dict[int, list[type[ServiceException]]] = getattr(
+            func, "__raised_service_exceptions", defaultdict(list)
+        )
         raising_causes[exc.status_code].append(exc)
-        setattr(func, "__raises__", raising_causes)
+        setattr(func, "__raised_service_exceptions", raising_causes)
         return func
 
     return wrapper
