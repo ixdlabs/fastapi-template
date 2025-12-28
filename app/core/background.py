@@ -83,7 +83,6 @@ class TaskRegistry:
         # Async function that wraps the original function to handle dependency injection
         async def async_func(ctx: Context, raw_task_input: str, **kwargs: object) -> str:
             settings = self.worker_get_settings()
-            settings = get_settings()
             async for db in self.worker_get_db_session(settings):
                 current_user = AuthUser(id=uuid.uuid4(), type="task_runner", worker_id=ctx.id)
                 input_model: type[InT] = task_input_param.annotation

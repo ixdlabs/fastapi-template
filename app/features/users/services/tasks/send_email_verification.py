@@ -39,7 +39,12 @@ class SendEmailVerificationOutput(BaseModel):
 
 @router.post("/send-email-verification")
 async def send_email_verification(
-    task_input: SendEmailVerificationInput, db: DbDep, settings: SettingsDep, current_user: CurrentTaskRunnerDep
+    task_input: SendEmailVerificationInput,
+    *,
+    db: DbDep,
+    settings: SettingsDep,
+    current_user: CurrentTaskRunnerDep,
+    **kwargs: object,
 ) -> SendEmailVerificationOutput:
     """
     Sends an email verification email to the user by creating a new email verification action.

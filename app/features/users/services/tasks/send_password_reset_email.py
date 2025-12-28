@@ -39,7 +39,12 @@ class SendPasswordResetOutput(BaseModel):
 
 @router.post("/send-password-reset-email")
 async def send_password_reset_email(
-    task_input: SendPasswordResetInput, current_user: CurrentTaskRunnerDep, settings: SettingsDep, db: DbDep
+    task_input: SendPasswordResetInput,
+    *,
+    current_user: CurrentTaskRunnerDep,
+    settings: SettingsDep,
+    db: DbDep,
+    **kwargs: object,
 ) -> SendPasswordResetOutput:
     """
     Sends a password reset email to the user by creating a new password reset action.

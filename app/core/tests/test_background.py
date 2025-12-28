@@ -1,8 +1,10 @@
 from unittest.mock import MagicMock
 from pydantic import BaseModel
 import pytest
+from app.core.auth import CurrentTaskRunnerDep
 from app.core.background import BackgroundTask, TaskRegistry
-from app.core.settings import Settings
+from app.core.database import DbDep
+from app.core.settings import Settings, SettingsDep
 
 
 class InputModel(BaseModel):
@@ -104,3 +106,34 @@ async def test_task_factory_submission_executes_task(task_registry_fixture: Task
     result = background_task.celery_task(input_model.model_dump_json())
     output_model = OutputModel.model_validate_json(result)
     assert output_model.result == 10
+
+
+@pytest.mark.asyncio
+async def test_task_with_dependencies_execution(
+    task_registry_fixture: TaskRegistry, settings_fixture: Settings, db_fixture: DbDep
+):
+    called_current_user: list[CurrentTaskRunnerDep] = []
+    called_db: list[DbDep] = []
+    called_settings: list[Settings] = []
+
+    async def sample_endpoint(
+        task_input: InputModel, current_user: CurrentTaskRunnerDep, db: DbDep, settings: SettingsDep
+    ) -> OutputModel:
+        nonlocal called_current_user, called_db, called_settings
+        called_current_user.append(current_user)
+        called_db.append(db)
+        called_settings.append(settings)
+        return OutputModel(result=task_input.value * 2)
+
+    factory = task_registry_fixture.register_background_task(sample_endpoint)
+    background_task = factory(settings_fixture)
+
+    input_model = InputModel(value=5)
+    result = background_task.celery_task(input_model.model_dump_json())
+    output_model = OutputModel.model_validate_json(result)
+    assert output_model.result == 10
+    assert len(called_current_user) == 1
+    assert len(called_db) == 1
+    assert len(called_settings) == 1
+    assert called_db[0] is db_fixture
+    assert called_settings[0] is settings_fixture
