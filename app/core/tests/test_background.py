@@ -117,7 +117,12 @@ async def test_task_with_dependencies_execution(
     called_settings: list[Settings] = []
 
     async def sample_endpoint(
-        task_input: InputModel, current_user: CurrentTaskRunnerDep, db: DbDep, settings: SettingsDep
+        task_input: InputModel,
+        *,
+        current_user: CurrentTaskRunnerDep,
+        db: DbDep,
+        settings: SettingsDep,
+        **kwargs: object,
     ) -> OutputModel:
         nonlocal called_current_user, called_db, called_settings
         called_current_user.append(current_user)

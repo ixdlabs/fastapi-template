@@ -1,7 +1,6 @@
 import logging
 from pathlib import Path
 from unittest.mock import MagicMock
-import uuid
 import pytest
 import pytest_asyncio
 from sqlalchemy import pool
@@ -37,6 +36,9 @@ def settings_fixture():
         database_url="",
         celery_task_always_eager=True,
         logger_name="console",
+        email_sender_type="local",
+        email_verification_expiration_minutes=30,
+        password_reset_expiration_minutes=45,
     )
 
 
@@ -194,8 +196,3 @@ async def authenticated_admin_fixture(db_fixture: AsyncSession):
 
     yield user
     del app.dependency_overrides[get_current_user]
-
-
-@pytest_asyncio.fixture(scope="function")
-async def authenticated_task_runner_fixture():
-    return AuthUser(id=uuid.uuid4(), type="task_runner")

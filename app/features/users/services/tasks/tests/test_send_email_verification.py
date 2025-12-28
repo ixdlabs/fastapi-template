@@ -5,24 +5,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthUser
-from app.core.settings import Settings
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
-from app.features.users.services.tasks.send_email_verification import (
-    SendEmailVerificationInput,
-    send_email_verification,
-)
+from fastapi.testclient import TestClient
 
+from app.main import app
 
-def fake_settings():
-    return Settings.model_construct(email_verification_expiration_minutes=30)
-
+client = TestClient(app)
+url = "/api/v1/tasks/users/send-email-verification"
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_send_email_verification_creates_action_and_invalidates_previous(
-    db_fixture: AsyncSession, authenticated_task_runner_fixture: AuthUser
+    db_fixture: AsyncSession, authenticated_admin_fixture: AuthUser
 ):
     user_id = uuid.uuid4()
     email = "new@example.com"
@@ -41,15 +37,10 @@ async def test_send_email_verification_creates_action_and_invalidates_previous(
     await db_fixture.commit()
     await db_fixture.refresh(old_action)
 
-    task_input = SendEmailVerificationInput(user_id=user_id, email=email)
     before_call = datetime.now(timezone.utc)
-
-    _ = await send_email_verification(
-        current_user=authenticated_task_runner_fixture,
-        task_input=task_input,
-        settings=fake_settings(),
-        db=db_fixture,
-    )
+    payload = {"user_id": str(user_id), "email": email}
+    response = client.post(url, json=payload)
+    assert response.status_code == 200
     after_call = datetime.now(timezone.utc)
 
     # Reload all actions for user

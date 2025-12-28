@@ -9,6 +9,7 @@ from sqlalchemy import update
 from app.core.auth import CurrentTaskRunnerDep
 from app.core.background import BackgroundTask, TaskRegistry
 from app.core.database import DbDep
+from app.core.email_sender import Email, EmailSenderDep
 from app.core.settings import SettingsDep
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
@@ -30,6 +31,7 @@ class SendEmailVerificationInput(BaseModel):
 class SendEmailVerificationOutput(BaseModel):
     detail: str = "Email verification sent successfully."
     action_id: uuid.UUID
+    message_id: str
     token: str
 
 
@@ -44,7 +46,7 @@ async def send_email_verification(
     db: DbDep,
     settings: SettingsDep,
     current_user: CurrentTaskRunnerDep,
-    **kwargs: object,
+    email_sender: EmailSenderDep,
 ) -> SendEmailVerificationOutput:
     """
     Sends an email verification email to the user by creating a new email verification action.
@@ -77,9 +79,36 @@ async def send_email_verification(
     await db.commit()
     await db.refresh(action)
 
-    logger.info("Sending email verification, action_id=%s, token=%s", action.id, token)
-    return SendEmailVerificationOutput(action_id=action.id, token=token)
+    message_id = await email_sender.send_email(
+        Email(
+            sender=settings.email_sender_address,
+            receivers=[task_input.email],
+            subject="Verify your email address",
+            body_html_template=EMAIL_VERIFICATION_HTML_TEMPLATE,
+            body_text_template=EMAIL_VERIFICATION_TEXT_TEMPLATE,
+            template_data={"token": token},
+        )
+    )
+
+    logger.info("Sent email verification, action_id=%s,  message_id=%s, token=%s", action.id, message_id, token)
+    return SendEmailVerificationOutput(action_id=action.id, token=token, message_id=message_id)
 
 
 send_email_verification_task = registry.register_background_task(send_email_verification)
 SendEmailVerificationTaskDep = Annotated[BackgroundTask, Depends(send_email_verification_task)]
+
+
+# Templates
+# ----------------------------------------------------------------------------------------------------------------------
+
+EMAIL_VERIFICATION_HTML_TEMPLATE = """
+<html>
+    <body>
+        <p>Please verify your email address by clicking the link below:</p>
+        <a href="https://example.com/verify-email?token={token}">Verify Email</a>
+    </body>
+</html>
+"""
+EMAIL_VERIFICATION_TEXT_TEMPLATE = """
+Please verify your email address by visiting the following link: https://example.com/verify-email?token={token}
+"""

@@ -8,7 +8,7 @@ Fast API Docs: https://fastapi.tiangolo.com/advanced/settings
 """
 
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     otel_exporter_otlp_endpoint: str = ""
     otel_exporter_otlp_insecure: bool = False
     otel_exporter_otlp_headers: str = ""
+
+    email_sender_type: Literal["local", "smtp"] = "local"
+    email_smtp_host: str = "localhost"
+    email_smtp_port: int = 25
+    email_smtp_username: str | None = None
+    email_smtp_password: str | None = None
+    email_smtp_use_tls: bool = False
+    email_smtp_use_ssl: bool = False
+    email_sender_address: str = "from@example.com"
 
     model_config = SettingsConfigDict(env_file=".env")
 

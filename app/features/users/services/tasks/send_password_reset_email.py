@@ -9,6 +9,7 @@ from sqlalchemy import update
 from app.core.auth import CurrentTaskRunnerDep
 from app.core.background import BackgroundTask, TaskRegistry
 from app.core.database import DbDep
+from app.core.email_sender import Email, EmailSenderDep
 from app.core.settings import SettingsDep
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
@@ -30,6 +31,7 @@ class SendPasswordResetInput(BaseModel):
 class SendPasswordResetOutput(BaseModel):
     detail: str = "Password reset email sent successfully."
     action_id: uuid.UUID
+    message_id: str
     token: str
 
 
@@ -44,7 +46,7 @@ async def send_password_reset_email(
     current_user: CurrentTaskRunnerDep,
     settings: SettingsDep,
     db: DbDep,
-    **kwargs: object,
+    email_sender: EmailSenderDep,
 ) -> SendPasswordResetOutput:
     """
     Sends a password reset email to the user by creating a new password reset action.
@@ -72,9 +74,36 @@ async def send_password_reset_email(
     await db.commit()
     await db.refresh(action)
 
-    logger.info("Sending password reset email, action_id=%s, token=%s", action.id, token)
-    return SendPasswordResetOutput(action_id=action.id, token=token)
+    message_id = await email_sender.send_email(
+        Email(
+            sender=settings.email_sender_address,
+            receivers=[task_input.email],
+            subject="Verify your email address",
+            body_html_template=EMAIL_VERIFICATION_HTML_TEMPLATE,
+            body_text_template=EMAIL_VERIFICATION_TEXT_TEMPLATE,
+            template_data={"token": token},
+        )
+    )
+
+    logger.info("Sending password reset email, action_id=%s, message_id=%s, token=%s", action.id, message_id, token)
+    return SendPasswordResetOutput(action_id=action.id, message_id=message_id, token=token)
 
 
 send_password_reset_email_task = registry.register_background_task(send_password_reset_email)
 SendPasswordResetTaskDep = Annotated[BackgroundTask, Depends(send_password_reset_email_task)]
+
+
+# Templates
+# ----------------------------------------------------------------------------------------------------------------------
+
+EMAIL_VERIFICATION_HTML_TEMPLATE = """
+<html>
+    <body>
+        <p>Please verify your email address by clicking the link below:</p>
+        <a href="https://example.com/verify-email?token={token}">Verify Email</a>
+    </body>
+</html>
+"""
+EMAIL_VERIFICATION_TEXT_TEMPLATE = """
+Please verify your email address by visiting the following link:https://example.com/verify-email?token={token}
+"""

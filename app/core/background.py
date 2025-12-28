@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthUser, CurrentTaskRunnerDep
 from app.core.database import DbDep, get_worker_db_session
+from app.core.email_sender import EmailSenderDep, get_email_sender
 from app.core.helpers import run_as_sync
 from app.core.settings import Settings, SettingsDep, get_settings
 
@@ -52,7 +53,13 @@ class TaskRegistryBackgroundTask[InT: BaseModel, OutT: BaseModel](Protocol):
     __name__: str
 
     def __call__(
-        self, task_input: InT, *, db: DbDep, settings: SettingsDep, current_user: CurrentTaskRunnerDep
+        self,
+        task_input: InT,
+        *,
+        db: DbDep,
+        settings: SettingsDep,
+        current_user: CurrentTaskRunnerDep,
+        email_sender: EmailSenderDep,
     ) -> Coroutine[object, object, OutT]: ...
 
 
@@ -83,11 +90,14 @@ class TaskRegistry:
         # Async function that wraps the original function to handle dependency injection
         async def async_func(ctx: Context, raw_task_input: str, **kwargs: object) -> str:
             settings = self.worker_get_settings()
+            email_sender = get_email_sender(settings)
             async for db in self.worker_get_db_session(settings):
                 current_user = AuthUser(id=uuid.uuid4(), type="task_runner", worker_id=ctx.id)
                 input_model: type[InT] = task_input_param.annotation
                 task_input = input_model.model_validate_json(raw_task_input)
-                result = await func(task_input, db=db, settings=settings, current_user=current_user)
+                result = await func(
+                    task_input, db=db, settings=settings, current_user=current_user, email_sender=email_sender
+                )
                 return result.model_dump_json()
             raise RuntimeError("Failed to get database session for background task")
 
