@@ -1,6 +1,8 @@
 from inspect import Parameter, Signature
 
-from app.core.helpers import inspect_augment_signature, inspect_locate_param
+import pytest
+
+from app.core.helpers import inspect_augment_signature, inspect_locate_param, run_as_sync
 
 # Tests for inspect_augment_signature
 # ----------------------------------------------------------------------------------------------------------------------
@@ -48,7 +50,7 @@ def test_inspect_augment_signature_multiple_var_keyword_preserved():
     sig = Signature(
         parameters=[
             Parameter("a", kind=Parameter.POSITIONAL_OR_KEYWORD),
-            Parameter("kwargs1", kind=Parameter.VAR_KEYWORD),
+            Parameter("kwargs1", kind=Parameter.POSITIONAL_OR_KEYWORD),
             Parameter("kwargs2", kind=Parameter.VAR_KEYWORD),
         ]
     )
@@ -108,3 +110,37 @@ def test_inspect_locate_param_ignores_name_and_matches_only_annotation():
 
     assert result is existing
     assert to_inject == []
+
+
+# Tests for run_as_sync
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+# Tests for TaskRegistry
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def test_background_task_runs_synchronously_when_event_loop_missing():
+    async def sample_task(x: int, y: int) -> int:
+        return x + y
+
+    result = run_as_sync(sample_task, 2, 3)
+    assert result == 5
+
+
+@pytest.mark.asyncio
+async def test_background_task_runs_as_coroutine_when_event_loop_present():
+    async def sample_task(x: int, y: int) -> int:
+        return x + y
+
+    result = run_as_sync(sample_task, 4, 5)
+    assert result == 9
+
+
+@pytest.mark.asyncio
+async def test_background_task_propagates_errors_from_wrapped_coroutine():
+    async def error_task():
+        raise ValueError("Intentional error")
+
+    with pytest.raises(ValueError, match="Intentional error"):
+        run_as_sync(error_task)

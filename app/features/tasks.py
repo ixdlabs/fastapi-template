@@ -1,5 +1,5 @@
 from app.core.background import TaskRegistry
-from app.features.users.tasks import user_task_registry
+from app.features.users.tasks import user_registry
 
-task_registry = TaskRegistry()
-task_registry.include_registry(user_task_registry)
+registry = TaskRegistry()
+registry.include_registry(user_registry)

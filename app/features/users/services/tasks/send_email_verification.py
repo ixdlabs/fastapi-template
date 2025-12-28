@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta, timezone
 import logging
+from typing import Annotated
 import uuid
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
 from app.core.auth import CurrentTaskRunnerDep
+from app.core.background import BackgroundTask, TaskRegistry
 from app.core.database import DbDep
 from app.core.settings import SettingsDep
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
@@ -13,6 +15,7 @@ from app.features.users.models.user_action import UserAction, UserActionState, U
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+registry = TaskRegistry()
 
 
 # Input/Output
@@ -34,9 +37,9 @@ class SendEmailVerificationOutput(BaseModel):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@router.post("/send-email-verification-email")
+@router.post("/send-email-verification")
 async def send_email_verification(
-    task_input: SendEmailVerificationInput, current_user: CurrentTaskRunnerDep, settings: SettingsDep, db: DbDep
+    task_input: SendEmailVerificationInput, db: DbDep, settings: SettingsDep, current_user: CurrentTaskRunnerDep
 ) -> SendEmailVerificationOutput:
     """
     Sends an email verification email to the user by creating a new email verification action.
@@ -71,3 +74,7 @@ async def send_email_verification(
 
     logger.info("Sending email verification, action_id=%s, token=%s", action.id, token)
     return SendEmailVerificationOutput(action_id=action.id, token=token)
+
+
+send_email_verification_task = registry.register_background_task(send_email_verification)
+SendEmailVerificationTaskDep = Annotated[BackgroundTask, Depends(send_email_verification_task)]

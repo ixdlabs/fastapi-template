@@ -1,127 +1,106 @@
 from unittest.mock import MagicMock
+from pydantic import BaseModel
 import pytest
-from app.core.background import Background, TaskRegistry, get_background
+from app.core.background import BackgroundTask, TaskRegistry
 from app.core.settings import Settings
-from celery import Task as CeleryTask
-from pytest import MonkeyPatch
 
 
-# Tests for Background
+class InputModel(BaseModel):
+    value: int
+
+
+class OutputModel(BaseModel):
+    result: int
+
+
+async def sample_task(task_input: InputModel, **kwargs: object) -> OutputModel:
+    return OutputModel(result=task_input.value)
+
+
+# Background Tasks
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_get_background_returns_configured_background_instance(settings_fixture: Settings):
-    background = get_background(settings_fixture)
-    assert isinstance(background, Background)
+def test_register_background_task_returns_factory(task_registry_fixture: TaskRegistry):
+    factory = task_registry_fixture.register_background_task(sample_task)
+    assert callable(factory)
+
+
+def test_register_background_task_adds_beat_schedule(task_registry_fixture: TaskRegistry):
+    _ = task_registry_fixture.register_background_task(sample_task, schedule=60)
+
+    assert "sample_task" in task_registry_fixture.beat_schedule
+    assert task_registry_fixture.beat_schedule["sample_task"]["schedule"] == 60
+    assert isinstance(task_registry_fixture.beat_schedule["sample_task"]["task"], str)
+    assert task_registry_fixture.beat_schedule["sample_task"]["task"].endswith("sample_task")
+
+
+def test_task_factory_creates_background_task(
+    celery_background_fixture: MagicMock, task_registry_fixture: TaskRegistry, settings_fixture: Settings
+):
+    factory = task_registry_fixture.register_background_task(sample_task)
+    background_task = factory(settings_fixture)
+
+    assert isinstance(background_task, BackgroundTask)
+    assert background_task.celery_task is celery_background_fixture
+    assert background_task.settings is settings_fixture
 
 
 @pytest.mark.asyncio
-async def test_submit_raises_value_error_for_non_celery_task(settings_fixture: Settings):
-    bg = Background(settings_fixture)
+async def test_background_task_submit_calls_celery_apply_async(
+    celery_background_fixture: MagicMock, task_registry_fixture: TaskRegistry, settings_fixture: Settings
+):
+    factory = task_registry_fixture.register_background_task(sample_task)
+    background_task = factory(settings_fixture)
 
-    async def not_a_task():
-        return 42
+    input_model = InputModel(value=42)
+    await background_task.submit(input_model)
 
-    assert await not_a_task() == 42
-    with pytest.raises(ValueError, match="Function must be a Celery task"):
-        await bg.submit(not_a_task)
-
-
-@pytest.mark.asyncio
-async def test_submit_delegates_apply_async_with_args_and_kwargs(settings_fixture: Settings, monkeypatch: MonkeyPatch):
-    bg = Background(settings_fixture)
-
-    task = MagicMock(spec=CeleryTask)
-    task.apply_async = MagicMock()
-
-    await bg.submit(task, 1, 2, foo="bar")
-
-    task.apply_async.assert_called_once_with(
-        args=(1, 2),
-        kwargs={"foo": "bar"},
-    )
+    celery_background_fixture.apply_async.assert_called_once()
+    _, kwargs = celery_background_fixture.apply_async.call_args
+    assert kwargs == {"args": (input_model.model_dump_json(),)}
 
 
-# Tests for TaskRegistry
+# Task Registry
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_background_task_runs_synchronously_when_event_loop_missing():
+def test_task_registry_initialization():
     registry = TaskRegistry()
+    assert registry.beat_schedule == {}
+    assert callable(registry.worker_get_settings)
+    assert callable(registry.worker_get_db_session)
 
-    @registry.background_task("test_task")
-    async def sample_task(x: int, y: int) -> int:
-        return x + y
 
-    result = sample_task(2, 3)
-    assert result == 5
+def test_task_registry_register_background_task():
+    registry = TaskRegistry()
+    factory = registry.register_background_task(sample_task, schedule=120)
+
+    assert callable(factory)
+    assert "sample_task" in registry.beat_schedule
+    assert registry.beat_schedule["sample_task"]["schedule"] == 120
+    assert isinstance(registry.beat_schedule["sample_task"]["task"], str)
+    assert registry.beat_schedule["sample_task"]["task"].endswith("sample_task")
+
+
+def test_task_registry_register_background_task_without_schedule():
+    registry = TaskRegistry()
+    factory = registry.register_background_task(sample_task)
+
+    assert callable(factory)
+    assert "sample_task" not in registry.beat_schedule
+
+
+# Background Task Execution
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_background_task_runs_as_coroutine_when_event_loop_present():
-    registry = TaskRegistry()
+async def test_task_factory_submission_executes_task(task_registry_fixture: TaskRegistry, settings_fixture: Settings):
+    factory = task_registry_fixture.register_background_task(sample_task)
+    background_task = factory(settings_fixture)
 
-    @registry.background_task("test_task_1")
-    async def sample_task(x: int, y: int) -> int:
-        return x + y
-
-    result = sample_task(4, 5)
-    assert result == 9
-
-
-@pytest.mark.asyncio
-async def test_background_task_propagates_errors_from_wrapped_coroutine():
-    registry = TaskRegistry()
-
-    @registry.background_task("test_task_error")
-    async def error_task():
-        raise ValueError("Intentional error")
-
-    with pytest.raises(ValueError, match="Intentional error"):
-        error_task()
-
-
-def test_background_task_with_schedule_registers_beat_entry():
-    registry = TaskRegistry()
-
-    @registry.background_task("test_task_2", schedule=120)
-    async def scheduled_task():
-        return 123
-
-    assert scheduled_task() == 123
-    assert "test_task_2" in registry.beat_schedule
-    schedule_entry = registry.beat_schedule["test_task_2"]
-    assert schedule_entry["schedule"] == 120
-
-
-def test_background_task_without_schedule_skips_beat_registration():
-    registry = TaskRegistry()
-
-    @registry.background_task("test_task_3")
-    async def unscheduled_task():
-        return 123
-
-    assert unscheduled_task() == 123
-    assert "test_task_3" not in registry.beat_schedule
-
-
-def test_include_registry_merges_beat_schedules_from_other_registry():
-    registry1 = TaskRegistry()
-    registry2 = TaskRegistry()
-
-    @registry1.background_task("test_task_a", schedule=60)
-    async def task_a():
-        return "a"
-
-    @registry2.background_task("test_task_b", schedule=120)
-    async def task_b():
-        return "b"
-
-    registry1.include_registry(registry2)
-
-    assert task_a() == "a"
-    assert task_b() == "b"
-    assert "test_task_a" in registry1.beat_schedule
-    assert "test_task_b" in registry1.beat_schedule
-    assert registry1.beat_schedule["test_task_a"]["schedule"] == 60
-    assert registry1.beat_schedule["test_task_b"]["schedule"] == 120
+    input_model = InputModel(value=10)
+    result = background_task.celery_task(input_model.model_dump_json())
+    output_model = OutputModel.model_validate_json(result)
+    assert output_model.result == 10

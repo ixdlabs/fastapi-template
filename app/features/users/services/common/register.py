@@ -6,12 +6,13 @@ from sqlalchemy import select
 
 from app.core.audit_log import AuditLoggerDep
 from app.core.auth import AuthenticatorDep
-from app.core.background import BackgroundDep
 from app.core.database import DbDep
 from app.core.exceptions import ServiceException, raises
 from app.features.users.models.user import User, UserType
-from app.features.users.services.tasks.send_email_verification import SendEmailVerificationInput
-from app.features.users.tasks import send_email_verification_task
+from app.features.users.services.tasks.send_email_verification import (
+    SendEmailVerificationInput,
+    SendEmailVerificationTaskDep,
+)
 
 
 router = APIRouter()
@@ -71,8 +72,8 @@ async def register(
     form: RegisterInput,
     db: DbDep,
     authenticator: AuthenticatorDep,
-    background: BackgroundDep,
     audit_logger: AuditLoggerDep,
+    send_email_verification_task: SendEmailVerificationTaskDep,
 ) -> RegisterOutput:
     """
     Register a new user and return access and refresh tokens.
@@ -114,7 +115,7 @@ async def register(
     # Send email verification if email provided
     if form.email is not None:
         task_input = SendEmailVerificationInput(user_id=user.id, email=form.email)
-        await background.submit(send_email_verification_task, task_input.model_dump_json())
+        await send_email_verification_task.submit(task_input)
 
     # Generate tokens and return response
     access_token, refresh_token = authenticator.encode(user)

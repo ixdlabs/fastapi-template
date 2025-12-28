@@ -3,11 +3,9 @@ from fastapi import APIRouter
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 
-from app.core.background import BackgroundDep
 from app.core.database import DbDep
 from app.features.users.models.user import User
-from app.features.users.services.tasks.send_password_reset_email import SendPasswordResetInput
-from app.features.users.tasks import send_password_reset_email_task
+from app.features.users.services.tasks.send_password_reset_email import SendPasswordResetInput, SendPasswordResetTaskDep
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -30,7 +28,9 @@ class ResetPasswordOutput(BaseModel):
 
 
 @router.post("/reset-password")
-async def reset_password(form: ResetPasswordInput, db: DbDep, background: BackgroundDep) -> ResetPasswordOutput:
+async def reset_password(
+    form: ResetPasswordInput, db: DbDep, send_password_reset_task: SendPasswordResetTaskDep
+) -> ResetPasswordOutput:
     """
     Initiate a password reset by sending a reset email to the user's email address.
     If the email does not exist, the response is the same to avoid disclosing user existence.
@@ -46,6 +46,6 @@ async def reset_password(form: ResetPasswordInput, db: DbDep, background: Backgr
 
     # Submit background task
     task_input = SendPasswordResetInput(user_id=user.id, email=form.email)
-    await background.submit(send_password_reset_email_task, task_input.model_dump_json())
+    await send_password_reset_task.submit(task_input)
     logger.info("Password reset email task submitted", extra={"user_id": str(user.id), "email": form.email})
     return ResetPasswordOutput()

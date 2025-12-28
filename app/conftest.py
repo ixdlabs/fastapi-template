@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from unittest.mock import MagicMock
 import uuid
 import pytest
 import pytest_asyncio
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 from alembic import command, config
 
 from app.core.auth import AuthUser, Authenticator, get_authenticator, get_current_user
-from app.core.background import Background, NoOpTaskTrackingBackground, get_background
+from app.core.background import TaskRegistry
 from app.core.cache import get_cache_backend
 from app.core.database import get_db_session
 from app.core.logging import setup_logging
@@ -93,15 +94,6 @@ def authenticator_fixture(settings_fixture: Settings):
     return Authenticator(settings_fixture)
 
 
-# Background task runner for tests that does not actually run tasks
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="function")
-def background_fixture(settings_fixture: Settings):
-    return NoOpTaskTrackingBackground(settings_fixture)
-
-
 # Rate limiting strategy for tests using in-memory storage
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -130,20 +122,42 @@ def cache_backend_fixture():
 def override_dependencies(
     db_fixture: AsyncSession,
     settings_fixture: Settings,
-    background_fixture: Background,
     rate_limit_strategy_fixture: RateLimiter,
     cache_backend_fixture: BaseCache,
     authenticator_fixture: Authenticator,
 ):
     app.dependency_overrides[get_db_session] = lambda: db_fixture
     app.dependency_overrides[get_settings] = lambda: settings_fixture
-    app.dependency_overrides[get_background] = lambda: background_fixture
     app.dependency_overrides[get_rate_limit_strategy] = lambda: rate_limit_strategy_fixture
     app.dependency_overrides[get_cache_backend] = lambda: cache_backend_fixture
     app.dependency_overrides[get_authenticator] = lambda: authenticator_fixture
 
     yield
     app.dependency_overrides.clear()
+
+
+# Dependency overrides for Task Registry
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="function", autouse=True)
+def task_registry_fixture(db_fixture: AsyncSession, settings_fixture: Settings):
+    async def worker_db_session(_: Settings):
+        yield db_fixture
+
+    registry = TaskRegistry()
+    registry.worker_get_db_session = worker_db_session
+    registry.worker_get_settings = lambda: settings_fixture
+    yield registry
+
+
+@pytest.fixture(scope="function")
+def celery_background_fixture(monkeypatch: pytest.MonkeyPatch):
+    celery_task = MagicMock()
+    celery_task.apply_async = MagicMock()
+    celery_task.return_value = celery_task
+    monkeypatch.setattr("app.core.background.shared_task", celery_task)
+    yield celery_task
 
 
 # Fake user log in for tests

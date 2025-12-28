@@ -9,7 +9,6 @@ Fast API Docs: https://fastapi.tiangolo.com/tutorial/sql-databases/
 """
 
 from collections.abc import Iterable
-from contextlib import asynccontextmanager
 from typing import Annotated
 from functools import lru_cache
 import logging
@@ -121,8 +120,7 @@ DbDep = Annotated[AsyncSession, Depends(get_db_session)]
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@asynccontextmanager
-async def get_db(settings: SettingsDep):
+async def get_worker_db_session(settings: SettingsDep):
     engine = create_db_engine(settings.database_url, debug=settings.debug, is_worker=True)
     session_maker = async_sessionmaker(engine)
     async with session_maker() as session:

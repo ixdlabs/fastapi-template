@@ -3,22 +3,24 @@ This module defines the Background class and its dependency for managing backgro
 The Background class provides a method to submit tasks to be executed asynchronously.
 """
 
-import asyncio
-from collections import defaultdict
-from collections.abc import Awaitable, Callable, Coroutine
+from collections.abc import Callable, Coroutine
 import functools
 import logging
-import threading
-from typing import Annotated, ParamSpec, TypeVar, override
-
+from typing import AsyncGenerator, ParamSpec, Protocol, TypeVar
+import uuid
+from fastapi.dependencies.utils import get_typed_signature
 
 from celery import shared_task
 
 from celery.app.task import Task as CeleryTask
 
-from fastapi import Depends
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import Settings, SettingsDep
+from app.core.auth import AuthUser, CurrentTaskRunnerDep
+from app.core.database import DbDep, get_worker_db_session
+from app.core.helpers import run_as_sync
+from app.core.settings import Settings, SettingsDep, get_settings
 
 logger = logging.getLogger(__name__)
 P = ParamSpec("P")
@@ -29,45 +31,33 @@ R = TypeVar("R")
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class Background:
-    def __init__(self, settings: Settings):
+class BackgroundTask:
+    def __init__(self, celery_task: "CeleryTask[[str], str]", settings: Settings):
         super().__init__()
         self.settings = settings
+        self.celery_task = celery_task
 
-    async def submit(self, fn: Callable[P, Awaitable[R]], *args: P.args, **kwargs: P.kwargs):
+    async def submit(self, input_model: BaseModel):
         """Submit a function to be run in the background as a Celery task."""
-        if not isinstance(fn, CeleryTask):
-            raise ValueError("Function must be a Celery task wrapped with @background_task")
-        result = fn.apply_async(args=args, kwargs=kwargs)
-        logger.info(f"Submitted background task {fn.name} with id {result.id}")
+        result = self.celery_task.apply_async(args=(input_model.model_dump_json(),))
+        logger.info(f"Submitted background task {self.celery_task.name} with id {result.id}")
 
 
-class NoOpTaskTrackingBackground(Background):
-    called_tasks: dict[str, list[tuple[tuple[object, ...], dict[str, object]]]]
-
-    def __init__(self, settings: Settings):
-        super().__init__(settings)
-        self.called_tasks = defaultdict(list)
-
-    @override
-    async def submit(self, fn: Callable[P, Awaitable[R]], *args: P.args, **kwargs: P.kwargs):
-        if fn.__name__ not in self.called_tasks:
-            self.called_tasks[fn.__name__] = []
-        self.called_tasks[fn.__name__].append((args, kwargs))
-
-
-def get_background(settings: SettingsDep):
-    return Background(settings)
-
-
-BackgroundDep = Annotated[Background, Depends(get_background)]
-
-
-# Helper to get the import string for a Celery task.
-# This will be used to register periodic tasks in the Celery beat schedule.
+# Type definition for background task functions
 # ----------------------------------------------------------------------------------------------------------------------
-# Normally, Celery tasks are synchronous functions. This utility allows defining async functions as Celery tasks.
-# Internally, it runs the async function in an event loop, either in the current thread or in a separate thread.
+
+
+class TaskRegistryBackgroundTask[InT: BaseModel, OutT: BaseModel](Protocol):
+    __module__: str
+    __name__: str
+
+    def __call__(
+        self, task_input: InT, *, db: DbDep, settings: SettingsDep, current_user: CurrentTaskRunnerDep
+    ) -> Coroutine[object, object, OutT]: ...
+
+
+# Task Registry
+# This acts similar to FastAPI's APIRouter but for background tasks.
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -75,47 +65,51 @@ class TaskRegistry:
     def __init__(self):
         super().__init__()
         self.beat_schedule: dict[str, dict[str, object]] = {}
+        self.worker_get_settings: Callable[[], SettingsDep] = get_settings
+        self.worker_get_db_session: Callable[[SettingsDep], AsyncGenerator[AsyncSession, None]] = get_worker_db_session
 
-    def _run_as_sync(self, func: Callable[P, Coroutine[R, object, R]], *args: P.args, **kwargs: P.kwargs) -> R:
-        """Converts an async function into a Celery task."""
-        try:
-            _ = asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(func(*args, **kwargs))
-
-        result_container: dict[str, R] = {}
-        error_container: dict[str, BaseException] = {}
-
-        def runner():
-            try:
-                result_container["result"] = asyncio.run(func(*args, **kwargs))
-            except BaseException as exc:
-                error_container["error"] = exc
-
-        thread = threading.Thread(target=runner, daemon=True)
-        thread.start()
-        thread.join()
-
-        if "error" in error_container:
-            raise error_container["error"]
-        return result_container["result"]
-
-    def background_task(self, name: str, *, schedule: int | None = None):
+    def register_background_task[InT: BaseModel, OutT: BaseModel](
+        self, func: TaskRegistryBackgroundTask[InT, OutT], *, schedule: int | None = None
+    ) -> Callable[[SettingsDep], BackgroundTask]:
         """Register a background task."""
+        task_name = func.__name__
+        task_full_name = f"{func.__module__}.{func.__name__}"
 
-        def decorator(func: Callable[P, Coroutine[R, object, R]]) -> Callable[P, R]:
-            @functools.wraps(func)
-            def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-                return self._run_as_sync(func, *args, **kwargs)
+        # Inspect the type of first parameter to determine input model type
+        wrapped_signature = get_typed_signature(func)
+        task_input_param = next(iter(wrapped_signature.parameters.values()), None)
+        assert task_input_param is not None and issubclass(task_input_param.annotation, BaseModel)
 
-            if schedule is not None:
-                self.beat_schedule[name] = {
-                    "task": f"{func.__module__}.{func.__name__}",
-                    "schedule": schedule,
-                }
-            return shared_task(name=name)(wrapper)
+        # Async function that wraps the original function to handle dependency injection
+        async def async_func(raw_task_input: str, **kwargs: object) -> str:
+            settings = self.worker_get_settings()
+            settings = get_settings()
+            async for db in self.worker_get_db_session(settings):
+                current_user = AuthUser(id=uuid.uuid4(), type="task_runner")
+                input_model: type[InT] = task_input_param.annotation
+                task_input = input_model.model_validate_json(raw_task_input)
+                result = run_as_sync(func, task_input, db=db, settings=settings, current_user=current_user)
+                return result.model_dump_json()
+            raise RuntimeError("Failed to get database session for background task")
 
-        return decorator
+        # Wrapper function to convert async function to sync for Celery
+        @functools.wraps(func)
+        def wrapper(raw_task_input: str, **kwargs: object) -> str:
+            return run_as_sync(async_func, raw_task_input, **kwargs)
+
+        # If the schedule is provided, add it to the beat schedule
+        # This will be picked up by Celery Beat to schedule periodic tasks
+        if schedule is not None:
+            self.beat_schedule[task_name] = {"task": task_full_name, "schedule": schedule}
+
+        # This requires settings as a dependency, which will be provided by FastAPI
+        # We do not use overrides here because overrides are meant for celery workers
+        # But this will be called in the FastAPI context, we can directly get settings via dependency injection
+        def task_factory(app_settings: SettingsDep) -> BackgroundTask:
+            task = shared_task(name=task_name)(wrapper)
+            return BackgroundTask(celery_task=task, settings=app_settings)
+
+        return task_factory
 
     def include_registry(self, registry: "TaskRegistry"):
         """Include another TaskRegistry's tasks."""

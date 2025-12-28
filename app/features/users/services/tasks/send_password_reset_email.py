@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta, timezone
 import logging
+from typing import Annotated
 import uuid
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
 from app.core.auth import CurrentTaskRunnerDep
+from app.core.background import BackgroundTask, TaskRegistry
 from app.core.database import DbDep
 from app.core.settings import SettingsDep
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
@@ -13,6 +15,7 @@ from app.features.users.models.user_action import UserAction, UserActionState, U
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+registry = TaskRegistry()
 
 
 # Input/Output
@@ -66,3 +69,7 @@ async def send_password_reset_email(
 
     logger.info("Sending password reset email, action_id=%s, token=%s", action.id, token)
     return SendPasswordResetOutput(action_id=action.id, token=token)
+
+
+send_password_reset_email_task = registry.register_background_task(send_password_reset_email)
+SendPasswordResetTaskDep = Annotated[BackgroundTask, Depends(send_password_reset_email_task)]

@@ -1,51 +1,11 @@
 import logging
-import uuid
 
-from pydantic import BaseModel
-from app.core.auth import AuthUser
 from app.core.background import TaskRegistry
-from app.core.database import get_db
-from app.core.settings import get_settings
-from app.features.users.services.tasks.send_email_verification import (
-    SendEmailVerificationInput,
-    send_email_verification,
-)
-from app.features.users.services.tasks.send_password_reset_email import (
-    SendPasswordResetInput,
-    send_password_reset_email,
-)
+
+from app.features.users.services.tasks import send_email_verification, send_password_reset_email
 
 
 logger = logging.getLogger(__name__)
-user_task_registry = TaskRegistry()
-
-
-@user_task_registry.background_task("send_email_verification")
-async def send_email_verification_task(raw_task_input: str):
-    logger.info("Starting send_email_verification_task")
-    settings = get_settings()
-    async with get_db(settings) as db:
-        current_user = AuthUser(id=uuid.uuid4(), type="task_runner")
-        task_input = SendEmailVerificationInput.model_validate_json(raw_task_input)
-        result: BaseModel = await send_email_verification(
-            task_input=task_input, current_user=current_user, settings=settings, db=db
-        )
-        return result.model_dump_json()
-
-
-@user_task_registry.background_task("send_password_reset_email")
-async def send_password_reset_email_task(raw_task_input: str):
-    logger.info("Starting send_password_reset_email_task")
-    settings = get_settings()
-    async with get_db(settings) as db:
-        current_user = AuthUser(id=uuid.uuid4(), type="task_runner")
-        task_input = SendPasswordResetInput.model_validate_json(raw_task_input)
-        result: BaseModel = await send_password_reset_email(
-            task_input=task_input, current_user=current_user, settings=settings, db=db
-        )
-        return result.model_dump_json()
-
-
-@user_task_registry.background_task("echo_task", schedule=60)
-async def echo_task():
-    logger.info("Echo task executed")
+user_registry = TaskRegistry()
+user_registry.include_registry(send_email_verification.registry)
+user_registry.include_registry(send_password_reset_email.registry)
