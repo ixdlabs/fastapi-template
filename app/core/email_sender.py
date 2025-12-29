@@ -1,4 +1,5 @@
 import abc
+import base64
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import logging
@@ -79,6 +80,14 @@ class SmtpEmailSender(EmailSender):
         message["To"] = ", ".join(email.receivers)
         message.attach(MIMEText(body_text, "plain"))
         message.attach(MIMEText(body_html, "html"))
+        if email.attachments:
+            for filename, filedata in email.attachments.items():
+                part = MIMEText(base64.b64encode(filedata).decode(), "base64")
+                part.add_header(
+                    "Content-Disposition",
+                    f'attachment; filename="{filename}"',
+                )
+                message.attach(part)
 
         try:
             if self.settings.email_smtp_use_ssl:
