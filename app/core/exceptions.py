@@ -54,6 +54,12 @@ class ServiceException(abc.ABC, HTTPException):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class InternalServerError(ServiceException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    type = "exceptions/internal-server-error"
+    detail = "An internal server error occurred."
+
+
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
     if exc.status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR:
         logger.error("server error", extra={"path": request.url.path}, exc_info=exc)
@@ -63,9 +69,7 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
 
 
 async def custom_exception_handler(request: Request, exc: Exception):
-    logger.error("server error", extra={"path": request.url.path}, exc_info=exc)
-    exc = HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
-    return await http_exception_handler(request, exc)
+    return await custom_http_exception_handler(request, InternalServerError())
 
 
 # Register the custom exception handlers with the FastAPI application.

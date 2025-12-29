@@ -20,6 +20,7 @@ from sqlalchemy import UUID, inspect
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapped, RelationshipProperty, attributes, mapped_column
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.pool import NullPool
 
 from app.core.settings import SettingsDep
 
@@ -92,13 +93,20 @@ class Base(DeclarativeBase):
 
 
 @lru_cache
-def create_db_engine(database_url: str, debug: bool = False):
+def create_db_engine(database_url: str, debug: bool = False, no_pooling: bool = False):
     logger.info("Creating database engine", extra={"database_url": database_url})
-    return create_async_engine(database_url, echo=debug)
+    engine_kwargs: dict[str, object] = {"echo": debug}
+    # asyncpg connections are bound to their event loop; using NullPool prevents
+    # connections created in one loop (e.g., Celery eager tasks) from being reused
+    # in another loop (e.g., FastAPI request), which triggers "Future attached to a different loop".
+    if no_pooling:
+        engine_kwargs["poolclass"] = NullPool
+    return create_async_engine(database_url, **engine_kwargs)
 
 
 def create_db_engine_from_settings(settings: SettingsDep):
-    return create_db_engine(settings.database_url, debug=settings.debug)
+    no_pooling = settings.celery_task_always_eager
+    return create_db_engine(settings.database_url, debug=settings.debug, no_pooling=no_pooling)
 
 
 async def get_db_session(settings: SettingsDep):

@@ -71,12 +71,17 @@ class TaskRegistry:
             func: BackgroundTaskCallable[P, R, X],
         ) -> BackgroundTaskFactory:
             task_full_name = f"{func.__module__}.{func.__name__}"
+            # If the schedule is provided, add it to the beat schedule
+            # This will be picked up by Celery Beat to schedule periodic tasks
+            if schedule is not None:
+                self.beat_schedule[task_name] = {"task": task_full_name, "schedule": schedule}
 
             wrapped_signature = get_typed_signature(func)
             task_input_param = next(iter(wrapped_signature.parameters.values()), None)
             assert task_input_param is not None and issubclass(task_input_param.annotation, BaseModel)
 
             # Async function that wraps the original function to handle dependency injection
+            # Celery will call this via the wrapper function below
             async def async_func(ctx: CeleryContext, raw_task_input: str, **kwargs: object) -> str:
                 input_model: type[P] = task_input_param.annotation
                 task_input = input_model.model_validate_json(raw_task_input)
@@ -87,20 +92,21 @@ class TaskRegistry:
                     return result.model_dump_json()
 
             # Wrapper function to convert async function to sync for Celery
+            # This is the function that Celery will actually call
             @functools.wraps(func)
             def wrapper(self: "CeleryTask[[str], str]", raw_task_input: str, **kwargs: object) -> str:
                 return run_as_sync(async_func, self.request, raw_task_input, **kwargs)
 
-            # If the schedule is provided, add it to the beat schedule
-            # This will be picked up by Celery Beat to schedule periodic tasks
-            if schedule is not None:
-                self.beat_schedule[task_name] = {"task": task_full_name, "schedule": schedule}
+            # This should be in this scope to make sure this is defined at the time of decorator call
+            # Otherwise celery might not pick up the task correctly
+            task = shared_task(name=task_name, bind=True)(wrapper)
 
-            def factory(settings: SettingsDep) -> BackgroundTask:
-                task = shared_task(name=task_name, bind=True)(wrapper)
+            # This will be called by FastAPI to provide the dependency
+            # The settings object here is the one in FastAPI context
+            def dependency(settings: SettingsDep) -> BackgroundTask:
                 return BackgroundTask(celery_task=task, settings=settings)
 
-            return factory
+            return dependency
 
         return decorator
 
