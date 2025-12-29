@@ -8,14 +8,15 @@ import smtplib
 from typing import Annotated, override
 
 from fastapi import Depends
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader, Template
 from pydantic import BaseModel, EmailStr
 
 from app.core.settings import SettingsDep
 from fast_depends import Depends as WorkerDepends
+from mjml import mjml2html
 
 logger = logging.getLogger(__name__)
-
+base_email_template_path = Path(__file__).parent / "emails"
 
 # Basic Email Structure
 # ----------------------------------------------------------------------------------------------------------------------
@@ -47,9 +48,9 @@ class EmailSender(abc.ABC):
         raise NotImplementedError()
 
     def render(self, template: Path, data: dict[str, str] | None) -> str:
-        with template.open() as fr:
-            jinja_template: Template = Template(fr.read())
-            return jinja_template.render(data or {})
+        env = Environment(loader=FileSystemLoader([base_email_template_path, template.parent]))
+        jinja_template: Template = env.get_template(template.name)
+        return jinja_template.render(data or {})
 
 
 # A simple local email sender that logs emails instead of sending them
@@ -77,6 +78,12 @@ class SmtpEmailSender(EmailSender):
     async def send_email(self, email: Email) -> str:
         body_html = self.render(email.body_html_template, email.template_data)
         body_text = self.render(email.body_text_template, email.template_data)
+
+        try:
+            body_html = mjml2html(body_html)
+        except Exception:
+            logger.error(f"Failed to compile MJML to HTML: \n{body_html}", exc_info=True)
+
         message = MIMEMultipart("alternative")
         message["Subject"] = email.subject
         message["From"] = email.sender

@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlencode
 import uuid
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, EmailStr
@@ -80,6 +81,8 @@ async def send_email_verification(
     await db.commit()
     await db.refresh(action)
 
+    verification_link_params = urlencode({"token": token, "email": task_input.email})
+    verification_link = f"{settings.frontend_base_url}/verify-email?{verification_link_params}"
     message_id = await email_sender.send_email(
         Email(
             sender=settings.email_sender_address,
@@ -87,7 +90,7 @@ async def send_email_verification(
             subject="Verify your email address",
             body_html_template=email_templates_dir / "send_email_verification.html",
             body_text_template=email_templates_dir / "send_email_verification.txt",
-            template_data={"token": token},
+            template_data={"verification_link": verification_link},
         )
     )
 

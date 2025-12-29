@@ -1,8 +1,18 @@
-<html>
-  <body>
-    <p>Please verify your email address by clicking the link below:</p>
-    <a href="https://example.com/verify-email?token={{ token }}"
-      >Verify Email</a
-    >
-  </body>
-</html>
+{% extends "base.html" %}
+<!---->
+
+{% block content %}
+<mj-text>
+  Please verify your email address by clicking the link below:
+</mj-text>
+<mj-button
+  href="{{ verification_link }}"
+  background-color="#346df1"
+  color="white"
+>
+  Verify Email
+</mj-button>
+<mj-text>
+  If you did not create an account, no further action is required.
+</mj-text>
+{% endblock %}

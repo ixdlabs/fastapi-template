@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlencode
 import uuid
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, EmailStr
@@ -75,14 +76,16 @@ async def send_password_reset_email(
     await db.commit()
     await db.refresh(action)
 
+    password_reset_link_params = urlencode({"token": token, "action_id": action.id})
+    password_reset_link = f"{settings.frontend_base_url}/reset-password?{password_reset_link_params}"
     message_id = await email_sender.send_email(
         Email(
             sender=settings.email_sender_address,
             receivers=[task_input.email],
-            subject="Verify your email address",
+            subject="Reset your password",
             body_html_template=email_templates_dir / "send_password_reset_email.html",
             body_text_template=email_templates_dir / "send_password_reset_email.txt",
-            template_data={"token": token},
+            template_data={"password_reset_link": password_reset_link},
         )
     )
 
