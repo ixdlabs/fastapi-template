@@ -3,6 +3,7 @@ import base64
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import logging
+from pathlib import Path
 import smtplib
 from typing import Annotated, override
 
@@ -23,8 +24,8 @@ class Email(BaseModel):
     sender: EmailStr
     receivers: list[EmailStr]
     subject: str
-    body_html_template: str
-    body_text_template: str
+    body_html_template: Path
+    body_text_template: Path
     template_data: dict[str, str] | None = None
     attachments: dict[str, bytes] | None = None
 
@@ -44,9 +45,10 @@ class EmailSender(abc.ABC):
         """Sends an email and returns the email provider's message ID."""
         raise NotImplementedError()
 
-    def render(self, template: str, data: dict[str, str] | None) -> str:
-        jinja_template: Template = Template(template)
-        return jinja_template.render(data or {})
+    def render(self, template: Path, data: dict[str, str] | None) -> str:
+        with template.open() as fr:
+            jinja_template: Template = Template(fr.read())
+            return jinja_template.render(data or {})
 
 
 # A simple local email sender that logs emails instead of sending them

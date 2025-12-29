@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import logging
+from pathlib import Path
 from typing import Annotated
 import uuid
 from fastapi import APIRouter, Depends
@@ -15,6 +16,7 @@ from app.features.users.models.user_action import UserAction, UserActionState, U
 
 
 logger = logging.getLogger(__name__)
+email_templates_dir = Path(__file__).parent
 router = APIRouter()
 registry = TaskRegistry()
 
@@ -84,8 +86,8 @@ async def send_email_verification(
             sender=settings.email_sender_address,
             receivers=[task_input.email],
             subject="Verify your email address",
-            body_html_template=EMAIL_VERIFICATION_HTML_TEMPLATE,
-            body_text_template=EMAIL_VERIFICATION_TEXT_TEMPLATE,
+            body_html_template=email_templates_dir / "send_email_verification.html",
+            body_text_template=email_templates_dir / "send_email_verification.txt",
             template_data={"token": token},
         )
     )
@@ -96,19 +98,3 @@ async def send_email_verification(
 
 send_email_verification_task = registry.register_background_task(send_email_verification)
 SendEmailVerificationTaskDep = Annotated[BackgroundTask, Depends(send_email_verification_task)]
-
-
-# Templates
-# ----------------------------------------------------------------------------------------------------------------------
-
-EMAIL_VERIFICATION_HTML_TEMPLATE = """
-<html>
-    <body>
-        <p>Please verify your email address by clicking the link below:</p>
-        <a href="https://example.com/verify-email?token={{ token }}">Verify Email</a>
-    </body>
-</html>
-"""
-EMAIL_VERIFICATION_TEXT_TEMPLATE = """
-Please verify your email address by visiting the following link: https://example.com/verify-email?token={{ token }}
-"""
