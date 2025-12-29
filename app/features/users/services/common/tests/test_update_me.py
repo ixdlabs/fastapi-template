@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 import pytest
+from pytest import MonkeyPatch
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.testclient import TestClient
@@ -31,9 +32,12 @@ async def test_user_can_update_own_profile(db_fixture: AsyncSession, authenticat
 
 
 @pytest.mark.asyncio
-async def test_user_can_update_email_triggers_verification(
-    authenticated_user_fixture: User, celery_background_fixture: MagicMock
-):
+async def test_user_can_update_email_triggers_verification(authenticated_user_fixture: User, monkeypatch: MonkeyPatch):
+    mocked_task = MagicMock()
+    monkeypatch.setattr(
+        "app.features.users.services.tasks.send_email_verification.send_email_verification", mocked_task
+    )
+
     update_data = {"first_name": "NewFirst", "last_name": "NewLast", "email": "newemail@example.com"}
     response = client.put(url, json=update_data)
     assert response.status_code == 200
@@ -43,11 +47,9 @@ async def test_user_can_update_email_triggers_verification(
     assert data["last_name"] == "NewLast"
     assert data["email"] == authenticated_user_fixture.email  # Email not updated yet
 
-    # Verify that email verification task was submitted
-    celery_background_fixture.apply_async.assert_called_once()
-    _, kwargs = celery_background_fixture.apply_async.call_args
-    assert isinstance(kwargs["args"][0], str)
-    task_input = SendEmailVerificationInput.model_validate_json(kwargs["args"][0])
+    mocked_task.assert_called_once()
+    task_input = mocked_task.call_args[0][0]
+    assert isinstance(task_input, SendEmailVerificationInput)
     assert task_input.user_id == authenticated_user_fixture.id
     assert task_input.email == "newemail@example.com"
 

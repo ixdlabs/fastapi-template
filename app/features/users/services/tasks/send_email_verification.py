@@ -101,7 +101,7 @@ async def send_email_verification(
 
 
 @registry.background_task("send_email_verification")
-async def task(task_input: SendEmailVerificationInput, scope: WorkerScope) -> SendEmailVerificationOutput:
+async def run_task_in_worker(task_input: SendEmailVerificationInput, scope: WorkerScope) -> SendEmailVerificationOutput:
     settings = get_settings()
     email_sender = get_email_sender(settings)
     current_user = scope.to_auth_user()
@@ -111,4 +111,4 @@ async def task(task_input: SendEmailVerificationInput, scope: WorkerScope) -> Se
         )
 
 
-SendEmailVerificationTaskDep = Annotated[BackgroundTask, Depends(task)]
+SendEmailVerificationTaskDep = Annotated[BackgroundTask, Depends(run_task_in_worker)]

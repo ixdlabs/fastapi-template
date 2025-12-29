@@ -44,7 +44,6 @@ class SendPasswordResetOutput(BaseModel):
 @router.post("/send-password-reset-email")
 async def send_password_reset_email(
     task_input: SendPasswordResetInput,
-    *,
     current_user: CurrentTaskRunnerDep,
     settings: SettingsDep,
     db: DbDep,
@@ -96,7 +95,7 @@ async def send_password_reset_email(
 
 
 @registry.background_task("send_password_reset_email")
-async def task(task_input: SendPasswordResetInput, scope: WorkerScope) -> SendPasswordResetOutput:
+async def run_task_in_worker(task_input: SendPasswordResetInput, scope: WorkerScope) -> SendPasswordResetOutput:
     settings = get_settings()
     email_sender = get_email_sender(settings)
     current_user = scope.to_auth_user()
@@ -106,4 +105,4 @@ async def task(task_input: SendPasswordResetInput, scope: WorkerScope) -> SendPa
         )
 
 
-SendPasswordResetTaskDep = Annotated[BackgroundTask, Depends(task)]
+SendPasswordResetTaskDep = Annotated[BackgroundTask, Depends(run_task_in_worker)]

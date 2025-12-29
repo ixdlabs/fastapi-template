@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
 import uuid
 import pytest
 from datetime import datetime, timezone, timedelta
@@ -7,12 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import AuthUser
 
-from app.core.settings import Settings
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
 from fastapi.testclient import TestClient
 
-from app.features.users.services.tasks.send_password_reset_email import SendPasswordResetInput, task
+from app.features.users.services.tasks.send_password_reset_email import SendPasswordResetInput, run_task_in_worker
 from app.main import app
 
 client = TestClient(app)
@@ -69,28 +68,18 @@ async def test_send_password_reset_email_creates_action_and_invalidates_previous
 
 
 @pytest.mark.asyncio
-async def test_send_password_reset_email_task_executed_as_task(
-    worker_db_fixture: AsyncSession, monkeypatch: MonkeyPatch, settings_fixture: Settings
-):
-    send_password_reset_email_func = AsyncMock()
+async def test_send_password_reset_email_task_executed_as_task(monkeypatch: MonkeyPatch):
+    mocked_task = MagicMock()
     monkeypatch.setattr(
-        "app.features.users.services.tasks.send_password_reset_email.send_password_reset_email",
-        send_password_reset_email_func,
-    )
-    monkeypatch.setattr(
-        "app.features.users.services.tasks.send_password_reset_email.get_worker_db_session",
-        worker_db_fixture,
-    )
-    monkeypatch.setattr(
-        "app.features.users.services.tasks.send_password_reset_email.get_settings",
-        lambda: settings_fixture,
+        "app.features.users.services.tasks.send_password_reset_email.send_password_reset_email", mocked_task
     )
 
-    background_task = task(settings_fixture)
-    await background_task.submit(SendPasswordResetInput(user_id=uuid.uuid4(), email="new@example.com"))
+    user_id = uuid.uuid4()
+    background_task = run_task_in_worker()
+    await background_task.submit(SendPasswordResetInput(user_id=user_id, email="new@example.com"))
 
-    send_password_reset_email_func.assert_awaited_once()
-    args, _ = send_password_reset_email_func.call_args
-    task_input = args[0]
+    mocked_task.assert_called_once()
+    task_input = mocked_task.call_args[0][0]
     assert isinstance(task_input, SendPasswordResetInput)
+    assert task_input.user_id == user_id
     assert task_input.email == "new@example.com"

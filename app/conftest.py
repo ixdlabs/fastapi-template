@@ -1,7 +1,5 @@
-from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
-from unittest.mock import MagicMock
 import pytest
 import pytest_asyncio
 from sqlalchemy import pool
@@ -136,28 +134,6 @@ def override_dependencies(
 
     yield
     app.dependency_overrides.clear()
-
-
-# Dependency overrides for Task Registry
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="function")
-def worker_db_fixture(db_fixture: AsyncSession):
-    @asynccontextmanager
-    async def _worker_db_session(_: Settings):
-        yield db_fixture
-
-    return _worker_db_session
-
-
-@pytest.fixture(scope="function")
-def celery_background_fixture(monkeypatch: pytest.MonkeyPatch):
-    celery_task = MagicMock()
-    celery_task.apply_async = MagicMock()
-    celery_task.return_value = celery_task
-    monkeypatch.setattr("app.core.background.shared_task", celery_task)
-    yield celery_task
 
 
 # Fake user log in for tests

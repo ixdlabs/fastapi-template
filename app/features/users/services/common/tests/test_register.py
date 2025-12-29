@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pytest import MonkeyPatch
 import pytest
 
 from app.features.users.models.user import User
@@ -14,7 +15,12 @@ url = "/api/auth/register"
 
 
 @pytest.mark.asyncio
-async def test_user_can_register_with_valid_data(db_fixture: AsyncSession, celery_background_fixture: MagicMock):
+async def test_user_can_register_with_valid_data(db_fixture: AsyncSession, monkeypatch: MonkeyPatch):
+    mocked_task = MagicMock()
+    monkeypatch.setattr(
+        "app.features.users.services.tasks.send_email_verification.send_email_verification", mocked_task
+    )
+
     user_data = {
         "username": "newuser",
         "first_name": "New",
@@ -37,11 +43,9 @@ async def test_user_can_register_with_valid_data(db_fixture: AsyncSession, celer
     assert user.check_password(user_data["password"])
     assert user.email is None
 
-    # Verify that email verification task was submitted
-    celery_background_fixture.apply_async.assert_called_once()
-    _, kwargs = celery_background_fixture.apply_async.call_args
-    assert isinstance(kwargs["args"][0], str)
-    task_input = SendEmailVerificationInput.model_validate_json(kwargs["args"][0])
+    mocked_task.assert_called_once()
+    task_input = mocked_task.call_args[0][0]
+    assert isinstance(task_input, SendEmailVerificationInput)
     assert task_input.user_id == user.id
     assert task_input.email == "newuser@example.com"
 

@@ -19,7 +19,6 @@ from pydantic import BaseModel
 
 from app.core.auth import AuthUser
 from app.core.helpers import run_as_sync
-from app.core.settings import Settings, SettingsDep
 
 logger = logging.getLogger(__name__)
 P = ParamSpec("P")
@@ -31,9 +30,8 @@ R = TypeVar("R")
 
 
 class BackgroundTask:
-    def __init__(self, celery_task: "CeleryTask[[str], str]", settings: Settings):
+    def __init__(self, celery_task: "CeleryTask[[str], str]"):
         super().__init__()
-        self.settings = settings
         self.celery_task = celery_task
 
     async def submit(self, input_model: BaseModel) -> None:
@@ -59,7 +57,7 @@ class WorkerScope:
 # ----------------------------------------------------------------------------------------------------------------------
 
 type BackgroundTaskCallable[P: BaseModel, R: BaseModel] = Callable[[P, WorkerScope], Coroutine[None, None, R]]
-type BackgroundTaskFactory = Callable[[SettingsDep], BackgroundTask]
+type BackgroundTaskFactory = Callable[[], BackgroundTask]
 
 
 class TaskRegistry:
@@ -92,19 +90,14 @@ class TaskRegistry:
             def wrapper(self: "CeleryTask[[str], str]", raw_task_input: str, **kwargs: object) -> str:
                 return run_as_sync(async_func, self.request, raw_task_input, **kwargs)
 
-            #     # If the schedule is provided, add it to the beat schedule
-            #     # This will be picked up by Celery Beat to schedule periodic tasks
+            # If the schedule is provided, add it to the beat schedule
+            # This will be picked up by Celery Beat to schedule periodic tasks
             if schedule is not None:
                 self.beat_schedule[task_name] = {"task": task_full_name, "schedule": schedule}
 
-            # This requires settings as a dependency, which will be provided by FastAPI
-            # We do not use overrides here because overrides are meant for celery workers
-            # But this will be called in the FastAPI context, we can directly get settings via dependency injection
-            def task_factory(app_settings: SettingsDep) -> BackgroundTask:
-                task = shared_task(name=task_name, bind=True)(wrapper)
-                return BackgroundTask(celery_task=task, settings=app_settings)
-
-            return task_factory
+            task = shared_task(name=task_name, bind=True)(wrapper)
+            background_task = BackgroundTask(celery_task=task)
+            return lambda: background_task
 
         return decorator
 
