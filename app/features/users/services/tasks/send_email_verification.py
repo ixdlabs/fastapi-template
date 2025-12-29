@@ -44,7 +44,6 @@ class SendEmailVerificationOutput(BaseModel):
 @router.post("/send-email-verification")
 async def send_email_verification(
     task_input: SendEmailVerificationInput,
-    *,
     db: DbDep,
     settings: SettingsDep,
     current_user: CurrentTaskRunnerDep,

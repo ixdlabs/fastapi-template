@@ -101,9 +101,7 @@ async def test_set_stores_value_and_get_retrieves_it_from_backend(cache_fixture:
 
 
 @pytest.mark.asyncio
-async def test_distinct_cache_instances_do_not_collide_on_different_keys(
-    cache_fixture: CacheDep, request_fixture: Request
-):
+async def test_distinct_cache_instances_do_not_collide_on_different_keys(cache_fixture: CacheDep):
     cache1 = cache_fixture.vary_on_path().with_ttl(10).build()
     cache2 = cache_fixture.vary_on_auth().with_ttl(10).build()
 
@@ -112,6 +110,25 @@ async def test_distinct_cache_instances_do_not_collide_on_different_keys(
 
     assert await cache1.get(ExampleModel) == ExampleModel(a=1, b="path-value")
     assert await cache2.get(ExampleModel) == ExampleModel(a=2, b="auth-value")
+
+
+@pytest.mark.asyncio
+async def test_get_returns_none_for_missing_cache_entry(cache_fixture: CacheDep):
+    cache = cache_fixture.with_ttl(10).build()
+    cached_value = await cache.get(ExampleModel)
+    assert cached_value is None
+
+
+@pytest.mark.asyncio
+async def test_get_handles_validation_error_gracefully(cache_fixture: CacheDep, cache_backend_fixture: BaseCache):
+    class InvalidModel(BaseModel):
+        x: int
+
+    cache = cache_fixture.vary_on_path().with_ttl(10).build()
+    _ = await cache.set(InvalidModel(x=100))
+
+    cached_value = await cache.get(ExampleModel)
+    assert cached_value is None
 
 
 # Backend & dependency tests

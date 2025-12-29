@@ -8,16 +8,15 @@ from app.features.users.models.user import User
 from app.features.users.services.tasks.send_email_verification import SendEmailVerificationInput
 from app.fixtures.user_factory import UserFactory
 
-from app.main import app
-
-client = TestClient(app)
-url = "/api/v1/common/users/me"
+URL = "/api/v1/common/users/me"
 
 
 @pytest.mark.asyncio
-async def test_user_can_update_own_profile(db_fixture: AsyncSession, authenticated_user_fixture: User):
+async def test_user_can_update_own_profile(
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticated_user_fixture: User
+):
     update_data = {"first_name": "NewFirst", "last_name": "NewLast"}
-    response = client.put(url, json=update_data)
+    response = test_client_fixture.put(URL, json=update_data)
 
     assert response.status_code == 200
     data = response.json()
@@ -32,14 +31,16 @@ async def test_user_can_update_own_profile(db_fixture: AsyncSession, authenticat
 
 
 @pytest.mark.asyncio
-async def test_user_can_update_email_triggers_verification(authenticated_user_fixture: User, monkeypatch: MonkeyPatch):
+async def test_user_can_update_email_triggers_verification(
+    test_client_fixture: TestClient, authenticated_user_fixture: User, monkeypatch: MonkeyPatch
+):
     mocked_task = MagicMock()
     monkeypatch.setattr(
         "app.features.users.services.tasks.send_email_verification.send_email_verification", mocked_task
     )
 
     update_data = {"first_name": "NewFirst", "last_name": "NewLast", "email": "newemail@example.com"}
-    response = client.put(url, json=update_data)
+    response = test_client_fixture.put(URL, json=update_data)
     assert response.status_code == 200
 
     data = response.json()
@@ -55,7 +56,9 @@ async def test_user_can_update_email_triggers_verification(authenticated_user_fi
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_update_email_to_existing_email(db_fixture: AsyncSession, authenticated_user_fixture: User):
+async def test_user_cannot_update_email_to_existing_email(
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticated_user_fixture: User
+):
     assert authenticated_user_fixture is not None
 
     existing_user: User = UserFactory.build(email="existing@example.com")
@@ -65,6 +68,6 @@ async def test_user_cannot_update_email_to_existing_email(db_fixture: AsyncSessi
     await db_fixture.refresh(authenticated_user_fixture)
 
     update_data = {"first_name": "NewFirst", "last_name": "NewLast", "email": "existing@example.com"}
-    response = client.put(url, json=update_data)
+    response = test_client_fixture.put(URL, json=update_data)
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/update/email-exists"

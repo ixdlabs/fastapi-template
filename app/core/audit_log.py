@@ -41,7 +41,7 @@ class AuditLogger:
         """
         self.tracked_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
 
-    async def record(self, action: Literal["create", "delete"] | str, resource: Base | None) -> None:
+    async def record(self, action: Literal["create", "delete"] | str, resource: Base) -> None:
         """
         Record an audit log entry for the specified action and resource.
         The actual database commit is not handled here; it should be done by the caller.
@@ -82,28 +82,27 @@ class AuditLogger:
 
             # Resource identity
             # ----------------------------------------------------------------------------------------------------------
-            if resource is not None:
-                if getattr(resource, "id", None) is None:
-                    # Resource can be expected to have an ID after commit, but we need it now for logging.
-                    raise ValueError(
-                        "Resource must have an ID to be logged in audit log, "
-                        + "either commit the resource first or manually set the ID."
-                    )
-                audit_log.resource_type = str(resource.__tablename__)
-                audit_log.resource_id = resource.id
+            if getattr(resource, "id", None) is None:
+                # Resource can be expected to have an ID after commit, but we need it now for logging.
+                raise ValueError(
+                    "Resource must have an ID to be logged in audit log, "
+                    + "either commit the resource first or manually set the ID."
+                )
+            audit_log.resource_type = str(resource.__tablename__)
+            audit_log.resource_id = resource.id
 
-                # Resource snapshots
-                # ------------------------------------------------------------------------------------------------------
-                audit_log.new_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
-                if action == "delete":
-                    audit_log.old_value = audit_log.new_value
-                    audit_log.new_value = None
-                elif action == "create":
-                    pass
-                elif self.tracked_value is not None:
-                    audit_log.old_value = self.tracked_value
-                    changed_value = DeepDiff(audit_log.old_value, audit_log.new_value)
-                    audit_log.changed_value = orjson.loads(orjson.dumps(changed_value))
+            # Resource snapshots
+            # ------------------------------------------------------------------------------------------------------
+            audit_log.new_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
+            if action == "delete":
+                audit_log.old_value = audit_log.new_value
+                audit_log.new_value = None
+            elif action == "create":
+                pass
+            elif self.tracked_value is not None:
+                audit_log.old_value = self.tracked_value
+                changed_value = DeepDiff(audit_log.old_value, audit_log.new_value)
+                audit_log.changed_value = orjson.loads(orjson.dumps(changed_value))
 
             # Persist audit log (Do not commit here, commit should be handled by caller)
             # ----------------------------------------------------------------------------------------------------------

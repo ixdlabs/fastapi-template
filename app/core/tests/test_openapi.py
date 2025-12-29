@@ -7,22 +7,19 @@ import pytest
 from fastapi.testclient import TestClient
 from app.core import openapi
 from app.core.exceptions import ServiceException, raises
-from app.main import app
 from pytest import MonkeyPatch
-
-client = TestClient(app)
 
 
 @pytest.mark.asyncio
-async def test_openapi_endpoint_serves_schema_successfully():
-    response = client.get("/api/openapi.json")
+async def test_openapi_endpoint_serves_schema_successfully(test_client_fixture: TestClient):
+    response = test_client_fixture.get("/api/openapi.json")
     assert response.status_code == 200
     assert "openapi" in response.json()
 
 
 @pytest.mark.asyncio
-async def test_apidoc_endpoint_serves_swagger_ui_successfully():
-    response = client.get("/api/docs")
+async def test_apidoc_endpoint_serves_swagger_ui_successfully(test_client_fixture: TestClient):
+    response = test_client_fixture.get("/api/docs")
     assert response.status_code == 200
 
 

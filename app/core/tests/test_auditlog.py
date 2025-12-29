@@ -7,7 +7,7 @@ from app.core.auth import Authenticator
 from starlette.types import Scope
 from starlette.datastructures import Headers
 
-from app.core.audit_log import AuditLogger
+from app.core.audit_log import AuditLogger, get_audit_logger
 from app.features.audit_logs.models.audit_log import ActorType, AuditLog
 
 from app.features.users.models.user import User
@@ -202,3 +202,34 @@ async def test_audit_logger_update_records_old_new_and_changed_values_after_trac
         "old_value": "user@example.com",
         "new_value": "newuser@example.com",
     }
+
+
+@pytest.mark.asyncio
+async def test_audit_logger_logs_without_request_present(
+    db_fixture: AsyncSession, authenticator_fixture: Authenticator
+):
+    logger = AuditLogger(request=None, authenticator=authenticator_fixture, db=db_fixture)
+    resource: User = UserFactory.build(id=uuid.uuid4(), email="user@example.com")
+
+    await logger.record("create", resource)
+    db_fixture.add(resource)
+    audit = await fetch_single_audit_log(db_fixture)
+    assert audit.action == "create"
+    assert audit.actor_type == ActorType.ANONYMOUS
+    assert audit.actor_id is None
+    assert audit.request_ip_address is None
+    assert audit.request_user_agent is None
+    assert audit.request_method is None
+    assert audit.request_url is None
+    assert audit.resource_type == "users"
+
+
+# Tests for get_audit_logger
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def test_get_audit_logger_returns_audit_logger_instance(
+    db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
+):
+    logger = get_audit_logger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
+    assert isinstance(logger, AuditLogger)

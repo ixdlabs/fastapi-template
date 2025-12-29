@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from app.core.auth import AuthUser
 from app.core.helpers import run_as_sync
+from app.core.settings import SettingsDep
 
 logger = logging.getLogger(__name__)
 P = ParamSpec("P")
@@ -30,13 +31,15 @@ R = TypeVar("R")
 
 
 class BackgroundTask:
-    def __init__(self, celery_task: "CeleryTask[[str], str]"):
+    def __init__(self, celery_task: "CeleryTask[[str], str]", settings: SettingsDep):
         super().__init__()
         self.celery_task = celery_task
+        self.settings = settings
 
     async def submit(self, input_model: BaseModel) -> None:
         """Submit a function to be run in the background as a Celery task."""
-        result = self.celery_task.apply_async(args=(input_model.model_dump_json(),))
+        task_input_raw = input_model.model_dump_json()
+        result = self.celery_task.apply_async(args=(task_input_raw,))
         logger.info(f"Submitted background task {self.celery_task.name} with id {result.id}")
 
 
@@ -57,7 +60,7 @@ class WorkerScope:
 # ----------------------------------------------------------------------------------------------------------------------
 
 type BackgroundTaskCallable[P: BaseModel, R: BaseModel] = Callable[[P, WorkerScope], Coroutine[None, None, R]]
-type BackgroundTaskFactory = Callable[[], BackgroundTask]
+type BackgroundTaskFactory = Callable[[SettingsDep], BackgroundTask]
 
 
 class TaskRegistry:
@@ -95,9 +98,11 @@ class TaskRegistry:
             if schedule is not None:
                 self.beat_schedule[task_name] = {"task": task_full_name, "schedule": schedule}
 
-            task = shared_task(name=task_name, bind=True)(wrapper)
-            background_task = BackgroundTask(celery_task=task)
-            return lambda: background_task
+            def factory(settings: SettingsDep) -> BackgroundTask:
+                task = shared_task(name=task_name, bind=True)(wrapper)
+                return BackgroundTask(celery_task=task, settings=settings)
+
+            return factory
 
         return decorator
 

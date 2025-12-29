@@ -6,14 +6,13 @@ from app.fixtures.user_factory import UserFactory
 from app.core.auth import Authenticator
 from fastapi.testclient import TestClient
 
-from app.main import app
-
-client = TestClient(app)
-url = "/api/auth/change-password"
+URL = "/api/auth/change-password"
 
 
 @pytest.mark.asyncio
-async def test_user_can_change_password(db_fixture: AsyncSession, authenticator_fixture: Authenticator):
+async def test_user_can_change_password(
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticator_fixture: Authenticator
+):
     user: User = UserFactory.build()
     user.set_password("old-password")
     db_fixture.add(user)
@@ -22,7 +21,7 @@ async def test_user_can_change_password(db_fixture: AsyncSession, authenticator_
     token, _ = authenticator_fixture.encode(user)
 
     payload = {"old_password": "old-password", "new_password": "new-password"}
-    response = client.post(url, json=payload, headers={"Authorization": f"Bearer {token}"})
+    response = test_client_fixture.post(URL, json=payload, headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
 
     data = response.json()
@@ -33,7 +32,7 @@ async def test_user_can_change_password(db_fixture: AsyncSession, authenticator_
 
 @pytest.mark.asyncio
 async def test_user_cannot_change_password_with_incorrect_old_password(
-    db_fixture: AsyncSession, authenticator_fixture: Authenticator
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticator_fixture: Authenticator
 ):
     user: User = UserFactory.build()
     user.set_password("old-password")
@@ -43,14 +42,14 @@ async def test_user_cannot_change_password_with_incorrect_old_password(
     token, _ = authenticator_fixture.encode(user)
 
     payload = {"old_password": "wrong-old-password", "new_password": "new-password"}
-    response = client.post(url, json=payload, headers={"Authorization": f"Bearer {token}"})
+    response = test_client_fixture.post(URL, json=payload, headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/change-password/password-incorrect"
 
 
 @pytest.mark.asyncio
 async def test_user_cannot_change_password_with_same_old_password(
-    db_fixture: AsyncSession, authenticator_fixture: Authenticator
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticator_fixture: Authenticator
 ):
     user: User = UserFactory.build()
     user.set_password("old-password")
@@ -60,14 +59,14 @@ async def test_user_cannot_change_password_with_same_old_password(
 
     token, _ = authenticator_fixture.encode(user)
     payload = {"old_password": "old-password", "new_password": "old-password"}
-    response = client.post(url, json=payload, headers={"Authorization": f"Bearer {token}"})
+    response = test_client_fixture.post(URL, json=payload, headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/change-password/passwords-identical"
 
 
 @pytest.mark.asyncio
 async def test_user_cannot_change_password_if_account_deleted(
-    db_fixture: AsyncSession, authenticator_fixture: Authenticator
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticator_fixture: Authenticator
 ):
     user: User = UserFactory.build()
     user.set_password("old-password")
@@ -80,12 +79,12 @@ async def test_user_cannot_change_password_if_account_deleted(
     await db_fixture.commit()
 
     payload = {"old_password": "old-password", "new_password": "new-password"}
-    response = client.post(url, json=payload, headers={"Authorization": f"Bearer {token}"})
+    response = test_client_fixture.post(URL, json=payload, headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 404
     assert response.json()["type"] == "users/common/change-password/user-not-found"
 
 
 @pytest.mark.asyncio
-async def test_unauthorized_user_cannot_change_password():
-    response = client.post(url, json={"old_password": "old-password", "new_password": "new-password"})
+async def test_unauthorized_user_cannot_change_password(test_client_fixture: TestClient):
+    response = test_client_fixture.post(URL, json={"old_password": "old-password", "new_password": "new-password"})
     assert response.status_code == 401

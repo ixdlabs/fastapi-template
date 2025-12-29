@@ -1,4 +1,4 @@
-from fastapi import FastAPI, status
+from fastapi import FastAPI, HTTPException, status
 import pytest
 from unittest.mock import ANY, MagicMock
 from pytest import MonkeyPatch
@@ -39,6 +39,10 @@ def test_app():
     async def _():
         raise Sample404Exception()
 
+    @app.get("/base-http-error")
+    async def _():
+        raise HTTPException(status_code=403, detail="This is a base HTTPException")
+
     @app.get("/unexpected-error")
     async def _():
         _ = 1 / 0
@@ -62,6 +66,7 @@ async def test_custom_http_exception_handler_logs_and_returns_registered_server_
 
     assert response.status_code == 500
     assert response.json()["detail"] == "This is a sample 500 error"
+    assert "type" in response.json()
     mock_logger.assert_called_once_with("server error", extra={"path": "/server-error"}, exc_info=ANY)
 
 
@@ -72,6 +77,19 @@ async def test_custom_http_exception_handler_returns_registered_client_error_wit
 
     assert response.status_code == 404
     assert response.json()["detail"] == "This is a sample 404 error"
+    assert "type" in response.json()
+
+
+@pytest.mark.asyncio
+async def test_custom_http_exception_handler_logs_and_returns_base_http_exception_as_server_error(
+    test_app: FastAPI, monkeypatch: MonkeyPatch
+):
+    client = TestClient(test_app)
+    response = client.get("/base-http-error")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "This is a base HTTPException"
+    assert "type" not in response.json()
 
 
 @pytest.mark.asyncio

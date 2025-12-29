@@ -9,55 +9,65 @@ from app.core.database import create_db_engine_from_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import setup_logging
 from app.core.otel import setup_open_telemetry
-from app.core.settings import get_settings
+from app.core.settings import Settings, get_settings
 
 from app.features import models  # noqa: F401
 from app.features import api
 
 from app import worker  # noqa: F401
 
-settings = get_settings()
-setup_logging(settings)
 
-app = FastAPI(
-    title="Sample API",
-    description="This is a sample API built with FastAPI.",
-    version="1.0.0",
-    contact={"name": "IXD Labs", "url": "https://ixdlabs.com", "email": "sunera@ixdlabs.com"},
-    openapi_url="/api/openapi.json",
-    docs_url=None,
-    redoc_url=None,
-)
+def create_fastapi_app(settings: Settings) -> FastAPI:
+    setup_logging(settings)
 
-db_engine = create_db_engine_from_settings(settings)
-setup_open_telemetry(app, db_engine, settings)
-app.openapi = openapi.custom(app)
+    app = FastAPI(
+        title="Sample API",
+        description="This is a sample API built with FastAPI.",
+        version="1.0.0",
+        contact={"name": "IXD Labs", "url": "https://ixdlabs.com", "email": "sunera@ixdlabs.com"},
+        openapi_url="/api/openapi.json",
+        docs_url=None,
+        redoc_url=None,
+    )
 
-app.include_router(openapi.router)
-app.include_router(api.router)
+    db_engine = create_db_engine_from_settings(settings)
+    setup_open_telemetry(app, db_engine, settings)
+    app.openapi = openapi.custom(app)
 
-register_exception_handlers(app)
+    app.include_router(openapi.router)
+    app.include_router(api.router)
 
-# Enforces that all incoming requests must be https.
-# https://fastapi.tiangolo.com/advanced/middleware/#integrated-middlewares
-if not settings.debug:
-    app.add_middleware(HTTPSRedirectMiddleware)
+    register_exception_handlers(app)
 
-# Enforces that all incoming requests have a correctly set Host header (to guard against HTTP Host Header attacks).
-# https://fastapi.tiangolo.com/advanced/middleware/#trustedhostmiddleware
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+    # Enforces that all incoming requests must be https.
+    # https://fastapi.tiangolo.com/advanced/middleware/#integrated-middlewares
+    if not settings.debug:
+        app.add_middleware(HTTPSRedirectMiddleware)
 
-# Add appropriate CORS headers to outgoing responses in order to allow cross-origin requests from browsers.
-# https://www.starlette.dev/middleware/
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # Enforces that all incoming requests have a correctly set Host header (to guard against HTTP Host Header attacks).
+    # https://fastapi.tiangolo.com/advanced/middleware/#trustedhostmiddleware
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+
+    # Add appropriate CORS headers to outgoing responses in order to allow cross-origin requests from browsers.
+    # https://www.starlette.dev/middleware/
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    return app
+
 
 # Main entry point
 # ----------------------------------------------------------------------------------------------------------------------
 
-if __name__ == "__main__":
+
+def main() -> None:
+    app = create_fastapi_app(get_settings())
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+if __name__ == "__main__":
+    main()

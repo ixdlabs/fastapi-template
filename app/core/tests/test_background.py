@@ -41,20 +41,20 @@ def test_background_task_adds_beat_schedule():
     assert task_registry.beat_schedule["sample_task"]["task"].endswith("sample_task")
 
 
-def test_task_factory_creates_background_task():
+def test_task_factory_creates_background_task(settings_fixture: Settings):
     task_registry = TaskRegistry()
     factory = task_registry.background_task("sample_task")(sample_task)
-    background_task = factory()
+    background_task = factory(settings_fixture)
 
     assert isinstance(background_task, BackgroundTask)
     assert isinstance(background_task.celery_task, CeleryTask)
 
 
 @pytest.mark.asyncio
-async def test_background_task_submit_calls_celery_apply_async(monkeypatch: MonkeyPatch):
+async def test_background_task_submit_calls_celery_apply_async(monkeypatch: MonkeyPatch, settings_fixture: Settings):
     task_registry = TaskRegistry()
     factory = task_registry.background_task("sample_task")(sample_task)
-    background_task = factory()
+    background_task = factory(settings_fixture)
 
     mock_apply_async = MagicMock()
     monkeypatch.setattr(background_task.celery_task, "apply_async", mock_apply_async)
@@ -103,7 +103,7 @@ def test_task_registry_background_task_without_schedule():
 async def test_task_factory_submission_executes_task(settings_fixture: Settings):
     task_registry = TaskRegistry()
     factory = task_registry.background_task("sample_task")(sample_task)
-    background_task = factory()
+    background_task = factory(settings_fixture)
 
     input_model = InputModel(value=10)
     result = background_task.celery_task(input_model.model_dump_json())
@@ -132,7 +132,7 @@ async def test_task_with_dependencies_execution(settings_fixture: Settings, db_f
         return await sample_endpoint(task_input, current_user=current_user, db=db_fixture, settings=settings_fixture)
 
     factory = task_registry.background_task("sample_endpoint")(sample_endpoint_task)
-    background_task = factory()
+    background_task = factory(settings_fixture)
 
     input_model = InputModel(value=5)
     result = background_task.celery_task(input_model.model_dump_json())

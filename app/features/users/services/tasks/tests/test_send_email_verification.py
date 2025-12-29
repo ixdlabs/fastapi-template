@@ -7,21 +7,21 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthUser
+from app.core.settings import Settings
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 from fastapi.testclient import TestClient
 
 from app.features.users.services.tasks.send_email_verification import SendEmailVerificationInput, run_task_in_worker
-from app.main import app
 
-client = TestClient(app)
-url = "/api/v1/tasks/users/send-email-verification"
+
+URL = "/api/v1/tasks/users/send-email-verification"
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_send_email_verification_creates_action_and_invalidates_previous(
-    db_fixture: AsyncSession, authenticated_admin_fixture: AuthUser
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticated_admin_fixture: AuthUser
 ):
     user_id = uuid.uuid4()
     email = "new@example.com"
@@ -42,7 +42,7 @@ async def test_send_email_verification_creates_action_and_invalidates_previous(
 
     before_call = datetime.now(timezone.utc)
     payload = {"user_id": str(user_id), "email": email}
-    response = client.post(url, json=payload)
+    response = test_client_fixture.post(URL, json=payload)
     assert response.status_code == 200
     after_call = datetime.now(timezone.utc)
 
@@ -68,14 +68,14 @@ async def test_send_email_verification_creates_action_and_invalidates_previous(
 
 
 @pytest.mark.asyncio
-async def test_send_email_verification_task_executed_as_task(monkeypatch: MonkeyPatch):
+async def test_send_email_verification_task_executed_as_task(monkeypatch: MonkeyPatch, settings_fixture: Settings):
     mocked_task = MagicMock()
     monkeypatch.setattr(
         "app.features.users.services.tasks.send_email_verification.send_email_verification", mocked_task
     )
 
     user_id = uuid.uuid4()
-    background_task = run_task_in_worker()
+    background_task = run_task_in_worker(settings_fixture)
     await background_task.submit(SendEmailVerificationInput(user_id=user_id, email="new@example.com"))
 
     mocked_task.assert_called_once()

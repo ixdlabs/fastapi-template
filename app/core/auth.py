@@ -186,10 +186,8 @@ class AuthenticationFailedException(ServiceException):
     type = "auth/authentication-failed"
     detail = "Authentication failed, please login again"
 
-    def __init__(self, authenticate_value: str | None = None) -> None:
-        headers: dict[str, str] | None = None
-        if authenticate_value:
-            headers = {"WWW-Authenticate": authenticate_value}
+    def __init__(self, authenticate_value: str) -> None:
+        headers = {"WWW-Authenticate": authenticate_value}
         super().__init__(headers=headers)
 
 
@@ -198,10 +196,8 @@ class AuthorizationFailedException(ServiceException):
     type = "auth/authorization-failed"
     detail = "You do not have permission to access this resource"
 
-    def __init__(self, authenticate_value: str | None = None) -> None:
-        headers: dict[str, str] | None = None
-        if authenticate_value:
-            headers = {"WWW-Authenticate": authenticate_value}
+    def __init__(self, authenticate_value: str) -> None:
+        headers = {"WWW-Authenticate": authenticate_value}
         super().__init__(headers=headers)
 
 
@@ -232,10 +228,9 @@ def get_current_user(
     authenticator: AuthenticatorDep,
     security_scopes: SecurityScopes,
 ) -> AuthUser:
+    authenticate_value = "Bearer"
     if security_scopes.scopes:
         authenticate_value = f'Bearer scope="{security_scopes.scope_str}"'
-    else:
-        authenticate_value = "Bearer"
 
     try:
         user = authenticator.user(token)
@@ -252,6 +247,6 @@ def get_current_user(
 
 
 CurrentUserDep = Annotated[AuthUser, Security(get_current_user, scopes=["user"])]
-CurrentAdminDep = Annotated[AuthUser, Security(get_current_user, scopes=["admin"])]
-CurrentCustomerDep = Annotated[AuthUser, Security(get_current_user, scopes=["customer"])]
+CurrentAdminDep = Annotated[AuthUser, Security(get_current_user, scopes=["user", "admin"])]
+CurrentCustomerDep = Annotated[AuthUser, Security(get_current_user, scopes=["user", "customer"])]
 CurrentTaskRunnerDep = Annotated[AuthUser, Security(get_current_user, scopes=["task"])]

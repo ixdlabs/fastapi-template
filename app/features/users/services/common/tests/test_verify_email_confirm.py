@@ -8,14 +8,11 @@ from app.fixtures.user_factory import UserFactory
 from app.fixtures.user_action_factory import UserActionFactory
 from fastapi.testclient import TestClient
 
-from app.main import app
-
-client = TestClient(app)
-url = "/api/auth/verify-email"
+URL = "/api/auth/verify-email"
 
 
 @pytest.mark.asyncio
-async def test_user_can_verify_email_confirm(db_fixture: AsyncSession):
+async def test_user_can_verify_email_confirm(test_client_fixture: TestClient, db_fixture: AsyncSession):
     user: User = UserFactory.build(email="old@example.com")
     db_fixture.add(user)
     await db_fixture.commit()
@@ -27,7 +24,7 @@ async def test_user_can_verify_email_confirm(db_fixture: AsyncSession):
     await db_fixture.commit()
     await db_fixture.refresh(action)
 
-    response = client.post(url, json={"action_id": str(action.id), "token": "valid-token"})
+    response = test_client_fixture.post(URL, json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 200
 
     data = response.json()
@@ -42,14 +39,18 @@ async def test_user_can_verify_email_confirm(db_fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_verify_email_confirm_action_not_found():
-    response = client.post(url, json={"action_id": str(uuid.uuid4()), "token": "any-token"})
+async def test_user_cannot_verify_email_confirm_action_not_found(
+    test_client_fixture: TestClient,
+):
+    response = test_client_fixture.post(URL, json={"action_id": str(uuid.uuid4()), "token": "any-token"})
     assert response.status_code == 404
     assert response.json()["type"] == "users/common/verify-email-confirm/action-not-found"
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_verify_email_confirm_invalid_token(db_fixture: AsyncSession):
+async def test_user_cannot_verify_email_confirm_invalid_token(
+    test_client_fixture: TestClient, db_fixture: AsyncSession
+):
     user: User = UserFactory.build(email="old@example.com")
     db_fixture.add(user)
     await db_fixture.commit()
@@ -62,13 +63,15 @@ async def test_user_cannot_verify_email_confirm_invalid_token(db_fixture: AsyncS
     await db_fixture.commit()
     await db_fixture.refresh(action)
 
-    response = client.post(url, json={"action_id": str(action.id), "token": "wrong-token"})
+    response = test_client_fixture.post(URL, json={"action_id": str(action.id), "token": "wrong-token"})
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/verify-email-confirm/invalid-action-token"
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_verify_email_confirm_email_already_in_use(db_fixture: AsyncSession):
+async def test_user_cannot_verify_email_confirm_email_already_in_use(
+    test_client_fixture: TestClient, db_fixture: AsyncSession
+):
     user1: User = UserFactory.build(email="user1@example.com")
     user2: User = UserFactory.build(email="user2@example.com")
 
@@ -83,13 +86,15 @@ async def test_user_cannot_verify_email_confirm_email_already_in_use(db_fixture:
     await db_fixture.commit()
     await db_fixture.refresh(action)
 
-    response = client.post(url, json={"action_id": str(action.id), "token": "valid-token"})
+    response = test_client_fixture.post(URL, json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/verify-email-confirm/email-already-in-use"
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_verify_email_confirm_already_verified(db_fixture: AsyncSession):
+async def test_user_cannot_verify_email_confirm_already_verified(
+    test_client_fixture: TestClient, db_fixture: AsyncSession
+):
     user: User = UserFactory.build(email="old@example.com")
     db_fixture.add(user)
     await db_fixture.commit()
@@ -103,12 +108,14 @@ async def test_user_cannot_verify_email_confirm_already_verified(db_fixture: Asy
     await db_fixture.commit()
     await db_fixture.refresh(action)
 
-    response = client.post(url, json={"action_id": str(action.id), "token": "valid-token"})
+    response = test_client_fixture.post(URL, json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_verify_email_confirm_action_type_mismatch(db_fixture: AsyncSession):
+async def test_user_cannot_verify_email_confirm_action_type_mismatch(
+    test_client_fixture: TestClient, db_fixture: AsyncSession
+):
     user: User = UserFactory.build(email="old@example.com")
     db_fixture.add(user)
     await db_fixture.commit()
@@ -122,13 +129,15 @@ async def test_user_cannot_verify_email_confirm_action_type_mismatch(db_fixture:
     await db_fixture.commit()
     await db_fixture.refresh(action)
 
-    response = client.post(url, json={"action_id": str(action.id), "token": "valid-token"})
+    response = test_client_fixture.post(URL, json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/verify-email-confirm/invalid-action-token"
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_verify_email_confirm_missing_email_in_action_data(db_fixture: AsyncSession):
+async def test_user_cannot_verify_email_confirm_missing_email_in_action_data(
+    test_client_fixture: TestClient, db_fixture: AsyncSession
+):
     user: User = UserFactory.build(email="old@example.com")
     db_fixture.add(user)
     await db_fixture.commit()
@@ -140,6 +149,6 @@ async def test_user_cannot_verify_email_confirm_missing_email_in_action_data(db_
     await db_fixture.commit()
     await db_fixture.refresh(action)
 
-    response = client.post(url, json={"action_id": str(action.id), "token": "valid-token"})
+    response = test_client_fixture.post(URL, json={"action_id": str(action.id), "token": "valid-token"})
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/verify-email-confirm/invalid-action-token"

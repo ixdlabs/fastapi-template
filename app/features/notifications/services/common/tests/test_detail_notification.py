@@ -6,16 +6,16 @@ from app.features.notifications.models.notification_delivery import Notification
 from app.fixtures.notification_delivery_factory import NotificationDeliveryFactory
 from app.fixtures.notification_factory import NotificationFactory
 from app.fixtures.user_factory import UserFactory
-from app.main import app
 
 from app.features.users.models.user import User
 
-client = TestClient(app)
-base_url = "/api/v1/common/notifications"
+BASE_URL = "/api/v1/common/notifications"
 
 
 @pytest.mark.asyncio
-async def test_user_can_view_notification_details(db_fixture: AsyncSession, authenticated_user_fixture: User):
+async def test_user_can_view_notification_details(
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticated_user_fixture: User
+):
     notification = NotificationFactory.build(user=authenticated_user_fixture, data={"key": "value"})
     db_fixture.add(notification)
     await db_fixture.flush()
@@ -26,7 +26,7 @@ async def test_user_can_view_notification_details(db_fixture: AsyncSession, auth
     await db_fixture.commit()
     await db_fixture.refresh(delivery)
 
-    response = client.get(f"{base_url}/{delivery.id}")
+    response = test_client_fixture.get(f"{BASE_URL}/{delivery.id}")
     assert response.status_code == 200
 
     data = response.json()
@@ -35,7 +35,9 @@ async def test_user_can_view_notification_details(db_fixture: AsyncSession, auth
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_access_other_users_notification(db_fixture: AsyncSession, authenticated_user_fixture: User):
+async def test_user_cannot_access_other_users_notification(
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticated_user_fixture: User
+):
     assert authenticated_user_fixture is not None
 
     other_user: User = UserFactory.build()
@@ -49,6 +51,6 @@ async def test_user_cannot_access_other_users_notification(db_fixture: AsyncSess
     await db_fixture.commit()
     await db_fixture.refresh(notification_delivery)
 
-    response = client.get(f"{base_url}/{notification_delivery.id}")
+    response = test_client_fixture.get(f"{BASE_URL}/{notification_delivery.id}")
     assert response.status_code == 404
     assert response.json()["type"] == "notifications/common/detail-notification/notification-not-found"

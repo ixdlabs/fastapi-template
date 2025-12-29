@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     celery_task_always_eager: bool = False
     celery_broker_url: str = "sqla+sqlite:///sqlite.celery.db"
+    celery_result_backend_url: str = "rpc"
     celery_timezone: str = "UTC"
 
     otel_enabled: bool = False

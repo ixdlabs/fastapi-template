@@ -8,14 +8,14 @@ import pytest
 from app.features.users.models.user import User
 from app.features.users.services.tasks.send_email_verification import SendEmailVerificationInput
 from app.fixtures.user_factory import UserFactory
-from app.main import app
 
-client = TestClient(app)
-url = "/api/auth/register"
+URL = "/api/auth/register"
 
 
 @pytest.mark.asyncio
-async def test_user_can_register_with_valid_data(db_fixture: AsyncSession, monkeypatch: MonkeyPatch):
+async def test_user_can_register_with_valid_data(
+    test_client_fixture: TestClient, db_fixture: AsyncSession, monkeypatch: MonkeyPatch
+):
     mocked_task = MagicMock()
     monkeypatch.setattr(
         "app.features.users.services.tasks.send_email_verification.send_email_verification", mocked_task
@@ -28,7 +28,7 @@ async def test_user_can_register_with_valid_data(db_fixture: AsyncSession, monke
         "password": "newpassword",
         "email": "newuser@example.com",
     }
-    response = client.post(url, json=user_data)
+    response = test_client_fixture.post(URL, json=user_data)
     assert response.status_code == 201
 
     data = response.json()
@@ -51,7 +51,7 @@ async def test_user_can_register_with_valid_data(db_fixture: AsyncSession, monke
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_register_with_existing_username(db_fixture: AsyncSession):
+async def test_user_cannot_register_with_existing_username(test_client_fixture: TestClient, db_fixture: AsyncSession):
     existing_user: User = UserFactory.build()
     db_fixture.add(existing_user)
     await db_fixture.commit()
@@ -63,13 +63,13 @@ async def test_user_cannot_register_with_existing_username(db_fixture: AsyncSess
         "last_name": "User",
         "password": "anotherpassword",
     }
-    response = client.post(url, json=user_data)
+    response = test_client_fixture.post(URL, json=user_data)
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/register/username-exists"
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_register_with_existing_email(db_fixture: AsyncSession):
+async def test_user_cannot_register_with_existing_email(test_client_fixture: TestClient, db_fixture: AsyncSession):
     existing_user: User = UserFactory.build(email="existing@example.com")
     db_fixture.add(existing_user)
     await db_fixture.commit()
@@ -82,6 +82,6 @@ async def test_user_cannot_register_with_existing_email(db_fixture: AsyncSession
         "password": "anotherpassword",
         "email": "existing@example.com",
     }
-    response = client.post(url, json=user_data)
+    response = test_client_fixture.post(URL, json=user_data)
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/register/email-exists"

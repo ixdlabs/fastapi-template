@@ -3,18 +3,16 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.testclient import TestClient
 
-from app.main import app
 from app.features.users.models.user import User
 from app.features.users.models.user_action import UserAction, UserActionType, UserActionState
 from app.fixtures.user_factory import UserFactory
 from app.fixtures.user_action_factory import UserActionFactory
 
-client = TestClient(app)
-url = "/api/auth/reset-password-confirm"
+URL = "/api/auth/reset-password-confirm"
 
 
 @pytest.mark.asyncio
-async def test_user_can_reset_password(db_fixture: AsyncSession):
+async def test_user_can_reset_password(test_client_fixture: TestClient, db_fixture: AsyncSession):
     user: User = UserFactory.build()
     db_fixture.add(user)
     await db_fixture.commit()
@@ -28,7 +26,7 @@ async def test_user_can_reset_password(db_fixture: AsyncSession):
     await db_fixture.refresh(action)
 
     payload = {"action_id": str(action.id), "token": "valid-token", "new_password": "new-secure-password"}
-    response = client.post(url, json=payload)
+    response = test_client_fixture.post(URL, json=payload)
     assert response.status_code == 200
 
     await db_fixture.refresh(user)
@@ -38,16 +36,20 @@ async def test_user_can_reset_password(db_fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_reset_password_with_invalid_action_id():
+async def test_user_cannot_reset_password_with_invalid_action_id(
+    test_client_fixture: TestClient,
+):
     payload = {"action_id": str(uuid.uuid4()), "token": "any-token", "new_password": "password"}
-    response = client.post(url, json=payload)
+    response = test_client_fixture.post(URL, json=payload)
 
     assert response.status_code == 404
     assert response.json()["type"] == "users/common/reset-password-confirm/action-not-found"
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_reset_password_with_different_action_type(db_fixture: AsyncSession):
+async def test_user_cannot_reset_password_with_different_action_type(
+    test_client_fixture: TestClient, db_fixture: AsyncSession
+):
     user: User = UserFactory.build()
     db_fixture.add(user)
     await db_fixture.commit()
@@ -60,14 +62,14 @@ async def test_user_cannot_reset_password_with_different_action_type(db_fixture:
     await db_fixture.refresh(action)
 
     payload = {"action_id": str(action.id), "token": "some-token", "new_password": "password"}
-    response = client.post(url, json=payload)
+    response = test_client_fixture.post(URL, json=payload)
 
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/reset-password-confirm/invalid-action-token"
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_reset_password_with_invalid_token(db_fixture: AsyncSession):
+async def test_user_cannot_reset_password_with_invalid_token(test_client_fixture: TestClient, db_fixture: AsyncSession):
     user: User = UserFactory.build()
     db_fixture.add(user)
     await db_fixture.commit()
@@ -80,14 +82,16 @@ async def test_user_cannot_reset_password_with_invalid_token(db_fixture: AsyncSe
     await db_fixture.refresh(action)
 
     payload = {"action_id": str(action.id), "token": "wrong-token", "new_password": "password"}
-    response = client.post(url, json=payload)
+    response = test_client_fixture.post(URL, json=payload)
 
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/reset-password-confirm/invalid-action-token"
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_reset_password_with_already_completed_action(db_fixture: AsyncSession):
+async def test_user_cannot_reset_password_with_already_completed_action(
+    test_client_fixture: TestClient, db_fixture: AsyncSession
+):
     user: User = UserFactory.build()
     db_fixture.add(user)
     await db_fixture.commit()
@@ -102,6 +106,6 @@ async def test_user_cannot_reset_password_with_already_completed_action(db_fixtu
     await db_fixture.refresh(action)
 
     payload = {"action_id": str(action.id), "token": "wrong-token", "new_password": "password"}
-    response = client.post(url, json=payload)
+    response = test_client_fixture.post(URL, json=payload)
     assert response.status_code == 400
     assert response.json()["type"] == "users/common/reset-password-confirm/invalid-action-token"

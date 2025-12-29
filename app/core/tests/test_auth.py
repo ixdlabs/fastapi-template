@@ -18,7 +18,7 @@ from app.core.settings import Settings
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.users.models.user import User
+from app.features.users.models.user import User, UserType
 from app.fixtures.user_factory import UserFactory
 
 
@@ -29,6 +29,22 @@ async def user_fixture(db_fixture: AsyncSession):
     await db_fixture.commit()
     await db_fixture.refresh(user)
     return user
+
+
+@pytest.fixture
+def debug_true_settings_fixture(settings_fixture: Settings):
+    original_debug = settings_fixture.debug
+    settings_fixture.debug = True
+    yield settings_fixture
+    settings_fixture.debug = original_debug
+
+
+@pytest.fixture
+def debug_false_settings_fixture(settings_fixture: Settings):
+    original_debug = settings_fixture.debug
+    settings_fixture.debug = False
+    yield settings_fixture
+    settings_fixture.debug = original_debug
 
 
 # Tests for Authenticator
@@ -83,6 +99,45 @@ def test_encode_rejects_requested_scopes_outside_default_set(authenticator_fixtu
         _ = authenticator_fixture.encode(user_fixture, requested_scopes=requested_scopes)
 
 
+def test_encode_adds_task_claim_in_debug_mode_for_admin_users(
+    authenticator_fixture: Authenticator, debug_true_settings_fixture: Settings, user_fixture: User
+):
+    user_fixture.type = UserType.ADMIN
+    access_token, refresh_token = authenticator_fixture.encode(user_fixture)
+
+    assert isinstance(access_token, str)
+    assert isinstance(refresh_token, str)
+
+    token_scopes = authenticator_fixture.scopes(access_token)
+    assert "task" in token_scopes
+
+
+def test_encode_does_not_add_task_claim_in_debug_mode_for_non_admin_users(
+    authenticator_fixture: Authenticator, debug_true_settings_fixture: Settings, user_fixture: User
+):
+    user_fixture.type = UserType.CUSTOMER
+    access_token, refresh_token = authenticator_fixture.encode(user_fixture)
+
+    assert isinstance(access_token, str)
+    assert isinstance(refresh_token, str)
+
+    token_scopes = authenticator_fixture.scopes(access_token)
+    assert "task" not in token_scopes
+
+
+def test_encode_does_not_add_task_claim_in_non_debug_mode_for_admin_users(
+    authenticator_fixture: Authenticator, debug_false_settings_fixture: Settings, user_fixture: User
+):
+    user_fixture.type = UserType.ADMIN
+    access_token, refresh_token = authenticator_fixture.encode(user_fixture)
+
+    assert isinstance(access_token, str)
+    assert isinstance(refresh_token, str)
+
+    token_scopes = authenticator_fixture.scopes(access_token)
+    assert "task" not in token_scopes
+
+
 # JWT User Tests
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -113,9 +168,7 @@ def test_user_raises_auth_exception_for_malformed_jwt(authenticator_fixture: Aut
         _ = authenticator_fixture.user("invalid.token.value")
 
 
-def test_user_raises_auth_exception_when_user_payload_missing(
-    authenticator_fixture: Authenticator, settings_fixture: Settings
-):
+def test_user_raises_auth_exception_when_user_payload_missing(authenticator_fixture: Authenticator):
     token = authenticator_fixture.jwt_encode(
         payload={"sub": str(uuid.uuid4()), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     )
@@ -124,9 +177,7 @@ def test_user_raises_auth_exception_when_user_payload_missing(
         _ = authenticator_fixture.user(token)
 
 
-def test_user_raises_auth_exception_for_invalid_user_payload(
-    authenticator_fixture: Authenticator, settings_fixture: Settings
-):
+def test_user_raises_auth_exception_for_invalid_user_payload(authenticator_fixture: Authenticator):
     token = authenticator_fixture.jwt_encode(
         payload={
             "sub": str(uuid.uuid4()),
@@ -139,9 +190,7 @@ def test_user_raises_auth_exception_for_invalid_user_payload(
         _ = authenticator_fixture.user(token)
 
 
-def test_user_raises_auth_exception_for_expired_token(
-    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
-):
+def test_user_raises_auth_exception_for_expired_token(authenticator_fixture: Authenticator, user_fixture: User):
     expired_token = authenticator_fixture.jwt_encode(
         payload={
             "sub": str(user_fixture.id),
@@ -160,7 +209,7 @@ def test_user_raises_auth_exception_for_expired_token(
 
 
 def test_user_raises_auth_exception_when_user_payload_not_provided(
-    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+    authenticator_fixture: Authenticator, user_fixture: User
 ):
     token = authenticator_fixture.jwt_encode(
         payload={
@@ -175,7 +224,7 @@ def test_user_raises_auth_exception_when_user_payload_not_provided(
 
 
 def test_user_raises_auth_exception_for_unexpected_payload_fields(
-    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+    authenticator_fixture: Authenticator, user_fixture: User
 ):
     token = authenticator_fixture.jwt_encode(
         payload={
@@ -191,7 +240,7 @@ def test_user_raises_auth_exception_for_unexpected_payload_fields(
 
 
 def test_user_returns_auth_user_when_payload_contains_expected_fields(
-    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
+    authenticator_fixture: Authenticator, user_fixture: User
 ):
     token = authenticator_fixture.jwt_encode(
         payload={
@@ -233,18 +282,14 @@ def test_sub_returns_uuid_from_access_token(authenticator_fixture: Authenticator
     assert user_id == user_fixture.id
 
 
-def test_sub_raises_auth_exception_when_sub_claim_missing(
-    authenticator_fixture: Authenticator, settings_fixture: Settings
-):
+def test_sub_raises_auth_exception_when_sub_claim_missing(authenticator_fixture: Authenticator):
     token = authenticator_fixture.jwt_encode(payload={"exp": datetime.now(timezone.utc) + timedelta(minutes=5)})
 
     with pytest.raises(AuthException):
         _ = authenticator_fixture.sub(token)
 
 
-def test_sub_raises_auth_exception_for_non_uuid_sub_claim(
-    authenticator_fixture: Authenticator, settings_fixture: Settings
-):
+def test_sub_raises_auth_exception_for_non_uuid_sub_claim(authenticator_fixture: Authenticator):
     token = authenticator_fixture.jwt_encode(
         payload={"sub": "not-a-uuid", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     )
@@ -257,9 +302,7 @@ def test_sub_raises_auth_exception_for_non_uuid_sub_claim(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_iat_raises_auth_exception_when_iat_claim_missing(
-    authenticator_fixture: Authenticator, settings_fixture: Settings
-):
+def test_iat_raises_auth_exception_when_iat_claim_missing(authenticator_fixture: Authenticator):
     token = authenticator_fixture.jwt_encode(
         payload={"sub": str(uuid.uuid4()), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
     )
@@ -268,9 +311,7 @@ def test_iat_raises_auth_exception_when_iat_claim_missing(
         _ = authenticator_fixture.iat(token)
 
 
-def test_iat_raises_auth_exception_for_malformed_iat_claim(
-    authenticator_fixture: Authenticator, settings_fixture: Settings
-):
+def test_iat_raises_auth_exception_for_malformed_iat_claim(authenticator_fixture: Authenticator):
     token = authenticator_fixture.jwt_encode(
         payload={
             "sub": str(uuid.uuid4()),
@@ -282,9 +323,7 @@ def test_iat_raises_auth_exception_for_malformed_iat_claim(
         _ = authenticator_fixture.iat(token)
 
 
-def test_iat_returns_issued_at_datetime_from_token(
-    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
-):
+def test_iat_returns_issued_at_datetime_from_token(authenticator_fixture: Authenticator, user_fixture: User):
     with time_machine.travel("2025-01-01 00:00:00"):
         issued_at = datetime.now(timezone.utc)
         expiration = issued_at + timedelta(minutes=5)
@@ -306,9 +345,7 @@ def test_iat_raises_auth_exception_for_malformed_jwt(authenticator_fixture: Auth
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_scopes_returns_empty_set_when_scope_claim_missing(
-    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
-):
+def test_scopes_returns_empty_set_when_scope_claim_missing(authenticator_fixture: Authenticator, user_fixture: User):
     token = authenticator_fixture.jwt_encode(
         payload={
             "sub": str(user_fixture.id),
@@ -322,9 +359,7 @@ def test_scopes_returns_empty_set_when_scope_claim_missing(
     assert len(scopes) == 0
 
 
-def test_scopes_splits_space_delimited_scope_claim_into_set(
-    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
-):
+def test_scopes_splits_space_delimited_scope_claim_into_set(authenticator_fixture: Authenticator, user_fixture: User):
     token = authenticator_fixture.jwt_encode(
         payload={
             "sub": str(user_fixture.id),
@@ -339,9 +374,7 @@ def test_scopes_splits_space_delimited_scope_claim_into_set(
     assert scopes == {"admin", "user", "customer"}
 
 
-def test_scopes_returns_empty_set_for_empty_scope_claim(
-    authenticator_fixture: Authenticator, settings_fixture: Settings, user_fixture: User
-):
+def test_scopes_returns_empty_set_for_empty_scope_claim(authenticator_fixture: Authenticator, user_fixture: User):
     token = authenticator_fixture.jwt_encode(
         payload={
             "sub": str(user_fixture.id),

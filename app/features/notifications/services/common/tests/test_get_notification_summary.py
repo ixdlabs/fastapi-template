@@ -6,17 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.notifications.models.notification_delivery import NotificationChannel, NotificationStatus
 from app.fixtures.notification_delivery_factory import NotificationDeliveryFactory
 from app.fixtures.notification_factory import NotificationFactory
-from app.main import app
 
 from app.features.users.models.user import User
 
-client = TestClient(app)
-url = "/api/v1/common/notifications/summary"
+URL = "/api/v1/common/notifications/summary"
 
 
 @pytest.mark.asyncio
 async def test_user_can_get_notification_summary_containing_only_unread_inapp_notifications(
-    db_fixture: AsyncSession, authenticated_user_fixture: User
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticated_user_fixture: User
 ):
     notification = NotificationFactory.build(user=authenticated_user_fixture)
     unread = NotificationDeliveryFactory.build(
@@ -34,6 +32,6 @@ async def test_user_can_get_notification_summary_containing_only_unread_inapp_no
 
     await db_fixture.commit()
 
-    response = client.get(url)
+    response = test_client_fixture.get(URL)
     assert response.status_code == 200
     assert response.json() == {"unread_count": 1}

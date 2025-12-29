@@ -9,16 +9,16 @@ from app.features.notifications.models.notification_delivery import (
 )
 from app.fixtures.notification_delivery_factory import NotificationDeliveryFactory
 from app.fixtures.notification_factory import NotificationFactory
-from app.main import app
 
 from app.features.users.models.user import User
 
-client = TestClient(app)
-base_url = "/api/v1/common/notifications"
+BASE_URL = "/api/v1/common/notifications"
 
 
 @pytest.mark.asyncio
-async def test_user_can_mark_notification_as_read(db_fixture: AsyncSession, authenticated_user_fixture: User):
+async def test_user_can_mark_notification_as_read(
+    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticated_user_fixture: User
+):
     notification = NotificationFactory.build(user=authenticated_user_fixture)
     notification_delivery: NotificationDelivery = NotificationDeliveryFactory.build(
         notification=notification, channel=NotificationChannel.INAPP, status=NotificationStatus.SENT
@@ -28,7 +28,7 @@ async def test_user_can_mark_notification_as_read(db_fixture: AsyncSession, auth
     await db_fixture.commit()
     await db_fixture.refresh(notification_delivery)
 
-    response = client.post(f"{base_url}/{notification_delivery.id}/read")
+    response = test_client_fixture.post(f"{BASE_URL}/{notification_delivery.id}/read")
     assert response.status_code == 200
 
     await db_fixture.refresh(notification_delivery)
