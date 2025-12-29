@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.database import Base, create_db_engine, get_db_session, get_worker_db_session
+from app.core.database import Base, create_db_engine, get_db_session
 from app.core.settings import Settings
 
 from pytest import MonkeyPatch
@@ -139,13 +139,5 @@ def test_create_db_engine_caches_connections_per_url_and_debug_flag(monkeypatch:
 async def test_get_db_session_yields_async_session_bound_to_given_url():
     test_settings = Settings.model_construct(database_url="sqlite+aiosqlite:///:memory:", debug=True)
     async for db in get_db_session(test_settings):
-        url = getattr(db.bind, "url", None)
-        assert str(url) == "sqlite+aiosqlite:///:memory:"
-
-
-@pytest.mark.asyncio
-async def test_get_worker_db_session_yields_async_session_bound_to_given_url():
-    test_settings = Settings.model_construct(database_url="sqlite+aiosqlite:///:memory:", debug=True)
-    async with get_worker_db_session(test_settings) as db:
         url = getattr(db.bind, "url", None)
         assert str(url) == "sqlite+aiosqlite:///:memory:"

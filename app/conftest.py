@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from fast_depends import dependency_provider
 from fastapi import FastAPI
 import pytest
 from fastapi.testclient import TestClient
@@ -90,15 +91,6 @@ async def db_fixture(db_engine_fixture: AsyncEngine):
             await transaction.rollback()
 
 
-# Celery app for tests
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="function", autouse=True)
-def celery_app_fixture(settings_fixture: Settings):
-    yield create_celery_app(settings_fixture)
-
-
 # Authenticator for tests
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -126,6 +118,17 @@ def rate_limit_strategy_fixture():
 @pytest.fixture(scope="function")
 def cache_backend_fixture():
     yield SimpleMemoryCache()
+
+
+# Celery app for tests
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="function", autouse=True)
+def celery_app_fixture(settings_fixture: Settings, db_fixture: AsyncSession):
+    with dependency_provider.scope(get_settings, lambda: settings_fixture):
+        with dependency_provider.scope(get_db_session, lambda: db_fixture):
+            yield create_celery_app(settings_fixture)
 
 
 # Dependency overrides for tests

@@ -3,27 +3,25 @@ This module defines the Background class and its dependency for managing backgro
 The Background class provides a method to submit tasks to be executed asynchronously.
 """
 
-from collections.abc import Callable, Coroutine
-from dataclasses import dataclass
+from collections.abc import Callable
 import functools
 import logging
-from typing import ParamSpec, TypeVar
+from typing import ParamSpec, Protocol, TypeVar
 import uuid
+from fast_depends import dependency_provider, inject
 from fastapi.dependencies.utils import get_typed_signature
 
 from celery import shared_task
-from celery.app.task import Context
+from celery.app.task import Context as CeleryContext
 from celery.app.task import Task as CeleryTask
 
 from pydantic import BaseModel
 
-from app.core.auth import AuthUser
+from app.core.auth import AuthUser, get_current_user
 from app.core.helpers import run_as_sync
 from app.core.settings import SettingsDep
 
 logger = logging.getLogger(__name__)
-P = ParamSpec("P")
-R = TypeVar("R")
 
 # Dependency that provides application background task runner.
 # The background is cached to avoid recreating it on each request.
@@ -43,24 +41,22 @@ class BackgroundTask:
         logger.info(f"Submitted background task {self.celery_task.name} with id {result.id}")
 
 
-# Worker scope containing all current worker information.
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@dataclass
-class WorkerScope:
-    context: Context
-
-    def to_auth_user(self) -> AuthUser:
-        return AuthUser(id=uuid.uuid4(), type="task_runner", worker_id=self.context.id)
-
-
 # Task Registry
 # This acts similar to FastAPI's APIRouter but for background tasks.
 # ----------------------------------------------------------------------------------------------------------------------
 
-type BackgroundTaskCallable[P: BaseModel, R: BaseModel] = Callable[[P, WorkerScope], Coroutine[None, None, R]]
 type BackgroundTaskFactory = Callable[[SettingsDep], BackgroundTask]
+type WorkerContext = CeleryContext
+
+P = TypeVar("P", bound=BaseModel, contravariant=True)
+R = TypeVar("R", bound=BaseModel, covariant=True)
+X = ParamSpec("X")
+
+
+class BackgroundTaskCallable(Protocol[P, R, X]):
+    __name__: str
+
+    async def __call__(self, task_input: P, *args: X.args, **kwargs: X.kwargs) -> R: ...
 
 
 class TaskRegistry:
@@ -68,25 +64,27 @@ class TaskRegistry:
         super().__init__()
         self.beat_schedule: dict[str, dict[str, object]] = {}
 
-    def background_task[P: BaseModel, R: BaseModel](
-        self, task_name: str, *, schedule: int | None = None
-    ) -> Callable[[BackgroundTaskCallable[P, R]], BackgroundTaskFactory]:
+    def background_task(self, task_name: str, *, schedule: int | None = None):
         """Register a background task."""
 
-        def decorator(func: BackgroundTaskCallable[P, R]) -> BackgroundTaskFactory:
+        def decorator(
+            func: BackgroundTaskCallable[P, R, X],
+        ) -> BackgroundTaskFactory:
             task_full_name = f"{func.__module__}.{func.__name__}"
 
-            # Inspect the type of first parameter to determine input model type
             wrapped_signature = get_typed_signature(func)
             task_input_param = next(iter(wrapped_signature.parameters.values()), None)
             assert task_input_param is not None and issubclass(task_input_param.annotation, BaseModel)
 
             # Async function that wraps the original function to handle dependency injection
-            async def async_func(ctx: Context, raw_task_input: str, **kwargs: object) -> str:
+            async def async_func(ctx: CeleryContext, raw_task_input: str, **kwargs: object) -> str:
                 input_model: type[P] = task_input_param.annotation
                 task_input = input_model.model_validate_json(raw_task_input)
-                result = await func(task_input, WorkerScope(context=ctx))
-                return result.model_dump_json()
+                current_user = AuthUser(id=uuid.uuid4(), type="task_runner", worker_id=str(ctx.id))
+                with dependency_provider.scope(get_current_user, lambda: current_user):
+                    injected_func = inject(func)
+                    result: R = await injected_func(task_input)  # pyright: ignore[reportCallIssue]
+                    return result.model_dump_json()
 
             # Wrapper function to convert async function to sync for Celery
             @functools.wraps(func)

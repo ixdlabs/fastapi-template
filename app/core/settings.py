@@ -12,6 +12,7 @@ from typing import Annotated, Literal
 
 from fastapi import Depends
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from fast_depends import Depends as WorkerDepends
 
 # Application settings class.
 # These are loaded from a .env file.
@@ -70,3 +71,4 @@ def get_settings():
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+SettingsWorkerDep = Annotated[Settings, WorkerDepends(get_settings)]

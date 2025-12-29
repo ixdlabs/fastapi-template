@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
-from app.core.auth import CurrentTaskRunnerDep
-from app.core.background import BackgroundTask, TaskRegistry, WorkerScope
-from app.core.database import DbDep, get_worker_db_session
-from app.core.email_sender import Email, EmailSenderDep, get_email_sender
-from app.core.settings import SettingsDep, get_settings
+from app.core.auth import CurrentTaskRunnerDep, CurrentWorkerDep
+from app.core.background import BackgroundTask, TaskRegistry
+from app.core.database import DbDep, DbWorkerDep
+from app.core.email_sender import Email, EmailSenderDep, EmailSenderWorkerDep
+from app.core.settings import SettingsDep, SettingsWorkerDep
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
 
@@ -95,14 +95,16 @@ async def send_password_reset_email(
 
 
 @registry.background_task("send_password_reset_email")
-async def run_task_in_worker(task_input: SendPasswordResetInput, scope: WorkerScope) -> SendPasswordResetOutput:
-    settings = get_settings()
-    email_sender = get_email_sender(settings)
-    current_user = scope.to_auth_user()
-    async with get_worker_db_session(settings) as db:
-        return await send_password_reset_email(
-            task_input, db=db, settings=settings, current_user=current_user, email_sender=email_sender
-        )
+async def run_task_in_worker(
+    task_input: SendPasswordResetInput,
+    current_user: CurrentWorkerDep,
+    settings: SettingsWorkerDep,
+    db: DbWorkerDep,
+    email_sender: EmailSenderWorkerDep,
+) -> SendPasswordResetOutput:
+    return await send_password_reset_email(
+        task_input, current_user=current_user, db=db, settings=settings, email_sender=email_sender
+    )
 
 
 SendPasswordResetTaskDep = Annotated[BackgroundTask, Depends(run_task_in_worker)]

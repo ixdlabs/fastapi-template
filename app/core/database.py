@@ -9,12 +9,12 @@ Fast API Docs: https://fastapi.tiangolo.com/tutorial/sql-databases/
 """
 
 from collections.abc import Iterable
-from contextlib import asynccontextmanager
 from typing import Annotated
 from functools import lru_cache
 import logging
 import uuid
 from fastapi import Depends
+from fast_depends import Depends as WorkerDepends
 import orjson
 from sqlalchemy import UUID, inspect
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -92,8 +92,8 @@ class Base(DeclarativeBase):
 
 
 @lru_cache
-def create_db_engine(database_url: str, debug: bool = False, is_worker: bool = False):
-    logger.info("Creating database engine", extra={"database_url": database_url, "is_worker": is_worker})
+def create_db_engine(database_url: str, debug: bool = False):
+    logger.info("Creating database engine", extra={"database_url": database_url})
     return create_async_engine(database_url, echo=debug)
 
 
@@ -109,17 +109,4 @@ async def get_db_session(settings: SettingsDep):
 
 
 DbDep = Annotated[AsyncSession, Depends(get_db_session)]
-
-
-# Helper to get a database session within an async context manager.
-# This should only be used in places where FastAPI dependencies cannot be used (eg: tasks).
-# Make sure the functionality is tested properly when using this.
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@asynccontextmanager
-async def get_worker_db_session(settings: SettingsDep):
-    engine = create_db_engine(settings.database_url, debug=settings.debug, is_worker=True)
-    session_maker = async_sessionmaker(engine)
-    async with session_maker() as session:
-        yield session
+DbWorkerDep = Annotated[AsyncSession, WorkerDepends(get_db_session)]

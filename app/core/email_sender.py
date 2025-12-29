@@ -12,6 +12,7 @@ from jinja2 import Template
 from pydantic import BaseModel, EmailStr
 
 from app.core.settings import SettingsDep
+from fast_depends import Depends as WorkerDepends
 
 logger = logging.getLogger(__name__)
 
@@ -122,3 +123,4 @@ def get_email_sender(settings: SettingsDep) -> EmailSender:
 
 
 EmailSenderDep = Annotated[EmailSender, Depends(get_email_sender)]
+EmailSenderWorkerDep = Annotated[EmailSender, WorkerDepends(get_email_sender)]
