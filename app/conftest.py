@@ -21,8 +21,8 @@ from app.core.settings import Settings, get_settings
 from app.features.users.models.user import UserType, User
 from aiocache import SimpleMemoryCache, BaseCache
 
-from app.main import create_fastapi_app
-from app.worker import create_celery_app
+from app.fastapi import create_fastapi_app
+from app.celery import create_celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -90,26 +90,8 @@ async def db_fixture(db_engine_fixture: AsyncEngine):
             await transaction.rollback()
 
 
-# Celery fixtures
+# Celery app for tests
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def celery_config(settings_fixture: Settings):
-    return {
-        "broker_url": settings_fixture.celery_broker_url,
-        "result_backend": settings_fixture.celery_result_backend_url,
-    }
-
-
-@pytest.fixture(scope="session")
-def use_celery_app_trap():
-    return True
-
-
-@pytest.fixture(scope="session")
-def celery_enable_logging():
-    return True
 
 
 @pytest.fixture(scope="function", autouse=True)

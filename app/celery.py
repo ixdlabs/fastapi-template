@@ -7,7 +7,7 @@ from app.core.logging import setup_logging
 from app.core.otel import setup_open_telemetry
 from app.core.settings import Settings, get_settings
 
-from app.features import models  # noqa: F401,E402
+from app.features import models  # noqa: F401
 from app.features import tasks
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def create_celery_app(settings: Settings) -> Celery:
     # Ensure task modules are imported when the worker starts.
     # This makes task registration deterministic without needing to rely on
     # side-effect imports in worker entrypoints.
-    app.conf.imports = ("app.features.task_registry",)
+    app.conf.imports = ("app.features.tasks",)
 
     # Register periodic tasks from the task registry.
     # https://docs.celeryq.dev/en/main/userguide/periodic-tasks.html
@@ -45,10 +45,8 @@ def create_celery_app(settings: Settings) -> Celery:
     return app
 
 
-def main() -> None:
-    app = create_celery_app(get_settings())
-    app.start()
-
+global_settings = get_settings()
+app = create_celery_app(global_settings)
 
 if __name__ == "__main__":
-    main()
+    app.start()

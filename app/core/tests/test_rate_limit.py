@@ -179,7 +179,8 @@ async def test_rate_limit_calls_limit():
     assert await handler(x=1) == "ok"
     rl_handler = rate_limit("3/minute")(handler)
 
-    result = await rl_handler(x=1, __rate_limit_dependency=rate_limit_obj)  # pyright: ignore[reportCallIssue]
+    kwargs = {"__rate_limit_dependency": rate_limit_obj}
+    result = await rl_handler(x=1, **kwargs)
 
     assert result == "ok"
     parsed_limit = parse("3/minute")
@@ -199,7 +200,8 @@ async def test_rate_limit_strips_dependency_kwarg():
     assert await handler() == "ok"
     rl_handler = rate_limit("1/second")(handler)
 
-    result = await rl_handler(__rate_limit_dependency=limiter)  # pyright: ignore[reportCallIssue]
+    kwargs = {"__rate_limit_dependency": limiter}
+    result = await rl_handler(**kwargs)
     assert result == "ok"
 
 

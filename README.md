@@ -100,7 +100,7 @@ OTEL_EXPORTER_OTLP_HEADERS="signoz-ingestion-key=<your-ingestion-key>"
 Start the application using:
 
 ```bash
-uv run uvicorn app.main:app
+uv run uvicorn app.fastapi:app
 ```
 
 ### Installing OTel Instrumentations
@@ -131,7 +131,7 @@ Once configured, traces, metrics, and logs are automatically exported via OTLP a
 Run after applying migrations:
 
 ```bash
-uv run fastapi dev app/main.py
+uv run fastapi dev app/fastapi.py
 ```
 
 Docs available at: [http://127.0.0.1:8000/api/docs](http://127.0.0.1:8000/api/docs)
@@ -163,9 +163,9 @@ Default queue backend is SQLite. Run following commands to start the worker and 
 
 ```bash
 # Worker - do the actual work
-uv run celery -A app.worker worker
+uv run celery -A app.celery worker
 # Beat Scheduler - schedule periodic tasks
-uv run celery -A app.worker beat
+uv run celery -A app.celery beat
 ```
 
 ## 🐳 Docker Setup
@@ -189,7 +189,7 @@ docker run --rm --env-file .env fastapi-template uv run alembic upgrade head
 
 ```
 app/
-├── main.py                  # App entry point
+├── fastapi.py               # App entry point
 ├── core/                    # Core configuration (env, logging, otel, etc.)
 ├── features/users/          # User domain logic
 ├── migrations/              # Alembic migrations

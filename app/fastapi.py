@@ -13,8 +13,7 @@ from app.core.settings import Settings, get_settings
 
 from app.features import models  # noqa: F401
 from app.features import api
-
-from app import worker  # noqa: F401
+from app.celery import create_celery_app
 
 
 def create_fastapi_app(settings: Settings) -> FastAPI:
@@ -64,10 +63,9 @@ def create_fastapi_app(settings: Settings) -> FastAPI:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def main() -> None:
-    app = create_fastapi_app(get_settings())
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
+global_settings = get_settings()
+app = create_fastapi_app(global_settings)
+_ = create_celery_app(global_settings)
 
 if __name__ == "__main__":
-    main()
+    uvicorn.run(app, host="0.0.0.0", port=8000)
