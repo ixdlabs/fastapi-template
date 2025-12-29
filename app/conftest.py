@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -9,7 +10,6 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 from alembic import command, config
 
 from app.core.auth import AuthUser, Authenticator, get_authenticator, get_current_user
-from app.core.background import TaskRegistry
 from app.core.cache import get_cache_backend
 from app.core.database import get_db_session
 from app.core.logging import setup_logging
@@ -142,15 +142,13 @@ def override_dependencies(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@pytest.fixture(scope="function", autouse=True)
-def task_registry_fixture(db_fixture: AsyncSession, settings_fixture: Settings):
-    async def worker_db_session(_: Settings):
+@pytest.fixture(scope="function")
+def worker_db_fixture(db_fixture: AsyncSession):
+    @asynccontextmanager
+    async def _worker_db_session(_: Settings):
         yield db_fixture
 
-    registry = TaskRegistry()
-    registry.worker_get_db_session = worker_db_session
-    registry.worker_get_settings = lambda: settings_fixture
-    yield registry
+    return _worker_db_session
 
 
 @pytest.fixture(scope="function")

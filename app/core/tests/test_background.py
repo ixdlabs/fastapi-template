@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel
 import pytest
 from app.core.auth import CurrentTaskRunnerDep
-from app.core.background import BackgroundTask, TaskRegistry
+from app.core.background import BackgroundTask, TaskRegistry, WorkerScope
 from app.core.database import DbDep
 from app.core.settings import Settings, SettingsDep
 
@@ -15,7 +15,7 @@ class OutputModel(BaseModel):
     result: int
 
 
-async def sample_task(task_input: InputModel, **kwargs: object) -> OutputModel:
+async def sample_task(task_input: InputModel, scope: WorkerScope) -> OutputModel:
     return OutputModel(result=task_input.value)
 
 
@@ -23,24 +23,25 @@ async def sample_task(task_input: InputModel, **kwargs: object) -> OutputModel:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_register_background_task_returns_factory(task_registry_fixture: TaskRegistry):
-    factory = task_registry_fixture.register_background_task(sample_task)
+def test_background_task_returns_factory():
+    task_registry = TaskRegistry()
+    factory = task_registry.background_task("sample_task")(sample_task)
     assert callable(factory)
 
 
-def test_register_background_task_adds_beat_schedule(task_registry_fixture: TaskRegistry):
-    _ = task_registry_fixture.register_background_task(sample_task, schedule=60)
+def test_background_task_adds_beat_schedule():
+    task_registry = TaskRegistry()
+    _ = task_registry.background_task("sample_task", schedule=60)(sample_task)
 
-    assert "sample_task" in task_registry_fixture.beat_schedule
-    assert task_registry_fixture.beat_schedule["sample_task"]["schedule"] == 60
-    assert isinstance(task_registry_fixture.beat_schedule["sample_task"]["task"], str)
-    assert task_registry_fixture.beat_schedule["sample_task"]["task"].endswith("sample_task")
+    assert "sample_task" in task_registry.beat_schedule
+    assert task_registry.beat_schedule["sample_task"]["schedule"] == 60
+    assert isinstance(task_registry.beat_schedule["sample_task"]["task"], str)
+    assert task_registry.beat_schedule["sample_task"]["task"].endswith("sample_task")
 
 
-def test_task_factory_creates_background_task(
-    celery_background_fixture: MagicMock, task_registry_fixture: TaskRegistry, settings_fixture: Settings
-):
-    factory = task_registry_fixture.register_background_task(sample_task)
+def test_task_factory_creates_background_task(celery_background_fixture: MagicMock, settings_fixture: Settings):
+    task_registry = TaskRegistry()
+    factory = task_registry.background_task("sample_task")(sample_task)
     background_task = factory(settings_fixture)
 
     assert isinstance(background_task, BackgroundTask)
@@ -50,9 +51,10 @@ def test_task_factory_creates_background_task(
 
 @pytest.mark.asyncio
 async def test_background_task_submit_calls_celery_apply_async(
-    celery_background_fixture: MagicMock, task_registry_fixture: TaskRegistry, settings_fixture: Settings
+    celery_background_fixture: MagicMock, settings_fixture: Settings
 ):
-    factory = task_registry_fixture.register_background_task(sample_task)
+    task_registry = TaskRegistry()
+    factory = task_registry.background_task("sample_task")(sample_task)
     background_task = factory(settings_fixture)
 
     input_model = InputModel(value=42)
@@ -70,13 +72,11 @@ async def test_background_task_submit_calls_celery_apply_async(
 def test_task_registry_initialization():
     registry = TaskRegistry()
     assert registry.beat_schedule == {}
-    assert callable(registry.worker_get_settings)
-    assert callable(registry.worker_get_db_session)
 
 
-def test_task_registry_register_background_task():
+def test_task_registry_background_task():
     registry = TaskRegistry()
-    factory = registry.register_background_task(sample_task, schedule=120)
+    factory = registry.background_task("sample_task", schedule=120)(sample_task)
 
     assert callable(factory)
     assert "sample_task" in registry.beat_schedule
@@ -85,9 +85,9 @@ def test_task_registry_register_background_task():
     assert registry.beat_schedule["sample_task"]["task"].endswith("sample_task")
 
 
-def test_task_registry_register_background_task_without_schedule():
+def test_task_registry_background_task_without_schedule():
     registry = TaskRegistry()
-    factory = registry.register_background_task(sample_task)
+    factory = registry.background_task("sample_task")(sample_task)
 
     assert callable(factory)
     assert "sample_task" not in registry.beat_schedule
@@ -98,8 +98,9 @@ def test_task_registry_register_background_task_without_schedule():
 
 
 @pytest.mark.asyncio
-async def test_task_factory_submission_executes_task(task_registry_fixture: TaskRegistry, settings_fixture: Settings):
-    factory = task_registry_fixture.register_background_task(sample_task)
+async def test_task_factory_submission_executes_task(settings_fixture: Settings):
+    task_registry = TaskRegistry()
+    factory = task_registry.background_task("sample_task")(sample_task)
     background_task = factory(settings_fixture)
 
     input_model = InputModel(value=10)
@@ -109,20 +110,14 @@ async def test_task_factory_submission_executes_task(task_registry_fixture: Task
 
 
 @pytest.mark.asyncio
-async def test_task_with_dependencies_execution(
-    task_registry_fixture: TaskRegistry, settings_fixture: Settings, db_fixture: DbDep
-):
+async def test_task_with_dependencies_execution(settings_fixture: Settings, db_fixture: DbDep):
+    task_registry = TaskRegistry()
     called_current_user: list[CurrentTaskRunnerDep] = []
     called_db: list[DbDep] = []
     called_settings: list[Settings] = []
 
     async def sample_endpoint(
-        task_input: InputModel,
-        *,
-        current_user: CurrentTaskRunnerDep,
-        db: DbDep,
-        settings: SettingsDep,
-        **kwargs: object,
+        task_input: InputModel, current_user: CurrentTaskRunnerDep, db: DbDep, settings: SettingsDep
     ) -> OutputModel:
         nonlocal called_current_user, called_db, called_settings
         called_current_user.append(current_user)
@@ -130,7 +125,11 @@ async def test_task_with_dependencies_execution(
         called_settings.append(settings)
         return OutputModel(result=task_input.value * 2)
 
-    factory = task_registry_fixture.register_background_task(sample_endpoint)
+    async def sample_endpoint_task(task_input: InputModel, scope: WorkerScope) -> OutputModel:
+        current_user = scope.to_auth_user()
+        return await sample_endpoint(task_input, current_user=current_user, db=db_fixture, settings=settings_fixture)
+
+    factory = task_registry.background_task("sample_endpoint")(sample_endpoint_task)
     background_task = factory(settings_fixture)
 
     input_model = InputModel(value=5)

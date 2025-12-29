@@ -146,6 +146,6 @@ async def test_get_db_session_yields_async_session_bound_to_given_url():
 @pytest.mark.asyncio
 async def test_get_worker_db_session_yields_async_session_bound_to_given_url():
     test_settings = Settings.model_construct(database_url="sqlite+aiosqlite:///:memory:", debug=True)
-    async for db in get_worker_db_session(test_settings):
+    async with get_worker_db_session(test_settings) as db:
         url = getattr(db.bind, "url", None)
         assert str(url) == "sqlite+aiosqlite:///:memory:"

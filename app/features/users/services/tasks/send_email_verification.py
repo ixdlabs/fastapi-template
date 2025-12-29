@@ -8,15 +8,15 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
 from app.core.auth import CurrentTaskRunnerDep
-from app.core.background import BackgroundTask, TaskRegistry
-from app.core.database import DbDep
-from app.core.email_sender import Email, EmailSenderDep
-from app.core.settings import SettingsDep
+from app.core.background import BackgroundTask, TaskRegistry, WorkerScope
+from app.core.database import DbDep, get_worker_db_session
+from app.core.email_sender import Email, EmailSenderDep, get_email_sender
+from app.core.settings import SettingsDep, get_settings
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
 
 logger = logging.getLogger(__name__)
-email_templates_dir = Path(__file__).parent
+email_templates_dir = Path(__file__).parent / "emails"
 router = APIRouter()
 registry = TaskRegistry()
 
@@ -96,5 +96,19 @@ async def send_email_verification(
     return SendEmailVerificationOutput(action_id=action.id, token=token, message_id=message_id)
 
 
-send_email_verification_task = registry.register_background_task(send_email_verification)
-SendEmailVerificationTaskDep = Annotated[BackgroundTask, Depends(send_email_verification_task)]
+# Register as background task
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@registry.background_task("send_email_verification")
+async def task(task_input: SendEmailVerificationInput, scope: WorkerScope) -> SendEmailVerificationOutput:
+    settings = get_settings()
+    email_sender = get_email_sender(settings)
+    current_user = scope.to_auth_user()
+    async with get_worker_db_session(settings) as db:
+        return await send_email_verification(
+            task_input, db=db, settings=settings, current_user=current_user, email_sender=email_sender
+        )
+
+
+SendEmailVerificationTaskDep = Annotated[BackgroundTask, Depends(task)]

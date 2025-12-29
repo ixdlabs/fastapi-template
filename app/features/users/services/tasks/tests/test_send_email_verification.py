@@ -1,13 +1,17 @@
+from unittest.mock import AsyncMock
 import uuid
 import pytest
 from datetime import datetime, timezone, timedelta
+from pytest import MonkeyPatch
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthUser
+from app.core.settings import Settings
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 from fastapi.testclient import TestClient
 
+from app.features.users.services.tasks.send_email_verification import SendEmailVerificationInput, task
 from app.main import app
 
 client = TestClient(app)
@@ -62,3 +66,31 @@ async def test_send_email_verification_creates_action_and_invalidates_previous(
 
     # Expiration window correctness
     assert before_call + timedelta(minutes=30) <= new_action.expires_at <= after_call + timedelta(minutes=30)
+
+
+@pytest.mark.asyncio
+async def test_send_email_verification_task_executed_as_task(
+    monkeypatch: MonkeyPatch, worker_db_fixture: AsyncSession, settings_fixture: Settings
+):
+    send_email_verification_func = AsyncMock()
+    monkeypatch.setattr(
+        "app.features.users.services.tasks.send_email_verification.send_email_verification",
+        send_email_verification_func,
+    )
+    monkeypatch.setattr(
+        "app.features.users.services.tasks.send_email_verification.get_worker_db_session",
+        worker_db_fixture,
+    )
+    monkeypatch.setattr(
+        "app.features.users.services.tasks.send_email_verification.get_settings",
+        lambda: settings_fixture,
+    )
+
+    background_task = task(settings_fixture)
+    await background_task.submit(SendEmailVerificationInput(user_id=uuid.uuid4(), email="new@example.com"))
+
+    send_email_verification_func.assert_awaited_once()
+    args, _ = send_email_verification_func.call_args
+    task_input = args[0]
+    assert isinstance(task_input, SendEmailVerificationInput)
+    assert task_input.email == "new@example.com"
