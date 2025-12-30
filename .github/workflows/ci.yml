@@ -33,12 +33,12 @@ jobs:
         run: uv run pre-commit run --all-files --show-diff-on-failure
 
       - name: Run tests
-        run: uv run pytest --cov=app --cov-report=xml:coverage.xml --junit-xml=pytest.xml
+        run: uv run pytest \
+          --cov-report term-missing --cov-branch --cov-report xml --cov-report term \
+          --cov=app -vv --strict-markers -rfE
 
       - name: Coverage
-        uses: MishaKav/pytest-coverage-comment@v1.2.0
+        uses: py-cov-action/python-coverage-comment-action@v3
         if: ${{ github.event_name == 'pull_request' }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          pytest-xml-coverage-path: coverage.xml
-          junitxml-path: pytest.xml
+          GITHUB_TOKEN: ${{ github.token }}
