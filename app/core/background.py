@@ -11,6 +11,7 @@ import uuid
 from fast_depends import dependency_provider, inject, Depends as WorkerDepends
 from fastapi.dependencies.utils import get_typed_signature
 
+from celery.result import AsyncResult
 from celery import shared_task
 from celery.app.task import Task as CeleryTask
 
@@ -34,12 +35,20 @@ class BackgroundTask:
         super().__init__()
         self.celery_task = celery_task
         self.settings = settings
+        self.result: AsyncResult[str] | None = None
 
     async def submit(self, input_model: BaseModel) -> None:
         """Submit a function to be run in the background as a Celery task."""
         task_input_raw = input_model.model_dump_json()
-        result = self.celery_task.apply_async(args=(task_input_raw,))
-        logger.info(f"Submitted background task {self.celery_task.name} with id {result.id}")
+        self.result = self.celery_task.apply_async(args=(task_input_raw,))
+        logger.info(f"Submitted background task {self.celery_task.name} with id {self.result.id}")
+
+    async def wait_and_get_result[T: BaseModel](self, output_cls: type[T], timeout: float | None = None) -> T:
+        """Wait for the task to complete and get the result as a Pydantic model."""
+        if self.result is None:
+            raise RuntimeError("Task has not been submitted yet.")
+        raw_result = self.result.get(timeout=timeout)
+        return output_cls.model_validate_json(raw_result)
 
 
 # Task Registry
@@ -58,30 +67,30 @@ class BackgroundTaskCallable(Protocol[P, R, X]):
     async def __call__(self, task_input: P, *args: X.args, **kwargs: X.kwargs) -> R: ...
 
 
+class PeriodicTaskCallable(Protocol[R, X]):
+    __name__: str
+
+    async def __call__(self, *args: X.args, **kwargs: X.kwargs) -> R: ...
+
+
 class TaskRegistry:
     def __init__(self):
         super().__init__()
         self.beat_schedule: dict[str, dict[str, object]] = {}
 
-    def background_task(self, task_name: str, *, schedule: int | None = None):
+    def background_task(self, task_name: str):
         """Register a background task."""
 
         def decorator(
             func: BackgroundTaskCallable[P, R, X],
         ) -> BackgroundTaskFactory:
-            task_full_name = f"{func.__module__}.{func.__name__}"
-            # If the schedule is provided, add it to the beat schedule
-            # This will be picked up by Celery Beat to schedule periodic tasks
-            if schedule is not None:
-                self.beat_schedule[task_name] = {"task": task_full_name, "schedule": schedule}
-
             wrapped_signature = get_typed_signature(func)
             task_input_param = next(iter(wrapped_signature.parameters.values()), None)
             assert task_input_param is not None and issubclass(task_input_param.annotation, BaseModel)
 
             # Async function that wraps the original function to handle dependency injection
             # Celery will call this via the wrapper function below
-            async def async_func(self: "CeleryTask[[str], str]", raw_task_input: str, **kwargs: object) -> str:
+            async def async_func(self: "CeleryTask[[str], str]", raw_task_input: str) -> str:
                 input_model: type[P] = task_input_param.annotation
                 task_input = input_model.model_validate_json(raw_task_input)
                 worker_scope = WorkerScope(task=self)
@@ -93,8 +102,8 @@ class TaskRegistry:
             # Wrapper function to convert async function to sync for Celery
             # This is the function that Celery will actually call
             @functools.wraps(func)
-            def wrapper(self: "CeleryTask[[str], str]", raw_task_input: str, **kwargs: object) -> str:
-                return run_as_sync(async_func, self, raw_task_input, **kwargs)
+            def wrapper(self: "CeleryTask[[str], str]", raw_task_input: str) -> str:
+                return run_as_sync(async_func, self, raw_task_input)
 
             # This should be in this scope to make sure this is defined at the time of decorator call
             # Otherwise celery might not pick up the task correctly
@@ -109,6 +118,34 @@ class TaskRegistry:
 
         return decorator
 
+    def periodic_task(self, task_name: str, schedule: int):
+        """Decorator to register a periodic background task."""
+
+        def decorator(func: PeriodicTaskCallable[R, X]) -> CeleryTask[[], str]:
+            task_full_name = f"{func.__module__}.{func.__name__}"
+            # Add to beat schedule
+            self.beat_schedule[task_name] = {"task": task_full_name, "schedule": schedule}
+
+            # Async function that wraps the original function to handle dependency injection
+            async def async_func(self: "CeleryTask[[], str]") -> str:
+                worker_scope = WorkerScope(task=self)
+                with dependency_provider.scope(get_worker_scope, lambda: worker_scope):
+                    injected_func = inject(func)
+                    result: R = await injected_func()  # pyright: ignore[reportCallIssue]
+                    return result.model_dump_json()
+
+            # Wrapper function to convert async function to sync for Celery
+            # This is the function that Celery will actually call
+            @functools.wraps(func)
+            def wrapper(self: "CeleryTask[[], str]") -> str:
+                return run_as_sync(async_func, self)
+
+            # This should be in this scope to make sure this is defined at the time of decorator call
+            # Otherwise celery might not pick up the task correctly
+            return shared_task(name=task_name, bind=True)(wrapper)
+
+        return decorator
+
     def include_registry(self, registry: "TaskRegistry"):
         """Include another TaskRegistry's tasks."""
         self.beat_schedule.update(registry.beat_schedule)
@@ -119,9 +156,9 @@ class TaskRegistry:
 
 
 class WorkerScope:
-    def __init__(self, task: "CeleryTask[[str], str]"):
+    def __init__(self, task: "CeleryTask[..., str]"):
         super().__init__()
-        self.task: "CeleryTask[[str], str]" = task
+        self.task: "CeleryTask[..., str]" = task
 
     @property
     def auth_user(self) -> AuthUser:

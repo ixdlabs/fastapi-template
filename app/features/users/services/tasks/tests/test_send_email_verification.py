@@ -9,6 +9,7 @@ from app.features.users.models.user_action import UserAction, UserActionState, U
 
 from app.features.users.services.tasks.send_email_verification import (
     SendEmailVerificationInput,
+    SendEmailVerificationOutput,
     send_email_verification,
 )
 
@@ -42,7 +43,9 @@ async def test_send_email_verification_creates_action_and_invalidates_previous(
     before_call = datetime.now(timezone.utc)
     task_input = SendEmailVerificationInput(user_id=user_id, email=email)
     background_task = send_email_verification(settings_fixture)
-    result = background_task.celery_task.delay(task_input.model_dump_json()).get()
+    await background_task.submit(task_input)
+    task_output = await background_task.wait_and_get_result(SendEmailVerificationOutput)
+    assert task_output.detail == "Email verification sent successfully."
     after_call = datetime.now(timezone.utc)
 
     # Reload all actions for user

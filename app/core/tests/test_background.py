@@ -30,9 +30,9 @@ def test_background_task_returns_factory():
     assert callable(factory)
 
 
-def test_background_task_adds_beat_schedule():
+def test_periodic_task_adds_beat_schedule():
     task_registry = TaskRegistry()
-    _ = task_registry.background_task("sample_task", schedule=60)(sample_task)
+    _ = task_registry.periodic_task("sample_task", schedule=60)(sample_task)
 
     assert "sample_task" in task_registry.beat_schedule
     assert task_registry.beat_schedule["sample_task"]["schedule"] == 60
@@ -75,9 +75,9 @@ def test_task_registry_initialization():
     assert registry.beat_schedule == {}
 
 
-def test_task_registry_background_task():
+def test_task_registry_periodic_task():
     registry = TaskRegistry()
-    factory = registry.background_task("sample_task", schedule=120)(sample_task)
+    factory = registry.periodic_task("sample_task", schedule=120)(sample_task)
 
     assert callable(factory)
     assert "sample_task" in registry.beat_schedule
@@ -105,9 +105,9 @@ async def test_task_factory_submission_executes_task(settings_fixture: Settings)
     background_task = factory(settings_fixture)
 
     input_model = InputModel(value=10)
-    result = background_task.celery_task(input_model.model_dump_json())
-    output_model = OutputModel.model_validate_json(result)
-    assert output_model.result == 10
+    await background_task.submit(input_model)
+    result = await background_task.wait_and_get_result(OutputModel)
+    assert result.result == 10
 
 
 @pytest.mark.asyncio
@@ -126,8 +126,8 @@ async def test_task_with_dependencies_execution(settings_fixture: Settings, db_f
     background_task = factory(settings_fixture)
 
     input_model = InputModel(value=5)
-    result = background_task.celery_task(input_model.model_dump_json())
-    output_model = OutputModel.model_validate_json(result)
-    assert output_model.result == 10
+    await background_task.submit(input_model)
+    task_output = await background_task.wait_and_get_result(OutputModel)
+    assert task_output.result == 10
     assert len(called_settings) == 1
     assert called_settings[0] is settings_fixture
