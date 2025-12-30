@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.settings import Settings
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
-from fastapi.testclient import TestClient
 
 from app.features.users.services.tasks.send_password_reset_email import (
     SendPasswordResetInput,
@@ -22,7 +21,7 @@ URL = "/api/v1/tasks/users/send-password-reset-email"
 
 @pytest.mark.asyncio
 async def test_send_password_reset_email_creates_action_and_invalidates_previous(
-    test_client_fixture: TestClient, db_fixture: AsyncSession, settings_fixture: Settings
+    db_fixture: AsyncSession, settings_fixture: Settings
 ):
     user_id = uuid.uuid4()
     email = "reset@example.com"
