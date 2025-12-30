@@ -88,7 +88,7 @@ async def send_email_verification(
             sender=settings.email_sender_address,
             receivers=[task_input.email],
             subject="Verify your email address",
-            body_html_template=email_templates_dir / "send_email_verification.html",
+            body_html_template=email_templates_dir / "send_email_verification.mjml",
             body_text_template=email_templates_dir / "send_email_verification.txt",
             template_data={"verification_link": verification_link},
         )

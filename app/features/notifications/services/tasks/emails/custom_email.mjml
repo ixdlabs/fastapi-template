@@ -1,0 +1,8 @@
+{% extends "base.mjml" %}
+<!---->
+
+{% block content %}
+<mj-text>
+    {{ body }}
+</mj-text>
+{% endblock %}

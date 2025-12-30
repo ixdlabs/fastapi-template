@@ -83,7 +83,7 @@ async def send_password_reset_email(
             sender=settings.email_sender_address,
             receivers=[task_input.email],
             subject="Reset your password",
-            body_html_template=email_templates_dir / "send_password_reset_email.html",
+            body_html_template=email_templates_dir / "send_password_reset_email.mjml",
             body_text_template=email_templates_dir / "send_password_reset_email.txt",
             template_data={"password_reset_link": password_reset_link},
         )

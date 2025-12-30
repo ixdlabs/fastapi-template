@@ -6,7 +6,7 @@ from app.features.users.api import common_user_router
 from app.features.users.api import auth_router
 
 from app.features.notifications.api import common_notification_router
-
+from app.features.notifications.api import task_notification_router
 
 router = APIRouter()
 
@@ -15,3 +15,4 @@ router.include_router(admin_user_router)
 router.include_router(common_user_router)
 router.include_router(user_task_router)
 router.include_router(common_notification_router)
+router.include_router(task_notification_router)

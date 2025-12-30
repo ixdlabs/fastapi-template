@@ -7,6 +7,9 @@ from sqlalchemy.orm import joinedload
 from app.core.audit_log import AuditLoggerDep
 from app.core.database import DbDep
 from app.core.exceptions import ServiceException, raises
+from app.features.notifications.models.notification import Notification, NotificationType
+from app.features.notifications.models.notification_delivery import NotificationChannel, NotificationDelivery
+from app.features.notifications.services.tasks.send_notification import SendNotificationInput, SendNotificationTaskDep
 from app.features.users.models.user import User
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
@@ -58,7 +61,9 @@ class EmailAlreadyInUseException(ServiceException):
 @raises(InvalidActionTokenException)
 @raises(EmailAlreadyInUseException)
 @router.post("/verify-email")
-async def verify_email_confirm(form: VerifyEmailInput, db: DbDep, audit_logger: AuditLoggerDep) -> VerifyEmailOutput:
+async def verify_email_confirm(
+    form: VerifyEmailInput, db: DbDep, audit_logger: AuditLoggerDep, send_notification_task: SendNotificationTaskDep
+) -> VerifyEmailOutput:
     """
     Verify and set a user's email using a valid action token.
     The email must not be already in use by another user.
@@ -99,8 +104,30 @@ async def verify_email_confirm(form: VerifyEmailInput, db: DbDep, audit_logger: 
     user.email = action_email
     action.state = UserActionState.COMPLETED
 
+    # Create welcome notification
+    notification = Notification(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        type=NotificationType.WELCOME,
+        deliveries=[
+            NotificationDelivery(
+                id=uuid.uuid4(),
+                channel=NotificationChannel.EMAIL,
+                recipient=user.email,
+                title="Welcome",
+                body=f"Welcome {user.first_name}, your email has been successfully verified.",
+            )
+        ],
+    )
+    db.add(notification)
+
     # Finalize
     await audit_logger.record("verify_email", user)
     await db.commit()
+    await db.refresh(notification)
+
+    # Send welcome notification
+    task_input = SendNotificationInput(notification_id=notification.id)
+    await send_notification_task.submit(task_input)
 
     return VerifyEmailOutput(user_id=user_id, email=action_email)
