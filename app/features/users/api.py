@@ -13,7 +13,6 @@ from app.features.users.services.common import (
     login_oauth2,
     update_me,
 )
-from app.features.users.services.tasks import send_email_verification, send_password_reset_email
 from app.features.users.services.admin import update_user, delete_user, list_users, detail_user
 
 
@@ -37,7 +36,3 @@ common_user_router = APIRouter(prefix="/api/v1/common/users", tags=["Users"])
 common_user_router.include_router(detail_me.router)
 common_user_router.include_router(update_me.router)
 common_user_router.include_router(delete_me.router)
-
-user_task_router = APIRouter(prefix="/api/v1/tasks/users", tags=["Users"])
-user_task_router.include_router(send_email_verification.router)
-user_task_router.include_router(send_password_reset_email.router)

@@ -4,21 +4,20 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
 import uuid
-from fastapi import APIRouter, Depends
+from fastapi import Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
-from app.core.auth import CurrentTaskRunnerDep
-from app.core.background import BackgroundTask, TaskRegistry, WorkerScopeDep
-from app.core.database import DbDep, DbWorkerDep
-from app.core.email_sender import Email, EmailSenderDep, EmailSenderWorkerDep
-from app.core.settings import SettingsDep, SettingsWorkerDep
+from app.core.background import BackgroundTask, TaskRegistry
+from app.core.database import DbWorkerDep
+from app.core.email_sender import Email, EmailSenderWorkerDep
+from app.core.settings import SettingsWorkerDep
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
 
 logger = logging.getLogger(__name__)
 email_templates_dir = Path(__file__).parent / "emails"
-router = APIRouter()
+
 registry = TaskRegistry()
 
 
@@ -42,20 +41,14 @@ class SendPasswordResetOutput(BaseModel):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@router.post("/send-password-reset-email")
+@registry.background_task("send_password_reset_email")
 async def send_password_reset_email(
-    task_input: SendPasswordResetInput,
-    current_user: CurrentTaskRunnerDep,
-    settings: SettingsDep,
-    db: DbDep,
-    email_sender: EmailSenderDep,
+    task_input: SendPasswordResetInput, settings: SettingsWorkerDep, db: DbWorkerDep, email_sender: EmailSenderWorkerDep
 ) -> SendPasswordResetOutput:
     """
     Sends a password reset email to the user by creating a new password reset action.
     This invalidates any existing pending password reset actions for the user.
     """
-    logger.info("Task running in worker=%s", current_user.worker_id)
-
     # Invalidate existing pending password reset actions
     update_stmt = (
         update(UserAction)
@@ -93,21 +86,4 @@ async def send_password_reset_email(
     return SendPasswordResetOutput(action_id=action.id, message_id=message_id, token=token)
 
 
-# Register as background task
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@registry.background_task("send_password_reset_email")
-async def run_task_in_worker(
-    task_input: SendPasswordResetInput,
-    scope: WorkerScopeDep,
-    settings: SettingsWorkerDep,
-    db: DbWorkerDep,
-    email_sender: EmailSenderWorkerDep,
-) -> SendPasswordResetOutput:
-    return await send_password_reset_email(
-        task_input, current_user=scope.auth_user, db=db, settings=settings, email_sender=email_sender
-    )
-
-
-SendPasswordResetTaskDep = Annotated[BackgroundTask, Depends(run_task_in_worker)]
+SendPasswordResetTaskDep = Annotated[BackgroundTask, Depends(send_password_reset_email)]

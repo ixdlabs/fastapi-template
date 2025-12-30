@@ -1,11 +1,14 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
+from fastapi import FastAPI
 import pytest
-from pytest import MonkeyPatch
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.testclient import TestClient
 from app.features.users.models.user import User
-from app.features.users.services.tasks.send_email_verification import SendEmailVerificationInput
+from app.features.users.services.tasks.send_email_verification import (
+    SendEmailVerificationInput,
+    send_email_verification,
+)
 from app.fixtures.user_factory import UserFactory
 
 URL = "/api/v1/common/users/me"
@@ -32,12 +35,10 @@ async def test_user_can_update_own_profile(
 
 @pytest.mark.asyncio
 async def test_user_can_update_email_triggers_verification(
-    test_client_fixture: TestClient, authenticated_user_fixture: User, monkeypatch: MonkeyPatch
+    test_client_fixture: TestClient, authenticated_user_fixture: User, fastapi_app_fixture: FastAPI
 ):
-    mocked_task = MagicMock()
-    monkeypatch.setattr(
-        "app.features.users.services.tasks.send_email_verification.send_email_verification", mocked_task
-    )
+    mocked_task = AsyncMock()
+    fastapi_app_fixture.dependency_overrides[send_email_verification] = lambda: mocked_task
 
     update_data = {"first_name": "NewFirst", "last_name": "NewLast", "email": "newemail@example.com"}
     response = test_client_fixture.put(URL, json=update_data)
@@ -48,8 +49,8 @@ async def test_user_can_update_email_triggers_verification(
     assert data["last_name"] == "NewLast"
     assert data["email"] == authenticated_user_fixture.email  # Email not updated yet
 
-    mocked_task.assert_called_once()
-    task_input = mocked_task.call_args[0][0]
+    mocked_task.submit.assert_called_once()
+    task_input = mocked_task.submit.call_args[0][0]
     assert isinstance(task_input, SendEmailVerificationInput)
     assert task_input.user_id == authenticated_user_fixture.id
     assert task_input.email == "newemail@example.com"

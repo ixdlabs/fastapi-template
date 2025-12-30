@@ -3,15 +3,14 @@ import logging
 from pathlib import Path
 from typing import Annotated
 import uuid
-from fastapi import APIRouter, Depends
+from fastapi import Depends
 from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 from fastapi import status
 
-from app.core.auth import CurrentTaskRunnerDep
 from app.core.background import BackgroundTask, TaskRegistry, WorkerScopeDep
-from app.core.database import DbDep, DbWorkerDep
+from app.core.database import DbWorkerDep
 from app.core.email_sender import Email, EmailSenderDep, EmailSenderWorkerDep
 from app.core.exceptions import ServiceException
 from app.core.settings import SettingsDep, SettingsWorkerDep
@@ -25,7 +24,7 @@ from app.features.notifications.models.notification_delivery import (
 
 logger = logging.getLogger(__name__)
 email_templates_dir = Path(__file__).parent / "emails"
-router = APIRouter()
+
 registry = TaskRegistry()
 
 
@@ -62,22 +61,21 @@ class NotificationNotFoundException(ServiceException):
     detail = "Notification not found, it may have been deleted"
 
 
-# Task/Endpoint implementation
+# Task implementation
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@router.post("/send-notification")
+@registry.background_task("send_notification")
 async def send_notification(
     task_input: SendNotificationInput,
-    db: DbDep,
-    settings: SettingsDep,
-    current_user: CurrentTaskRunnerDep,
-    email_sender: EmailSenderDep,
+    scope: WorkerScopeDep,
+    settings: SettingsWorkerDep,
+    db: DbWorkerDep,
+    email_sender: EmailSenderWorkerDep,
 ) -> SendNotificationOutput:
     """
     Sends a notification to the user.
     """
-    logger.info("Task running in worker=%s", current_user.worker_id)
 
     stmt = (
         select(Notification)
@@ -96,7 +94,7 @@ async def send_notification(
     result = SendNotificationOutput(successful=[], failed=[])
     for delivery in notification.deliveries:
         try:
-            message_id = await deliver_notification(delivery, notification, settings, email_sender)
+            message_id = await _deliver_notification(delivery, notification, settings, email_sender)
             result.successful.append(SendNotificationOutputSuccessful(delivery_id=delivery.id, message_id=message_id))
         except Exception as e:
             result.failed.append(SendNotificationOutputFailed(delivery_id=delivery.id, error_message=str(e)))
@@ -123,18 +121,28 @@ async def send_notification(
         )
 
     await db.commit()
+
+    # Retry if there were failures
+    logger.info("Task completed...", extra={"result": result.model_dump()})
+    if result.failed:
+        logger.warning("%s notifications failed to send, retrying task...", len(result.failed))
+        raise scope.task.retry(exc=Exception("Some notifications failed to send"), countdown=60)
+
     return result
+
+
+SendNotificationTaskDep = Annotated[BackgroundTask, Depends(send_notification)]
 
 
 # Helpers to deliver email
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-async def deliver_notification(
+async def _deliver_notification(
     delivery: NotificationDelivery, notification: Notification, settings: SettingsDep, email_sender: EmailSenderDep
 ):
     if delivery.channel == NotificationChannel.EMAIL:
-        html_template, text_template = resolve_email_template(notification.type)
+        html_template, text_template = _resolve_email_template(notification.type)
         return await email_sender.send_email(
             Email(
                 sender=settings.email_sender_address,
@@ -148,38 +156,5 @@ async def deliver_notification(
     raise NotImplementedError(f"Delivery channel {delivery.channel} not implemented")
 
 
-def resolve_email_template(_: NotificationType) -> tuple[Path, Path]:
+def _resolve_email_template(_: NotificationType) -> tuple[Path, Path]:
     return email_templates_dir / "custom_email.mjml", email_templates_dir / "custom_email.txt"
-
-
-# Register as background task
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@registry.background_task("send_notification")
-async def run_task_in_worker(
-    task_input: SendNotificationInput,
-    scope: WorkerScopeDep,
-    settings: SettingsWorkerDep,
-    db: DbWorkerDep,
-    email_sender: EmailSenderWorkerDep,
-) -> SendNotificationOutput:
-    result = await send_notification(
-        task_input, current_user=scope.auth_user, db=db, settings=settings, email_sender=email_sender
-    )
-    logger.info(
-        "Task completed in worker=%s: %d successful, %d failed",
-        scope.auth_user.worker_id,
-        len(result.successful),
-        len(result.failed),
-    )
-    if result.failed:
-        logger.warning("Some notifications failed to send, retrying task...")
-        raise scope.task.retry(
-            exc=Exception("Some notifications failed to send"),
-            countdown=60,
-        )
-    return result
-
-
-SendNotificationTaskDep = Annotated[BackgroundTask, Depends(run_task_in_worker)]

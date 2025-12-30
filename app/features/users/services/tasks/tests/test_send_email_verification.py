@@ -1,17 +1,17 @@
-from unittest.mock import MagicMock
 import uuid
 import pytest
 from datetime import datetime, timezone, timedelta
-from pytest import MonkeyPatch
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import AuthUser
 from app.core.settings import Settings
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 from fastapi.testclient import TestClient
 
-from app.features.users.services.tasks.send_email_verification import SendEmailVerificationInput, run_task_in_worker
+from app.features.users.services.tasks.send_email_verification import (
+    SendEmailVerificationInput,
+    send_email_verification,
+)
 
 
 URL = "/api/v1/tasks/users/send-email-verification"
@@ -21,7 +21,7 @@ URL = "/api/v1/tasks/users/send-email-verification"
 
 @pytest.mark.asyncio
 async def test_send_email_verification_creates_action_and_invalidates_previous(
-    test_client_fixture: TestClient, db_fixture: AsyncSession, authenticated_admin_fixture: AuthUser
+    test_client_fixture: TestClient, db_fixture: AsyncSession, settings_fixture: Settings
 ):
     user_id = uuid.uuid4()
     email = "new@example.com"
@@ -41,9 +41,9 @@ async def test_send_email_verification_creates_action_and_invalidates_previous(
     await db_fixture.refresh(old_action)
 
     before_call = datetime.now(timezone.utc)
-    payload = {"user_id": str(user_id), "email": email}
-    response = test_client_fixture.post(URL, json=payload)
-    assert response.status_code == 200
+    task_input = SendEmailVerificationInput(user_id=user_id, email=email)
+    background_task = send_email_verification(settings_fixture)
+    result = background_task.celery_task.delay(task_input.model_dump_json()).get()
     after_call = datetime.now(timezone.utc)
 
     # Reload all actions for user
@@ -65,21 +65,3 @@ async def test_send_email_verification_creates_action_and_invalidates_previous(
 
     # Expiration window correctness
     assert before_call + timedelta(minutes=30) <= new_action.expires_at <= after_call + timedelta(minutes=30)
-
-
-@pytest.mark.asyncio
-async def test_send_email_verification_task_executed_as_task(monkeypatch: MonkeyPatch, settings_fixture: Settings):
-    mocked_task = MagicMock()
-    monkeypatch.setattr(
-        "app.features.users.services.tasks.send_email_verification.send_email_verification", mocked_task
-    )
-
-    user_id = uuid.uuid4()
-    background_task = run_task_in_worker(settings_fixture)
-    await background_task.submit(SendEmailVerificationInput(user_id=user_id, email="new@example.com"))
-
-    mocked_task.assert_called_once()
-    task_input = mocked_task.call_args[0][0]
-    assert isinstance(task_input, SendEmailVerificationInput)
-    assert task_input.user_id == user_id
-    assert task_input.email == "new@example.com"

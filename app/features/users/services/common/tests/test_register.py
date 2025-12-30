@@ -1,12 +1,15 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from pytest import MonkeyPatch
 import pytest
 
 from app.features.users.models.user import User
-from app.features.users.services.tasks.send_email_verification import SendEmailVerificationInput
+from app.features.users.services.tasks.send_email_verification import (
+    SendEmailVerificationInput,
+    send_email_verification,
+)
 from app.fixtures.user_factory import UserFactory
 
 URL = "/api/auth/register"
@@ -14,12 +17,10 @@ URL = "/api/auth/register"
 
 @pytest.mark.asyncio
 async def test_user_can_register_with_valid_data(
-    test_client_fixture: TestClient, db_fixture: AsyncSession, monkeypatch: MonkeyPatch
+    fastapi_app_fixture: FastAPI, test_client_fixture: TestClient, db_fixture: AsyncSession
 ):
-    mocked_task = MagicMock()
-    monkeypatch.setattr(
-        "app.features.users.services.tasks.send_email_verification.send_email_verification", mocked_task
-    )
+    mocked_task = AsyncMock()
+    fastapi_app_fixture.dependency_overrides[send_email_verification] = lambda: mocked_task
 
     user_data = {
         "username": "newuser",
@@ -43,8 +44,8 @@ async def test_user_can_register_with_valid_data(
     assert user.check_password(user_data["password"])
     assert user.email is None
 
-    mocked_task.assert_called_once()
-    task_input = mocked_task.call_args[0][0]
+    mocked_task.submit.assert_called_once()
+    task_input = mocked_task.submit.call_args[0][0]
     assert isinstance(task_input, SendEmailVerificationInput)
     assert task_input.user_id == user.id
     assert task_input.email == "newuser@example.com"

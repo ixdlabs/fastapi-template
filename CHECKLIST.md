@@ -12,6 +12,5 @@
 - Actual Email/SMS/Push notification support
 - Ability to send notifications
 - Framework for admin dashboard (eg: example)
-- Better coverage report for PRs
 - llms.txt file
 - DB persisted preference system

@@ -4,21 +4,20 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
 import uuid
-from fastapi import APIRouter, Depends
+from fastapi import Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
-from app.core.auth import CurrentTaskRunnerDep
-from app.core.background import BackgroundTask, TaskRegistry, WorkerScopeDep
-from app.core.database import DbDep, DbWorkerDep
-from app.core.email_sender import Email, EmailSenderDep, EmailSenderWorkerDep
-from app.core.settings import SettingsDep, SettingsWorkerDep
+from app.core.background import BackgroundTask, TaskRegistry
+from app.core.database import DbWorkerDep
+from app.core.email_sender import Email, EmailSenderWorkerDep
+from app.core.settings import SettingsWorkerDep
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
 
 logger = logging.getLogger(__name__)
 email_templates_dir = Path(__file__).parent / "emails"
-router = APIRouter()
+
 registry = TaskRegistry()
 
 
@@ -42,20 +41,17 @@ class SendEmailVerificationOutput(BaseModel):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@router.post("/send-email-verification")
+@registry.background_task("send_email_verification")
 async def send_email_verification(
     task_input: SendEmailVerificationInput,
-    db: DbDep,
-    settings: SettingsDep,
-    current_user: CurrentTaskRunnerDep,
-    email_sender: EmailSenderDep,
+    settings: SettingsWorkerDep,
+    db: DbWorkerDep,
+    email_sender: EmailSenderWorkerDep,
 ) -> SendEmailVerificationOutput:
     """
     Sends an email verification email to the user by creating a new email verification action.
     This invalidates any existing pending email verification actions for the user.
     """
-    logger.info("Task running in worker=%s", current_user.worker_id)
-
     # Invalidate existing pending email verification actions
     update_stmt = (
         update(UserAction)
@@ -98,21 +94,4 @@ async def send_email_verification(
     return SendEmailVerificationOutput(action_id=action.id, token=token, message_id=message_id)
 
 
-# Register as background task
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-@registry.background_task("send_email_verification")
-async def run_task_in_worker(
-    task_input: SendEmailVerificationInput,
-    scope: WorkerScopeDep,
-    settings: SettingsWorkerDep,
-    db: DbWorkerDep,
-    email_sender: EmailSenderWorkerDep,
-) -> SendEmailVerificationOutput:
-    return await send_email_verification(
-        task_input, current_user=scope.auth_user, db=db, settings=settings, email_sender=email_sender
-    )
-
-
-SendEmailVerificationTaskDep = Annotated[BackgroundTask, Depends(run_task_in_worker)]
+SendEmailVerificationTaskDep = Annotated[BackgroundTask, Depends(send_email_verification)]
