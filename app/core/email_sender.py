@@ -5,7 +5,7 @@ from email.mime.text import MIMEText
 import logging
 from pathlib import Path
 import smtplib
-from typing import Annotated, override
+from typing import Annotated, Literal, override
 
 from fastapi import Depends
 from jinja2 import Environment, FileSystemLoader, Template
@@ -33,7 +33,7 @@ class Email(BaseModel):
 
 
 # Email Sender Implementations
-# The rendering uses Jinja2 templates for flexibility
+# The rendering uses Jinja2 templates for flexibility and MJML for HTML email design.
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -47,10 +47,18 @@ class EmailSender(abc.ABC):
         """Sends an email and returns the email provider's message ID."""
         raise NotImplementedError()
 
-    def render(self, template: Path, data: dict[str, str] | None) -> str:
+    def render(self, type: Literal["text", "html"], template: Path, data: dict[str, str] | None) -> str:
+        """Renders an email template of the given type ('text' or 'html') using Jinja2 and MJML."""
         env = Environment(loader=FileSystemLoader([base_email_template_path, template.parent]))
         jinja_template: Template = env.get_template(template.name)
-        return jinja_template.render(data or {})
+        content = jinja_template.render(data or {})
+        if type == "html":
+            try:
+                return mjml2html(content)
+            except Exception:
+                logger.error(f"Failed to compile MJML to HTML: \n{content}", exc_info=True)
+
+        return content
 
 
 # A simple local email sender that logs emails instead of sending them
@@ -60,8 +68,8 @@ class EmailSender(abc.ABC):
 class LocalEmailSender(EmailSender):
     @override
     async def send_email(self, email: Email) -> str:
-        body_html = self.render(email.body_html_template, email.template_data)
-        body_text = self.render(email.body_text_template, email.template_data)
+        body_html = self.render("html", email.body_html_template, email.template_data)
+        body_text = self.render("text", email.body_text_template, email.template_data)
         logger.info(f"Simulated sending email to {email.receivers}")
         logger.debug(f"Email Subject: {email.subject}")
         logger.debug(f"Email Body (Text): {body_text}")
@@ -76,13 +84,8 @@ class LocalEmailSender(EmailSender):
 class SmtpEmailSender(EmailSender):
     @override
     async def send_email(self, email: Email) -> str:
-        body_html = self.render(email.body_html_template, email.template_data)
-        body_text = self.render(email.body_text_template, email.template_data)
-
-        try:
-            body_html = mjml2html(body_html)
-        except Exception:
-            logger.error(f"Failed to compile MJML to HTML: \n{body_html}", exc_info=True)
+        body_html = self.render("html", email.body_html_template, email.template_data)
+        body_text = self.render("text", email.body_text_template, email.template_data)
 
         message = MIMEMultipart("alternative")
         message["Subject"] = email.subject
