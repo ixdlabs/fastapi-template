@@ -101,3 +101,4 @@ reportUnknownArgumentType = "none" # alembic generated code is not compatible
 
 [tool.coverage.run]
 concurrency = ["greenlet", "thread"]
+relative_files = true
