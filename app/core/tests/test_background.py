@@ -26,7 +26,7 @@ async def sample_task(task_input: InputModel, settings: SettingsWorkerDep) -> Ou
 
 def test_background_task_returns_factory():
     task_registry = TaskRegistry()
-    factory = task_registry.background_task("sample_task")(sample_task)
+    factory = task_registry.background_task("sample_task_1")(sample_task)
     assert callable(factory)
 
 
@@ -42,7 +42,7 @@ def test_periodic_task_adds_beat_schedule():
 
 def test_task_factory_creates_background_task(settings_fixture: Settings):
     task_registry = TaskRegistry()
-    factory = task_registry.background_task("sample_task")(sample_task)
+    factory = task_registry.background_task("sample_task_2")(sample_task)
     background_task = factory(settings_fixture)
 
     assert isinstance(background_task, BackgroundTask)
@@ -52,7 +52,7 @@ def test_task_factory_creates_background_task(settings_fixture: Settings):
 @pytest.mark.asyncio
 async def test_background_task_submit_calls_celery_apply_async(monkeypatch: MonkeyPatch, settings_fixture: Settings):
     task_registry = TaskRegistry()
-    factory = task_registry.background_task("sample_task")(sample_task)
+    factory = task_registry.background_task("sample_task_3")(sample_task)
     background_task = factory(settings_fixture)
 
     mock_apply_async = MagicMock()
@@ -63,7 +63,7 @@ async def test_background_task_submit_calls_celery_apply_async(monkeypatch: Monk
 
     mock_apply_async.assert_called_once()
     _, kwargs = mock_apply_async.call_args
-    assert kwargs["args"][0] == input_model.model_dump_json()
+    assert kwargs["kwargs"]["raw_task_input"] == input_model.model_dump_json()
 
 
 # Task Registry
@@ -101,7 +101,7 @@ def test_task_registry_background_task_without_schedule():
 @pytest.mark.asyncio
 async def test_task_factory_submission_executes_task(settings_fixture: Settings):
     task_registry = TaskRegistry()
-    factory = task_registry.background_task("sample_task")(sample_task)
+    factory = task_registry.background_task("sample_task_4")(sample_task)
     background_task = factory(settings_fixture)
 
     input_model = InputModel(value=10)
@@ -122,7 +122,7 @@ async def test_task_with_dependencies_execution(settings_fixture: Settings, db_f
     async def sample_endpoint_task(task_input: InputModel, settings: SettingsWorkerDep) -> OutputModel:
         return await sample_endpoint(task_input, settings=settings)
 
-    factory = task_registry.background_task("sample_endpoint")(sample_endpoint_task)
+    factory = task_registry.background_task("sample_endpoint_5")(sample_endpoint_task)
     background_task = factory(settings_fixture)
 
     input_model = InputModel(value=5)

@@ -40,7 +40,7 @@ class BackgroundTask:
     async def submit(self, input_model: BaseModel) -> None:
         """Submit a function to be run in the background as a Celery task."""
         task_input_raw = input_model.model_dump_json()
-        self.result = self.celery_task.apply_async(args=(task_input_raw,))
+        self.result = self.celery_task.apply_async(kwargs={"raw_task_input": task_input_raw})
         logger.info(f"Submitted background task {self.celery_task.name} with id {self.result.id}")
 
     async def wait_and_get_result[T: BaseModel](self, output_cls: type[T], timeout: float | None = None) -> T:
