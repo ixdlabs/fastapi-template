@@ -56,14 +56,14 @@ class NotificationNotFoundException(ServiceException):
 
 @raises(NotificationNotFoundException)
 @raises(AuthenticationFailedException)
-@router.get("/{notification_id}")
-async def detail_notification(notification_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep):
+@router.get("/{notification_delivery_id}")
+async def detail_notification(notification_delivery_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep):
     """Retrieve a specific sent In-App notification belonging to the current user."""
     stmt = (
         select(NotificationDelivery)
         .join(Notification)
         .options(joinedload(NotificationDelivery.notification))
-        .where(NotificationDelivery.id == notification_id)
+        .where(NotificationDelivery.id == notification_delivery_id)
         .where(Notification.user_id == current_user.id)
         .where(NotificationDelivery.channel == NotificationChannel.INAPP)
         .where(NotificationDelivery.status == NotificationStatus.SENT)

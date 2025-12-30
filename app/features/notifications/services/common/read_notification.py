@@ -38,9 +38,9 @@ class NotificationNotFoundException(ServiceException):
 
 @raises(NotificationNotFoundException)
 @raises(AuthenticationFailedException)
-@router.post("/{notification_id}/read")
+@router.post("/{notification_delivery_id}/read")
 async def read_notification(
-    notification_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep
+    notification_delivery_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep
 ) -> ReadNotificationOutput:
     """
     Read a specific sent notification belonging to the current user.
@@ -48,7 +48,7 @@ async def read_notification(
     stmt = (
         select(NotificationDelivery)
         .join(Notification)
-        .where(NotificationDelivery.id == notification_id)
+        .where(NotificationDelivery.id == notification_delivery_id)
         .where(NotificationDelivery.status == NotificationStatus.SENT)
         .where(Notification.user_id == current_user.id)
     )

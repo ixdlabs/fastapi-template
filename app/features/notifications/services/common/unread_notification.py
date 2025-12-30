@@ -37,9 +37,9 @@ class NotificationNotFoundException(ServiceException):
 
 @raises(NotificationNotFoundException)
 @raises(AuthenticationFailedException)
-@router.post("/{notification_id}/unread")
+@router.post("/{notification_delivery_id}/unread")
 async def unread_notification(
-    notification_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep
+    notification_delivery_id: uuid.UUID, current_user: CurrentUserDep, db: DbDep
 ) -> UnreadNotificationOutput:
     """
     Mark a specific sent notification as unread for the current user.
@@ -47,7 +47,7 @@ async def unread_notification(
     stmt = (
         select(NotificationDelivery)
         .join(Notification)
-        .where(NotificationDelivery.id == notification_id)
+        .where(NotificationDelivery.id == notification_delivery_id)
         .where(Notification.user_id == current_user.id)
         .where(NotificationDelivery.status == NotificationStatus.SENT)
     )
