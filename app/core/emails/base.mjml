@@ -1,0 +1,33 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        {% block header %}
+        <mj-text font-size="20px" font-weight="bold" align="center">
+          Sample Email Header
+        </mj-text>
+        <mj-divider border-color="black" />
+        {% endblock %}
+      </mj-column>
+    </mj-section>
+    <mj-section>
+      <mj-column> 
+        {% block content %}
+        <mj-text>
+          This is the default content. Please override this block in your email template.
+        </mj-text>
+        {% endblock %} 
+      </mj-column>
+    </mj-section>
+    <mj-section>
+      <mj-column>
+        {% block footer %}
+        <mj-divider border-color="black" />
+        <mj-text font-size="12px" color="gray" align="center">
+          &copy; 2025 Our Service. All rights reserved.
+        </mj-text>
+        {% endblock %}
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

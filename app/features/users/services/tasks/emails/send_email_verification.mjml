@@ -5,13 +5,11 @@
 <mj-text>
   Please verify your email address by clicking the link below:
 </mj-text>
-<mj-button
-  href="{{ verification_link }}"
-  background-color="#346df1"
-  color="white"
->
+<mj-spacer height="10px" />
+<mj-button href="{{ verification_url }}" background-color="black" color="white">
   Verify Email
 </mj-button>
+<mj-spacer height="10px" />
 <mj-text>
   If you did not create an account, no further action is required.
 </mj-text>

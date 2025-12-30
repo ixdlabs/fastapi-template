@@ -81,14 +81,14 @@ async def send_email_verification(
     await db.commit()
     await db.refresh(action)
 
-    verification_link_params = urlencode({"token": token, "email": task_input.email})
+    verification_link_params = urlencode({"token": token, "action_id": str(action.id)})
     verification_link = f"{settings.frontend_base_url}/verify-email?{verification_link_params}"
     message_id = await email_sender.send_email(
         Email(
             sender=settings.email_sender_address,
             receivers=[task_input.email],
             subject="Verify your email address",
-            body_html_template=email_templates_dir / "send_email_verification.html",
+            body_html_template=email_templates_dir / "send_email_verification.mjml",
             body_text_template=email_templates_dir / "send_email_verification.txt",
             template_data={"verification_link": verification_link},
         )
