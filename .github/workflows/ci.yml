@@ -33,9 +33,7 @@ jobs:
         run: uv run pre-commit run --all-files --show-diff-on-failure
 
       - name: Run tests
-        run: uv run pytest \
-          --cov-report term-missing --cov-branch --cov-report xml --cov-report term \
-          --cov=app -vv --strict-markers -rfE
+        run: uv run pytest --cov-report term-missing --cov-branch --cov-report xml --cov-report term --cov=app -vv --strict-markers -rfE
 
       - name: Coverage
         uses: py-cov-action/python-coverage-comment-action@v3
