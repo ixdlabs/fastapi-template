@@ -28,7 +28,7 @@ class Email(BaseModel):
     subject: str
     body_html_template: Path
     body_text_template: Path
-    template_data: dict[str, str] | None = None
+    template_data: dict[str, object] | None = None
     attachments: dict[str, bytes] | None = None
 
 
@@ -47,7 +47,7 @@ class EmailSender(abc.ABC):
         """Sends an email and returns the email provider's message ID."""
         raise NotImplementedError()
 
-    def render(self, type: Literal["text", "html"], template: Path, data: dict[str, str] | None) -> str:
+    def render(self, type: Literal["text", "html"], template: Path, data: dict[str, object] | None) -> str:
         """Renders an email template of the given type ('text' or 'html') using Jinja2 and MJML."""
         env = Environment(loader=FileSystemLoader([base_email_template_path, template.parent]))
         jinja_template: Template = env.get_template(template.name)

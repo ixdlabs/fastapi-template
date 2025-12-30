@@ -19,7 +19,6 @@ from pydantic import BaseModel, ValidationError
 from app.core.exceptions import ServiceException
 from app.core.settings import Settings, SettingsDep
 from app.features.users.models.user import User, UserType
-from fast_depends import Depends as WorkerDepends
 
 logger = logging.getLogger(__name__)
 
@@ -251,4 +250,3 @@ CurrentUserDep = Annotated[AuthUser, Security(get_current_user, scopes=["user"])
 CurrentAdminDep = Annotated[AuthUser, Security(get_current_user, scopes=["user", "admin"])]
 CurrentCustomerDep = Annotated[AuthUser, Security(get_current_user, scopes=["user", "customer"])]
 CurrentTaskRunnerDep = Annotated[AuthUser, Security(get_current_user, scopes=["task"])]
-CurrentWorkerDep = Annotated[AuthUser, WorkerDepends(get_current_user)]

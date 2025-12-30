@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import update
 
-from app.core.auth import CurrentTaskRunnerDep, CurrentWorkerDep
-from app.core.background import BackgroundTask, TaskRegistry
+from app.core.auth import CurrentTaskRunnerDep
+from app.core.background import BackgroundTask, TaskRegistry, WorkerScopeDep
 from app.core.database import DbDep, DbWorkerDep
 from app.core.email_sender import Email, EmailSenderDep, EmailSenderWorkerDep
 from app.core.settings import SettingsDep, SettingsWorkerDep
@@ -105,13 +105,13 @@ async def send_email_verification(
 @registry.background_task("send_email_verification")
 async def run_task_in_worker(
     task_input: SendEmailVerificationInput,
-    current_user: CurrentWorkerDep,
+    scope: WorkerScopeDep,
     settings: SettingsWorkerDep,
     db: DbWorkerDep,
     email_sender: EmailSenderWorkerDep,
 ) -> SendEmailVerificationOutput:
     return await send_email_verification(
-        task_input, current_user=current_user, db=db, settings=settings, email_sender=email_sender
+        task_input, current_user=scope.auth_user, db=db, settings=settings, email_sender=email_sender
     )
 
 
