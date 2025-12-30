@@ -4,7 +4,6 @@ The Background class provides a method to submit tasks to be executed asynchrono
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
 import functools
 import logging
 from typing import Annotated, ParamSpec, Protocol, TypeVar
@@ -22,6 +21,8 @@ from app.core.helpers import run_as_sync
 from app.core.settings import SettingsDep
 
 logger = logging.getLogger(__name__)
+
+type BackgroundTaskFactory = Callable[[SettingsDep], BackgroundTask]
 
 # Dependency that provides application background task runner.
 # The background is cached to avoid recreating it on each request.
@@ -45,8 +46,6 @@ class BackgroundTask:
 # This acts similar to FastAPI's APIRouter but for background tasks.
 # ----------------------------------------------------------------------------------------------------------------------
 
-type BackgroundTaskFactory = Callable[[SettingsDep], BackgroundTask]
-type SelfBackgroundTask = "CeleryTask[[str], str]"
 
 P = TypeVar("P", bound=BaseModel, contravariant=True)
 R = TypeVar("R", bound=BaseModel, covariant=True)
@@ -82,7 +81,7 @@ class TaskRegistry:
 
             # Async function that wraps the original function to handle dependency injection
             # Celery will call this via the wrapper function below
-            async def async_func(self: SelfBackgroundTask, raw_task_input: str, **kwargs: object) -> str:
+            async def async_func(self: "CeleryTask[[str], str]", raw_task_input: str, **kwargs: object) -> str:
                 input_model: type[P] = task_input_param.annotation
                 task_input = input_model.model_validate_json(raw_task_input)
                 worker_scope = WorkerScope(task=self)
@@ -94,7 +93,7 @@ class TaskRegistry:
             # Wrapper function to convert async function to sync for Celery
             # This is the function that Celery will actually call
             @functools.wraps(func)
-            def wrapper(self: SelfBackgroundTask, raw_task_input: str, **kwargs: object) -> str:
+            def wrapper(self: "CeleryTask[[str], str]", raw_task_input: str, **kwargs: object) -> str:
                 return run_as_sync(async_func, self, raw_task_input, **kwargs)
 
             # This should be in this scope to make sure this is defined at the time of decorator call
@@ -119,9 +118,10 @@ class TaskRegistry:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass
 class WorkerScope:
-    task: SelfBackgroundTask
+    def __init__(self, task: "CeleryTask[[str], str]"):
+        super().__init__()
+        self.task: "CeleryTask[[str], str]" = task
 
     @property
     def auth_user(self) -> AuthUser:
