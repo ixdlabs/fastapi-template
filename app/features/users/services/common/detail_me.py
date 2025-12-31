@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.core.auth import AuthenticationFailedException, CurrentUserDep
 from app.core.database import DbDep
 from app.core.exceptions import ServiceException, raises
-from app.core.storage import downloadable_url
+from app.core.storage import StorageDep
 from app.features.users.models.user import User, UserType
 
 
@@ -47,7 +47,7 @@ class UserNotFoundException(ServiceException):
 @raises(AuthenticationFailedException)
 @raises(UserNotFoundException)
 @router.get("/me")
-async def detail_me(db: DbDep, current_user: CurrentUserDep) -> DetailMeOutput:
+async def detail_me(db: DbDep, current_user: CurrentUserDep, storage: StorageDep) -> DetailMeOutput:
     """Get detailed information about the currently authenticated user."""
     # Fetch user from database
     stmt = select(User).where(User.id == current_user.id)
@@ -56,7 +56,7 @@ async def detail_me(db: DbDep, current_user: CurrentUserDep) -> DetailMeOutput:
     if user is None:
         raise UserNotFoundException()
 
-    profile_picture_url = downloadable_url(user.profile_picture)
+    profile_picture_url = storage.cdn_url(user.profile_picture)
     return DetailMeOutput(
         id=user.id,
         type=user.type,

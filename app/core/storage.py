@@ -1,69 +1,60 @@
 import logging
 from pathlib import Path
-from fastapi import APIRouter, UploadFile
-from fastapi.responses import FileResponse
+from typing import Annotated, overload
+from fastapi import Depends, FastAPI, Request, UploadFile
 from pydantic import HttpUrl
 from sqlalchemy_file import File
 
 from sqlalchemy_file.storage import StorageManager
 from libcloud.storage.drivers.dummy import DummyStorageDriver
 from libcloud.storage.drivers.local import LocalStorageDriver
-from app.core.exceptions import ServiceException, raises
+from fastapi.staticfiles import StaticFiles
 from app.core.settings import Settings, SettingsDep
 
 
 logger = logging.getLogger(__name__)
 
-# Storage endpoint to serve files in development mode
-# ----------------------------------------------------------------------------------------------------------------------
-
-router = APIRouter()
-
-
-class StorageDisabledException(ServiceException):
-    status_code = 503
-    type = "core/storage/disabled"
-    detail = "Storage service is disabled."
-
-
-@raises(StorageDisabledException)
-@router.get("/storage/{file_id}", response_class=FileResponse)
-async def get_storage_file(file_id: str, settings: SettingsDep) -> Path:
-    """
-    Get a file from storage by its file ID.
-    This endpoint is intended for development use only and serves files from local storage.
-    """
-    if settings.storage_backend == "local":
-        return Path(settings.storage_local_base_path) / "files" / file_id
-    raise StorageDisabledException()
-
-
-# Utility functions for storage operations
+# Storage class
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-async def convert_uploaded_file_to_db(upload_file: UploadFile) -> File:
-    """Convert a FastAPI UploadFile to a SQLAlchemy File object."""
-    content = await upload_file.read()
-    return File(content=content, filename=upload_file.filename, content_type=upload_file.content_type)
+class Storage:
+    def __init__(self, request: Request, settings: Settings):
+        super().__init__()
+        self.request = request
+        self.settings = settings
+
+    async def prepare(self, upload_file: UploadFile) -> File:
+        """Convert a FastAPI UploadFile to a SQLAlchemy File object."""
+        content = await upload_file.read()
+        return File(content=content, filename=upload_file.filename, content_type=upload_file.content_type)
+
+    @overload
+    def cdn_url(self, file: None) -> None: ...
+
+    @overload
+    def cdn_url(self, file: File) -> HttpUrl: ...
+
+    def cdn_url(self, file: File | None) -> HttpUrl | None:
+        """Try to get a download URL for a SQLAlchemy File object."""
+        if file is None:
+            return None
+        if self.settings.storage_backend == "local":
+            return HttpUrl(f"{self.request.base_url}storage/{file.id}")
+        return file["url"]
 
 
-def downloadable_url(file: File | None) -> HttpUrl | None:
-    """Try to get a download URL for a SQLAlchemy File object."""
-    if file is None:
-        return None
-    storage_backend = StorageManager.get_default()
-    if storage_backend == "local":
-        # using development mode local storage, return a local URL
-        return HttpUrl(f"http://localhost:8000/storage/{file['file_id']}")
-    return file["url"]
+def get_storage(request: Request, settings: SettingsDep) -> Storage:
+    return Storage(request, settings)
 
+
+StorageDep = Annotated[Storage, Depends(get_storage)]
 
 # Storage setup function
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def setup_storage(settings: Settings):
+def setup_storage(app: FastAPI, settings: Settings):
     """Initialize storage backends based on application settings."""
     if settings.storage_backend == "local":
         logger.info("Creating local storage backend at %s", settings.storage_local_base_path)
@@ -74,6 +65,7 @@ def setup_storage(settings: Settings):
 
         driver = LocalStorageDriver(storage_path)
         container = driver.get_container(container_path.name)  # pyright: ignore[reportUnknownMemberType]
+        app.mount("/storage", StaticFiles(directory=container_path), name="storage")
 
     elif settings.storage_backend == "dummy":
         logger.info("Using dummy storage backend (no actual storage)")

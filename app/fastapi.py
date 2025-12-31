@@ -4,12 +4,12 @@ from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.cors import CORSMiddleware
 
 from app.core import health, openapi
-from app.core import storage
 from app.core.database import create_db_engine_from_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.otel import setup_open_telemetry
 from app.core.settings import Settings
 
+from app.core.storage import setup_storage
 from app.features import models  # noqa: F401
 from app.features import api
 
@@ -29,8 +29,9 @@ def create_fastapi_app(settings: Settings) -> FastAPI:
     setup_open_telemetry(app, db_engine, settings)
     app.openapi = openapi.custom(app)
 
+    setup_storage(app, settings)
+
     app.include_router(openapi.router)
-    app.include_router(storage.router)
     app.include_router(health.router)
     app.include_router(api.router)
 

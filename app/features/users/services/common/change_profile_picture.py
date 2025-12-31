@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.core.auth import AuthenticationFailedException, CurrentUserDep
 from app.core.database import DbDep
 from app.core.exceptions import ServiceException, raises
-from app.core.storage import convert_uploaded_file_to_db
+from app.core.storage import StorageDep
 from app.features.users.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class UserNotFoundException(ServiceException):
 @raises(UserNotFoundException)
 @router.post("/change-profile-picture")
 async def change_profile_picture(
-    profile_picture: UploadFile, current_user: CurrentUserDep, db: DbDep
+    profile_picture: UploadFile, current_user: CurrentUserDep, db: DbDep, storage: StorageDep
 ) -> ChangeProfilePictureOutput:
     """
     Change the profile picture for the current user.
@@ -52,7 +52,7 @@ async def change_profile_picture(
         raise UserNotFoundException()
 
     # Update the user's profile picture
-    user.profile_picture = await convert_uploaded_file_to_db(profile_picture)
+    user.profile_picture = await storage.prepare(profile_picture)
     db.add(user)
     await db.commit()
 
