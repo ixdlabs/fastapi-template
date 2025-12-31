@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.core.database import DbDep
-from app.core.exceptions import ServiceException
+from app.core.exceptions import ServiceException, raises
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,8 @@ class ServiceUnavailableException(ServiceException):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@router.get("/health", tags=["Health"])
+@raises(ServiceUnavailableException)
+@router.get("/health")
 async def health_check(db: DbDep) -> HealthCheckResponseModel:
     """Health check endpoint to verify the service is operational."""
     try:
