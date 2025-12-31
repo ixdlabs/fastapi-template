@@ -1,0 +1,10 @@
+from app.celery import create_celery_app
+from app.core.logging import setup_logging
+from app.core.settings import get_settings
+
+global_settings = get_settings()
+setup_logging(global_settings)
+app = create_celery_app(global_settings)
+
+if __name__ == "__main__":
+    app.start()

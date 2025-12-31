@@ -25,3 +25,5 @@ htmlcov/
 # Idea config
 .idea
 .run
+
+.storage

@@ -100,7 +100,7 @@ OTEL_EXPORTER_OTLP_HEADERS="signoz-ingestion-key=<your-ingestion-key>"
 Start the application using:
 
 ```bash
-uv run uvicorn app.fastapi:app
+uv run uvicorn app.web_app:app
 ```
 
 ### Installing OTel Instrumentations
@@ -131,7 +131,7 @@ Once configured, traces, metrics, and logs are automatically exported via OTLP a
 Run after applying migrations:
 
 ```bash
-uv run fastapi dev app/fastapi.py
+uv run fastapi dev app/web_app.py
 ```
 
 Docs available at: [http://127.0.0.1:8000/api/docs](http://127.0.0.1:8000/api/docs)
@@ -163,9 +163,9 @@ Default queue backend is SQLite. Run following commands to start the worker and 
 
 ```bash
 # Worker - do the actual work
-uv run celery -A app.celery worker
+uv run celery -A app.worker_app worker
 # Beat Scheduler - schedule periodic tasks
-uv run celery -A app.celery beat
+uv run celery -A app.worker_app beat
 ```
 
 ## 🐳 Docker Setup
@@ -189,12 +189,115 @@ docker run --rm --env-file .env fastapi-template uv run alembic upgrade head
 
 ```
 app/
-├── fastapi.py               # App entry point
-├── core/                    # Core configuration (env, logging, otel, etc.)
-├── features/users/          # User domain logic
-├── migrations/              # Alembic migrations
-uv.lock, pyproject.toml      # Dependency definitions
+├─ core/                            # Global configuration & shared infrastructure
+│  ├─ emails/                       # Email templates & base components
+│  ├─ tests/                        # Core-level tests
+│  └─ <module_1>.py
+│
+├─ features/                        # Feature-based modules (vertical slices)
+│  ├─ <domain_1>/                   # Example feature/domain
+│  │  ├─ models/                    # Database models
+│  │  │  ├─ tests/                  # Model tests
+│  │  │  └─ <model_1>.py
+│  │  │
+│  │  ├─ services/                  # Business logic & API handlers
+│  │  │  ├─ common/                 # Endpoints shared across user types
+│  │  │  ├─ <user_type>/            # User-type–specific endpoints
+│  │  │  └─ tasks/                  # Async/worker services
+│  │  │     ├─ tests/               # Task tests
+│  │  │     └─ <do_action>.py       # **Single-responsibility task
+│  │  │
+│  │  ├─ api.py                     # Feature-level API router
+│  │  └─ tasks.py                   # Feature-level Celery task registry
+│  │
+│  ├─ api.py                        # Aggregate feature routers
+│  ├─ tasks.py                      # Aggregate feature tasks
+│  └─ models.py                     # Aggregate feature models
+│
+├─ fixtures/                        # Test factories & fixtures
+│  └─ <model_1_factory>.py
+│
+├─ migrations/                      # Alembic migration root
+│  ├─ versions/                     # Migration files
+│  │  └─ <datetime>_<id>_<slug>.py
+│  ├─ env.py                        # Alembic runtime configuration
+│  └─ script.mako                   # Migration template
+│
+├─ conftest.py                      # Pytest global configuration
+├─ fastapi.py                       # FastAPI app factory / wiring
+├─ web_app.py                       # Web application entry point
+├─ celery.py                        # Celery app factory / wiring
+├─ worker_app.py                    # Worker entry point
+│
+├─ pyproject.toml                   # Project metadata & dependencies
+└─ uv.lock                          # Dependency lockfile
 ```
+
+The single responsibility task should have below structure.
+
+```python
+# ... imports
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()          # ... for API endpoints
+registry = TaskRegistry()     # ... for worker tasks
+
+
+# Input/Output
+# -----------------------------------------------------------------------------
+
+
+class DoActionInput(BaseModel):
+  ...
+
+
+class DoActionOutput(BaseModel):
+  ...
+
+
+# Exceptions
+# -----------------------------------------------------------------------------
+
+
+class Example1Exception(ServiceException):
+    status_code = status.HTTP_404_NOT_FOUND
+    type = "<domain>/<user-type>/<do-action>/example-exception-1"
+    detail = "Example exception 1 message"
+
+
+# Action
+# -----------------------------------------------------------------------------
+
+
+# ... for API endpoints
+@raises(Example1Exception)
+@router.post("/do-action")
+async def do_action(form: DoActionInput, dep1: Example1Dep, ...) -> DoActionOutput:
+    """
+    Documentation for the action with any special notes.
+    """
+
+
+# ... for worker tasks
+@registry.background_task("do_action")
+async def do_action(task_input: DoActionInput, dep1: Example1WorkerDep, ...) -> DoActionOutput:
+    """
+    Documentation for the action with any special notes.
+    """
+
+
+DoActionTaskDep = Annotated[BackgroundTask, Depends(do_action)]
+
+# ... for service methods
+async def do_action(form: DoActionInput, dep1: Example1Dep, ...) -> DoActionOutput:
+    """
+    Documentation for the action with any special notes.
+    """
+
+```
+
+The single responsibility task denoting a worker task should have below structure.
 
 ## 🧠 VS Code Config
 
