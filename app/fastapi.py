@@ -4,7 +4,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.cors import CORSMiddleware
 
-from app.core import openapi
+from app.core import health, openapi
 from app.core.database import create_db_engine_from_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import setup_logging
@@ -34,6 +34,7 @@ def create_fastapi_app(settings: Settings) -> FastAPI:
     app.openapi = openapi.custom(app)
 
     app.include_router(openapi.router)
+    app.include_router(health.router)
     app.include_router(api.router)
 
     register_exception_handlers(app)
