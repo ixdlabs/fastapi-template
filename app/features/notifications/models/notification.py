@@ -22,6 +22,7 @@ if typing.TYPE_CHECKING:
 
 
 class NotificationType(enum.Enum):
+    CUSTOM = "custom"
     WELCOME = "welcome"
 
 
