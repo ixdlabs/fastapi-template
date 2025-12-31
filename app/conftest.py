@@ -188,3 +188,26 @@ async def authenticated_admin_fixture(fastapi_app_fixture: FastAPI, db_fixture: 
     user, auth_user = await get_auth_user(UserType.ADMIN, db_fixture)
     fastapi_app_fixture.dependency_overrides[get_current_user] = lambda: auth_user
     yield user
+
+
+@pytest.fixture
+def email_templates(tmp_path: Path) -> tuple[Path, Path]:
+    html_template = tmp_path / "test.mjml"
+    text_template = tmp_path / "test.txt"
+
+    _ = html_template.write_text("""
+    <mjml>
+        <mj-body>
+            <mj-text>Hello {{ name}}</mj-text>
+        </mj-body>
+    </mjml>
+    """)
+
+    _ = text_template.write_text("Hello {{ name }}")
+
+    return html_template, text_template
+
+
+@pytest.fixture
+def fake_settings(settings_fixture: Settings) -> Settings:
+    return settings_fixture
