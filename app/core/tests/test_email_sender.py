@@ -1,37 +1,29 @@
 import logging
 import pytest
 from pathlib import Path
-from pydantic import EmailStr
-from typing import Callable, override
 from unittest.mock import MagicMock
 
-from app.core.email_sender import Email, EmailSender, LocalEmailSender, SmtpEmailSender, get_email_sender
+from app.core.email_sender import EmailSender, LocalEmailSender, SmtpEmailSender, get_email_sender
 from app.core.settings import SettingsDep
-
-
-EmailFactory = Callable[..., Email]
+from app.fixtures.email_factory import EmailFactory
 
 
 @pytest.fixture
-def email_factory(email_templates: tuple[Path, Path]):
-    html_template, text_template = email_templates
+def email_templates_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    html_template = tmp_path / "test.mjml"
+    text_template = tmp_path / "test.txt"
 
-    def _create_email(
-        sender: str = "test@testmail.com",
-        receivers: list[EmailStr] | None = None,
-        subject: str = "Test",
-        template_data: dict[str, object] | None = None,
-    ):
-        return Email(
-            sender=sender,
-            receivers=receivers or ["receiver@testemail.com"],
-            subject=subject,
-            body_html_template=html_template,
-            body_text_template=text_template,
-            template_data=template_data or {"name": "TestUser"},
-        )
+    _ = html_template.write_text("""
+    <mjml>
+        <mj-body>
+            <mj-text>Hello {{ name}}</mj-text>
+        </mj-body>
+    </mjml>
+    """)
 
-    return _create_email
+    _ = text_template.write_text("Hello {{ name }}")
+
+    return html_template, text_template
 
 
 # Test get_email_sender dependency injection for EmailSender
@@ -53,33 +45,31 @@ def test_get_email_sender_returns_smtp_sender_when_email_sender_type_is_smtp(set
 
 
 def test_get_email_sender_raises_not_implemented_error_for_invalid_email_sender_types(settings_fixture: SettingsDep):
-    settings_fixture.email_sender_type = "invalid"  # type: ignore
+    settings_fixture.email_sender_type = "invalid"  # pyright: ignore[reportAttributeAccessIssue]
     with pytest.raises(NotImplementedError, match="Email sender type 'invalid' is not implemented."):
         _ = get_email_sender(settings_fixture)
 
 
 @pytest.mark.asyncio
-async def test_base_email_sender_raises_not_implemented(settings_fixture: SettingsDep, email_factory: EmailFactory):
-    class ConcreteSender(EmailSender):
-        @override
-        async def send_email(self, email: Email) -> str:
-            return await super().send_email(email)  # type: ignore
-
-    sender = ConcreteSender(settings_fixture)
-    email = email_factory()
+async def test_base_email_sender_raises_not_implemented(
+    settings_fixture: SettingsDep, email_templates_fixture: tuple[Path, Path]
+):
+    html_template, text_template = email_templates_fixture
+    email = EmailFactory.build(body_html_template=html_template, body_text_template=text_template)
+    mock_self = MagicMock()
 
     with pytest.raises(NotImplementedError):
-        _ = await sender.send_email(email)
+        _ = await EmailSender.send_email(mock_self, email)  # pyright: ignore[reportAbstractUsage]
 
 
 def test_render_logs_error_and_returns_raw_content_on_mjml_failure(
     settings_fixture: SettingsDep,
-    email_templates: tuple[Path, Path],
+    email_templates_fixture: tuple[Path, Path],
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ):
     sender = LocalEmailSender(settings_fixture)
-    html_template, _ = email_templates
+    html_template, _ = email_templates_fixture
     mock_mjml = MagicMock(side_effect=Exception("Simulated MJML Failure"))
     monkeypatch.setattr("app.core.email_sender.mjml2html", mock_mjml)
     result = sender.render("html", html_template, {"name": "ErrorTest"})
@@ -95,28 +85,34 @@ def test_render_logs_error_and_returns_raw_content_on_mjml_failure(
 @pytest.mark.asyncio
 async def test_send_email_logs_details_and_returns_placeholder(
     settings_fixture: SettingsDep,
-    email_factory: EmailFactory,
+    email_templates_fixture: tuple[Path, Path],
     caplog: pytest.LogCaptureFixture,
 ):
     caplog.set_level(logging.DEBUG)
     settings_fixture.email_sender_type = "local"
     sender = LocalEmailSender(settings_fixture)
-    email = email_factory(subject="Test")
+    html_template, text_template = email_templates_fixture
+    email = EmailFactory.build(subject="Test", body_html_template=html_template, body_text_template=text_template)
     message_id = await sender.send_email(email)
 
     assert message_id == "local-message-id-placeholder"
     assert "Simulated sending email to" in caplog.text
-    assert "receiver@testemail.com" in caplog.text
+    assert "recipient@testemail.com" in caplog.text
     assert "Test" in caplog.text
 
 
 @pytest.mark.asyncio
 async def test_send_email_with_multiple_receivers_logs_all_recipients(
-    settings_fixture: SettingsDep, caplog: pytest.LogCaptureFixture, email_factory: EmailFactory
+    settings_fixture: SettingsDep, caplog: pytest.LogCaptureFixture, email_templates_fixture: tuple[Path, Path]
 ):
     settings_fixture.email_sender_type = "local"
     sender = LocalEmailSender(settings_fixture)
-    email = email_factory(receivers=["recipient1@testemail.com", "recipient2@testemail.com"])
+    html_template, text_template = email_templates_fixture
+    email = EmailFactory.build(
+        receivers=["recipient1@testemail.com", "recipient2@testemail.com"],
+        body_html_template=html_template,
+        body_text_template=text_template,
+    )
     message_id = await sender.send_email(email)
 
     assert message_id == "local-message-id-placeholder"
@@ -128,33 +124,33 @@ async def test_send_email_with_multiple_receivers_logs_all_recipients(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_render_text_template_with_data(settings_fixture: SettingsDep, email_templates: tuple[Path, Path]):
+def test_render_text_template_with_data(settings_fixture: SettingsDep, email_templates_fixture: tuple[Path, Path]):
     sender = LocalEmailSender(settings_fixture)
-    _, text_template = email_templates
+    _, text_template = email_templates_fixture
     result = sender.render("text", text_template, {"name": "John"})
 
     assert "Hello John" in result
 
 
-def test_render_text_template_empty_data(settings_fixture: SettingsDep, email_templates: tuple[Path, Path]):
+def test_render_text_template_empty_data(settings_fixture: SettingsDep, email_templates_fixture: tuple[Path, Path]):
     sender = LocalEmailSender(settings_fixture)
-    _, text_template = email_templates
+    _, text_template = email_templates_fixture
     result = sender.render("text", text_template, {})
 
     assert "Hello" in result
 
 
-def test_render_html_template_with_data(settings_fixture: SettingsDep, email_templates: tuple[Path, Path]):
+def test_render_html_template_with_data(settings_fixture: SettingsDep, email_templates_fixture: tuple[Path, Path]):
     sender = LocalEmailSender(settings_fixture)
-    html_template, _ = email_templates
+    html_template, _ = email_templates_fixture
     result = sender.render("html", html_template, {"name": "Alice"})
 
     assert "Hello Alice" in result
 
 
-def test_render_with_none_template_data(settings_fixture: SettingsDep, email_templates: tuple[Path, Path]):
+def test_render_with_none_template_data(settings_fixture: SettingsDep, email_templates_fixture: tuple[Path, Path]):
     sender = LocalEmailSender(settings_fixture)
-    _, text_template = email_templates
+    _, text_template = email_templates_fixture
     result = sender.render("text", text_template, None)
 
     assert isinstance(result, str)
@@ -180,10 +176,9 @@ def test_render_complex_template_data(settings_fixture: SettingsDep, tmp_path: P
     assert "bob@example.com" in result
 
 
-def test_render_methods_are_available(settings_fixture: SettingsDep, email_templates: tuple[Path, Path]):
-    """Verify SmtpEmailSender inherits render method from EmailSender"""
+def test_render_methods_are_available(settings_fixture: SettingsDep, email_templates_fixture: tuple[Path, Path]):
     sender = SmtpEmailSender(settings_fixture)
-    _, text_template = email_templates
+    _, text_template = email_templates_fixture
     result = sender.render("text", text_template, {"name": "Test"})
 
     assert "Hello Test" in result
@@ -195,7 +190,7 @@ def test_render_methods_are_available(settings_fixture: SettingsDep, email_templ
 
 @pytest.mark.asyncio
 async def test_send_email_raises_exception_when_smtp_connection_fails(
-    settings_fixture: SettingsDep, email_factory: EmailFactory, monkeypatch: pytest.MonkeyPatch
+    settings_fixture: SettingsDep, monkeypatch: pytest.MonkeyPatch, email_templates_fixture: tuple[Path, Path]
 ):
     monkeypatch.setattr(settings_fixture, "email_sender_type", "smtp")
     monkeypatch.setattr(settings_fixture, "email_smtp_host", "invalid-host-xyz")
@@ -205,7 +200,8 @@ async def test_send_email_raises_exception_when_smtp_connection_fails(
     mock_smtp_cls = MagicMock(side_effect=Exception("Simulated Connection Error"))
     monkeypatch.setattr("app.core.email_sender.smtplib.SMTP", mock_smtp_cls)
     sender = SmtpEmailSender(settings_fixture)
-    email = email_factory()
+    html_template, text_template = email_templates_fixture
+    email = EmailFactory.build(body_html_template=html_template, body_text_template=text_template)
     with pytest.raises(Exception, match="Simulated Connection Error"):
         _ = await sender.send_email(email)
 
@@ -213,16 +209,17 @@ async def test_send_email_raises_exception_when_smtp_connection_fails(
 @pytest.mark.asyncio
 async def test_send_email_logs_network_error_during_sending(
     settings_fixture: SettingsDep,
-    email_factory: EmailFactory,
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
+    email_templates_fixture: tuple[Path, Path],
 ):
     caplog.set_level(logging.ERROR)
     monkeypatch.setattr(settings_fixture, "email_sender_type", "smtp")
     mock_smtp_cls = MagicMock(side_effect=Exception("Major Network Fail"))
     monkeypatch.setattr("app.core.email_sender.smtplib.SMTP", mock_smtp_cls)
     sender = SmtpEmailSender(settings_fixture)
-    email = email_factory()
+    html_template, text_template = email_templates_fixture
+    email = EmailFactory.build(body_html_template=html_template, body_text_template=text_template)
     with pytest.raises(Exception):
         _ = await sender.send_email(email)
 
@@ -232,7 +229,7 @@ async def test_send_email_logs_network_error_during_sending(
 
 @pytest.mark.asyncio
 async def test_send_email_with_attachments_gets_added_to_the_MIME_multipart(
-    settings_fixture: SettingsDep, email_factory: EmailFactory, monkeypatch: pytest.MonkeyPatch
+    settings_fixture: SettingsDep, monkeypatch: pytest.MonkeyPatch, email_templates_fixture: tuple[Path, Path]
 ):
     monkeypatch.setattr(settings_fixture, "email_sender_type", "smtp")
     monkeypatch.setattr(settings_fixture, "email_smtp_use_ssl", False)
@@ -241,7 +238,8 @@ async def test_send_email_with_attachments_gets_added_to_the_MIME_multipart(
     mock_instance = mock_smtp_cls.return_value
     monkeypatch.setattr("app.core.email_sender.smtplib.SMTP", mock_smtp_cls)
     sender = SmtpEmailSender(settings_fixture)
-    email = email_factory()
+    html_template, text_template = email_templates_fixture
+    email = EmailFactory.build(body_html_template=html_template, body_text_template=text_template)
     email.attachments = {"report.pdf": b"%PDF-1.4 content..."}
     _ = await sender.send_email(email)
 
@@ -257,7 +255,7 @@ async def test_send_email_with_attachments_gets_added_to_the_MIME_multipart(
 
 @pytest.mark.asyncio
 async def test_send_email_follows_correct_flow_for_tls_connection_with_login(
-    settings_fixture: SettingsDep, email_factory: EmailFactory, monkeypatch: pytest.MonkeyPatch
+    settings_fixture: SettingsDep, monkeypatch: pytest.MonkeyPatch, email_templates_fixture: tuple[Path, Path]
 ):
     monkeypatch.setattr(settings_fixture, "email_sender_type", "smtp")
     monkeypatch.setattr(settings_fixture, "email_smtp_host", "smtp.example.com")
@@ -270,7 +268,8 @@ async def test_send_email_follows_correct_flow_for_tls_connection_with_login(
     mock_instance = mock_smtp_cls.return_value
     monkeypatch.setattr("app.core.email_sender.smtplib.SMTP", mock_smtp_cls)
     sender = SmtpEmailSender(settings_fixture)
-    email = email_factory()
+    html_template, text_template = email_templates_fixture
+    email = EmailFactory.build(body_html_template=html_template, body_text_template=text_template)
     _ = await sender.send_email(email)
 
     mock_smtp_cls.assert_called_with("smtp.example.com", 587)
@@ -282,7 +281,7 @@ async def test_send_email_follows_correct_flow_for_tls_connection_with_login(
 
 @pytest.mark.asyncio
 async def test_send_email_follows_correct_flow_for_ssl(
-    settings_fixture: SettingsDep, email_factory: EmailFactory, monkeypatch: pytest.MonkeyPatch
+    settings_fixture: SettingsDep, monkeypatch: pytest.MonkeyPatch, email_templates_fixture: tuple[Path, Path]
 ):
     monkeypatch.setattr(settings_fixture, "email_sender_type", "smtp")
     monkeypatch.setattr(settings_fixture, "email_smtp_host", "smtp.secure.com")
@@ -292,7 +291,8 @@ async def test_send_email_follows_correct_flow_for_ssl(
     mock_instance = mock_smtp_cls.return_value
     monkeypatch.setattr("app.core.email_sender.smtplib.SMTP_SSL", mock_smtp_cls)
     sender = SmtpEmailSender(settings_fixture)
-    email = email_factory()
+    html_template, text_template = email_templates_fixture
+    email = EmailFactory.build(body_html_template=html_template, body_text_template=text_template)
     _ = await sender.send_email(email)
     mock_instance = mock_smtp_cls.return_value
 
