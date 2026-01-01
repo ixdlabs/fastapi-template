@@ -43,6 +43,7 @@ def settings_fixture():
         email_sender_type="local",
         email_verification_expiration_minutes=30,
         password_reset_expiration_minutes=45,
+        storage_backend="dummy",
     )
 
 

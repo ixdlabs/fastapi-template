@@ -5,6 +5,7 @@ import typing
 
 from argon2 import PasswordHasher
 from argon2.exceptions import Argon2Error
+from sqlalchemy_file import File, ImageField
 
 from app.core.database import Base
 from sqlalchemy.orm import Mapped
@@ -50,6 +51,8 @@ class User(Base):
 
     first_name: Mapped[str] = mapped_column(String)
     last_name: Mapped[str] = mapped_column(String)
+
+    profile_picture: Mapped[File | None] = mapped_column(ImageField, nullable=True)
 
     # Password is stored as a hashed value using Argon2
     # The timestamp of when the password was last set is also stored to

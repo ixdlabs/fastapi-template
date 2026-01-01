@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     email_smtp_use_ssl: bool = False
     email_sender_address: str = "from@example.com"
 
+    storage_backend: Literal["local", "dummy"] = "local"
+    storage_local_base_path: str = "./.storage"
+
     frontend_base_url: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(env_file=".env")

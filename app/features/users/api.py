@@ -12,6 +12,7 @@ from app.features.users.services.common import (
     delete_me,
     login_oauth2,
     update_me,
+    change_profile_picture,
 )
 from app.features.users.services.admin import update_user, delete_user, list_users, detail_user
 
@@ -36,3 +37,4 @@ common_user_router = APIRouter(prefix="/api/v1/common/users", tags=["Users"])
 common_user_router.include_router(detail_me.router)
 common_user_router.include_router(update_me.router)
 common_user_router.include_router(delete_me.router)
+common_user_router.include_router(change_profile_picture.router)

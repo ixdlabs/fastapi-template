@@ -3,9 +3,8 @@ import logging
 from celery import Celery
 from celery.signals import worker_process_init
 from app.core.database import create_db_engine_from_settings
-from app.core.logging import setup_logging
 from app.core.otel import setup_open_telemetry
-from app.core.settings import Settings, get_settings
+from app.core.settings import Settings
 
 from app.features import models  # noqa: F401
 from app.features import tasks
@@ -14,8 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 def create_celery_app(settings: Settings) -> Celery:
-    setup_logging(settings)
-
     app = Celery("tasks", broker=settings.celery_broker_url)
     app.conf.task_always_eager = settings.celery_task_always_eager
     app.conf.timezone = settings.celery_timezone
@@ -43,10 +40,3 @@ def create_celery_app(settings: Settings) -> Celery:
     app.set_default()
 
     return app
-
-
-global_settings = get_settings()
-app = create_celery_app(global_settings)
-
-if __name__ == "__main__":
-    app.start()

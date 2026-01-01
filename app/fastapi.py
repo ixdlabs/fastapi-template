@@ -1,24 +1,20 @@
 from fastapi import FastAPI
-import uvicorn
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.cors import CORSMiddleware
 
-from app.core import openapi
+from app.core import health, openapi
 from app.core.database import create_db_engine_from_settings
 from app.core.exceptions import register_exception_handlers
-from app.core.logging import setup_logging
 from app.core.otel import setup_open_telemetry
-from app.core.settings import Settings, get_settings
+from app.core.settings import Settings
 
+from app.core.storage import setup_storage
 from app.features import models  # noqa: F401
 from app.features import api
-from app.celery import create_celery_app
 
 
 def create_fastapi_app(settings: Settings) -> FastAPI:
-    setup_logging(settings)
-
     app = FastAPI(
         title="Sample API",
         description="This is a sample API built with FastAPI.",
@@ -33,7 +29,10 @@ def create_fastapi_app(settings: Settings) -> FastAPI:
     setup_open_telemetry(app, db_engine, settings)
     app.openapi = openapi.custom(app)
 
+    setup_storage(app, settings)
+
     app.include_router(openapi.router)
+    app.include_router(health.router)
     app.include_router(api.router)
 
     register_exception_handlers(app)
@@ -57,15 +56,3 @@ def create_fastapi_app(settings: Settings) -> FastAPI:
     )
 
     return app
-
-
-# Main entry point
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-global_settings = get_settings()
-app = create_fastapi_app(global_settings)
-_ = create_celery_app(global_settings)
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
