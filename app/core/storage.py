@@ -54,14 +54,8 @@ StorageDep = Annotated[Storage, Depends(get_storage)]
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def setup_storage(app: FastAPI, settings: Settings):
+def setup_storage(settings: Settings):
     """Initialize storage backends based on application settings."""
-    try:
-        _ = StorageManager.get_default()
-        return  # Storage already set up
-    except RuntimeError:
-        pass
-
     if settings.storage_backend == "local":
         logger.info("Creating local storage backend at %s", settings.storage_local_base_path)
         storage_path = Path(settings.storage_local_base_path)
@@ -71,7 +65,6 @@ def setup_storage(app: FastAPI, settings: Settings):
 
         driver = LocalStorageDriver(storage_path)
         container = driver.get_container(container_path.name)  # pyright: ignore[reportUnknownMemberType]
-        app.mount("/storage", StaticFiles(directory=container_path), name="storage")
 
     elif settings.storage_backend == "dummy":
         logger.info("Using dummy storage backend (no actual storage)")
@@ -81,4 +74,11 @@ def setup_storage(app: FastAPI, settings: Settings):
     else:
         raise ValueError(f"Unsupported storage backend: {settings.storage_backend}")
 
-    StorageManager.add_storage(settings.storage_backend, container)
+    StorageManager.add_storage("default", container)
+
+
+def add_storage_route(app: FastAPI, settings: Settings):
+    """Add route to serve files from local storage if using local storage backend."""
+    if settings.storage_backend == "local":
+        storage_path = Path(settings.storage_local_base_path) / "files"
+        app.mount("/storage", StaticFiles(directory=storage_path), name="storage")

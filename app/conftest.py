@@ -15,6 +15,7 @@ from app.core.cache import get_cache_backend
 from app.core.database import get_db_session
 from app.core.logging import setup_logging
 from app.core.rate_limit import get_rate_limit_strategy
+from app.core.storage import setup_storage
 from app.fixtures.user_factory import UserFactory
 from limits.aio.storage import MemoryStorage
 from limits.aio.strategies import MovingWindowRateLimiter, RateLimiter
@@ -74,6 +75,16 @@ def db_engine_fixture(setup_logging_fixture: None):
 
     yield engine
     Path("sqlite.test.db").unlink(missing_ok=True)
+
+
+# Storage setup for tests
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session", autouse=True)
+def storage_fixture(settings_fixture: Settings):
+    setup_storage(settings_fixture)
+    yield
 
 
 # Run all in a transaction and roll it back after each test
