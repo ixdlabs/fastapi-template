@@ -56,6 +56,12 @@ StorageDep = Annotated[Storage, Depends(get_storage)]
 
 def setup_storage(app: FastAPI, settings: Settings):
     """Initialize storage backends based on application settings."""
+    try:
+        _ = StorageManager.get_default()
+        return  # Storage already set up
+    except RuntimeError:
+        pass
+
     if settings.storage_backend == "local":
         logger.info("Creating local storage backend at %s", settings.storage_local_base_path)
         storage_path = Path(settings.storage_local_base_path)
