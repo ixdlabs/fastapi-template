@@ -6,6 +6,7 @@ from starlette.datastructures import Headers
 from starlette.types import Scope
 
 from aiocache import BaseCache
+import time_machine
 
 from app.core.cache import CacheBuilder, CacheDep, get_cache_backend, Cache, get_cache_builder
 
@@ -152,6 +153,22 @@ async def test_get_handles_validation_error_gracefully(cache_fixture: CacheDep, 
     invalid_cache = cache_fixture.with_key("custom-key").with_ttl(10).build(InvalidModel)
     cached_value = await invalid_cache.get()
     assert cached_value is None
+
+
+@pytest.mark.skip(reason="aiocache does not support time manipulation for TTL expiry testing")
+@pytest.mark.asyncio
+async def test_cache_ttl_expires_properly(cache_fixture: CacheDep):
+    with time_machine.travel("2024-01-01 12:00:00"):
+        cache = cache_fixture.with_ttl(300).build(ExampleModel)
+        _ = await cache.set(ExampleModel(a=10, b="to-expire"))
+
+    with time_machine.travel("2024-01-01 12:04:00"):
+        cached_value = await cache.get()
+        assert cached_value == ExampleModel(a=10, b="to-expire")
+
+    with time_machine.travel("2024-01-01 12:06:00"):
+        cached_value = await cache.get()
+        assert cached_value is None
 
 
 # Backend & dependency tests
