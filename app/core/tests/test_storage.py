@@ -10,8 +10,7 @@ from app.core.settings import Settings
 
 @pytest.fixture
 def mock_request():
-    request = MagicMock(spec=Request)
-    request.base_url = "http://testserver/"
+    request = MagicMock(spec=Request, base_url="http://testserver/")
     return request
 
 
