@@ -67,7 +67,7 @@ def test_setup_storage_returns_early_if_already_configured(settings_fixture: Set
     app = FastAPI()
     mock_manager = MagicMock()
     mock_manager.get_default.return_value = "existing_storage"
-    monkeypatch.setattr("app.core.storage.StorageManager", mock_manager)
+    monkeypatch.setattr("sqlalchemy_file.storage.StorageManager", mock_manager)
     setup_storage(app, settings_fixture)
 
     mock_manager.add_storage.assert_not_called()
@@ -83,13 +83,13 @@ def test_setup_storage_configures_local_backend(
     mock_manager = MagicMock()
     mock_driver_cls = MagicMock()
     mock_static_files = MagicMock()
-    mock_manager.get_default.side_effect = RuntimeError("Not configured")  # Force setup flow
+    mock_manager.get_default.side_effect = RuntimeError("Not configured")
     mock_driver_instance = mock_driver_cls.return_value
     mock_container = MagicMock()
     mock_driver_instance.get_container.return_value = mock_container
-    monkeypatch.setattr("app.core.storage.StorageManager", mock_manager)
-    monkeypatch.setattr("app.core.storage.LocalStorageDriver", mock_driver_cls)
-    monkeypatch.setattr("app.core.storage.StaticFiles", mock_static_files)
+    monkeypatch.setattr("sqlalchemy_file.storage.StorageManager", mock_manager)
+    monkeypatch.setattr("libcloud.storage.drivers.local.LocalStorageDriver", mock_driver_cls)
+    monkeypatch.setattr("fastapi.staticfiles.StaticFiles", mock_static_files)
     setup_storage(app, settings_fixture)
     files_path = tmp_path / "local_storage" / "files"
 
