@@ -57,8 +57,8 @@ async def detail_user(
     This endpoint is cached for demonstration purposes.
     """
     # Check and return from cache
-    response_cache = cache.vary_on_path().vary_on_auth().with_ttl(60).build()
-    if cache_result := await response_cache.get(UserDetailOutput):
+    response_cache = cache.vary_on_path().vary_on_auth().with_ttl(60).build(UserDetailOutput)
+    if cache_result := await response_cache.get():
         return cache_result
 
     # Fetch user from database

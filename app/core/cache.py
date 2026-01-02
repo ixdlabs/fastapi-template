@@ -1,7 +1,7 @@
 from functools import lru_cache
 from hashlib import md5
 import logging
-from typing import Annotated, TypeVar
+from typing import Annotated
 
 from fastapi import Depends, Request
 from aiocache import SimpleMemoryCache, BaseCache
@@ -10,34 +10,43 @@ from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
+
+class CachableContainer[DataT](BaseModel):
+    """Container model to wrap cached data for validation."""
+
+    value: DataT
+
+
 # Cache class that provides get and set methods for caching.
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-T = TypeVar("T", bound=BaseModel)
-
-
-class Cache:
-    def __init__(self, *, backend: BaseCache, key: str, ttl: int):
+class Cache[T]:
+    def __init__(self, *, backend: BaseCache, value_cls: type[T], key: str, ttl: int):
         super().__init__()
         self.backend = backend
+        self.value_cls = value_cls
         self.key = key
         self.ttl = ttl
 
     async def set(self, value: T) -> T:
         """Set a value in the cache with the specified TTL."""
-        persist_value = value.model_dump_json()
+        cache_value = CachableContainer(value=value)
+        persist_value = cache_value.model_dump_json()
         await self.backend.set(self.key, persist_value, self.ttl)  # pyright: ignore[reportUnknownMemberType]
+        logger.info("Cached value under key %s for %d seconds", self.key, self.ttl)
         return value
 
-    async def get(self, cls: type[T]) -> T | None:
+    async def get(self) -> T | None:
         """Get a value from the cache."""
+        logger.info("Fetching cached value under key %s", self.key)
         persist_value = await self.backend.get(self.key)  # pyright: ignore[reportUnknownMemberType]
         if persist_value is None:
             return None
 
         try:
-            return cls.model_validate_json(persist_value)
+            cached_value = CachableContainer[self.value_cls].model_validate_json(persist_value)
+            return cached_value.value
         except ValidationError as e:
             logger.warning("Cache hit but failed to validate cached data", exc_info=e)
             return None
@@ -78,9 +87,9 @@ class CacheBuilder:
         """Set a custom cache key."""
         return CacheBuilder(backend=self._backend, request=self._request, key=key, ttl=self._ttl)
 
-    def build(self) -> Cache:
+    def build[T](self, cls: type[T]) -> Cache[T]:
         """Build the Cache instance."""
-        return Cache(backend=self._backend, key=self._key, ttl=self._ttl)
+        return Cache[T](backend=self._backend, value_cls=cls, key=self._key, ttl=self._ttl)
 
 
 # Cache Backend used for caching.
