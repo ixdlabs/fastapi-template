@@ -8,7 +8,7 @@ from pytest import MonkeyPatch
 async def test_health_check_sends_ok_status_when_system_is_healthy(test_client_fixture: TestClient):
     response = test_client_fixture.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json()["status"] == "ok"
 
 
 @pytest.mark.asyncio

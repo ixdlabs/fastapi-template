@@ -2,6 +2,7 @@ import logging
 
 from celery import Celery
 from celery.signals import worker_process_init
+from app.core import health
 from app.core.database import create_db_engine_from_settings
 from app.core.otel import setup_open_telemetry
 from app.core.settings import Settings
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_celery_app(settings: Settings) -> Celery:
-    app = Celery("tasks", broker=settings.celery_broker_url)
+    app = Celery("tasks", broker=settings.celery_broker_url, backend=settings.celery_result_backend_url)
     app.conf.task_always_eager = settings.celery_task_always_eager
     app.conf.timezone = settings.celery_timezone
 
@@ -21,6 +22,9 @@ def create_celery_app(settings: Settings) -> Celery:
     # This makes task registration deterministic without needing to rely on
     # side-effect imports in worker entrypoints.
     app.conf.imports = ("app.features.tasks",)
+
+    # Health check task registration
+    tasks.registry.include_registry(health.registry)
 
     # Register periodic tasks from the task registry.
     # https://docs.celeryq.dev/en/main/userguide/periodic-tasks.html
