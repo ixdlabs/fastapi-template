@@ -187,7 +187,7 @@ To use Redis as the results backend, first turn eager mode off and set the `CELE
 ```bash
 # Start the redis service using docker:
 # docker run --name redis -d -p 6379:6379 redis
-CELERY_RESULT_BACKEND_URL=redis://localhost:6379/1
+CELERY_RESULT_BACKEND_URL=redis://localhost:6379/0
 # Eager mode must be disabled for redis to take effect.
 CELERY_TASK_ALWAYS_EAGER=False
 ```

@@ -55,7 +55,7 @@ class RateLimit:
 
 @lru_cache
 def get_rate_limit_backend_from_url(rate_limit_backend_url: str):
-    return limits.storage.storage_from_string(rate_limit_backend_url)
+    return limits.storage.storage_from_string(rate_limit_backend_url, implementation="redispy")
 
 
 def get_rate_limit_strategy(settings: SettingsDep) -> RateLimiter:
