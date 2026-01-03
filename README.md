@@ -168,6 +168,17 @@ uv run celery -A app.worker_app worker
 uv run celery -A app.worker_app beat
 ```
 
+### Using RabbitMQ
+
+Celery is configured to use a SQLite database by default.
+To swithc to RabbitMQ, start the RabbitMQ service and set the `CELERY_BROKER_URL` environment variable.
+
+```bash
+# Start the rabbitmq service using docker:
+# docker run -d --hostname rabbitmq --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+CELERY_BROKER_URL=amqp://guest:guest@localhost//
+```
+
 ## 📦 Cache Setup
 
 Cache is configured to use in-memory storage (`memory://`) by default.
