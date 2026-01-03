@@ -29,6 +29,7 @@ dependencies = [
     "pyjwt>=2.10.1",
     "python-json-logger>=4.0.0",
     "python-multipart>=0.0.20",
+    "redis>=7.1.0",
     "rich>=14.2.0",
     "sqlalchemy>=2.0.45",
     "sqlalchemy-file>=0.6.0",

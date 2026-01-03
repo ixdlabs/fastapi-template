@@ -4,8 +4,10 @@ import logging
 from typing import Annotated
 
 from fastapi import Depends, Request
-from aiocache import SimpleMemoryCache, BaseCache
+from aiocache import BaseCache, Cache as AioCache
 from pydantic import BaseModel, ValidationError
+
+from app.core.settings import SettingsDep
 
 
 logger = logging.getLogger(__name__)
@@ -97,8 +99,12 @@ class CacheBuilder:
 
 
 @lru_cache
-def get_cache_backend():
-    return SimpleMemoryCache()
+def get_cache_backend_from_url(cache_url: str):
+    return AioCache.from_url(cache_url)  # pyright: ignore[reportUnknownMemberType]
+
+
+def get_cache_backend(settings: SettingsDep):
+    return get_cache_backend_from_url(settings.cache_url)
 
 
 CacheBackendDep = Annotated[BaseCache, Depends(get_cache_backend)]

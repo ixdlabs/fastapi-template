@@ -8,7 +8,13 @@ from starlette.types import Scope
 from aiocache import BaseCache
 import time_machine
 
-from app.core.cache import CacheBuilder, CacheDep, get_cache_backend, Cache, get_cache_builder
+from app.core.cache import (
+    CacheBuilder,
+    CacheDep,
+    Cache,
+    get_cache_backend_from_url,
+    get_cache_builder,
+)
 
 
 @pytest.fixture
@@ -176,8 +182,8 @@ async def test_cache_ttl_expires_properly(cache_fixture: CacheDep):
 
 
 def test_get_cache_backend_returns_singleton_instance():
-    backend1 = get_cache_backend()
-    backend2 = get_cache_backend()
+    backend1 = get_cache_backend_from_url("memory://")
+    backend2 = get_cache_backend_from_url("memory://")
 
     assert backend1 is backend2
 
