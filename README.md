@@ -168,6 +168,17 @@ uv run celery -A app.worker_app worker
 uv run celery -A app.worker_app beat
 ```
 
+## 📦 Cache Setup
+
+Cache is configured to use in-memory storage (`memory://`) by default.
+To switch to redis, start the redis service and set the `CACHE_URL` environment variable.
+
+```bash
+# Start the redis service using docker:
+# docker run --name redis -d -p 6379:6379 redis
+CACHE_URL=redis://localhost:6379/0
+```
+
 ## 🐳 Docker Setup
 
 Build & run the production image:
