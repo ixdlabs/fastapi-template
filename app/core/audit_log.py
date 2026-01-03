@@ -4,12 +4,12 @@ for resource changes within the application. It captures actor information, requ
 resource identity, and snapshots of the resource before and after changes.
 """
 
+import json
 import logging
 from typing import Annotated, Literal
 from opentelemetry import trace
 from opentelemetry.trace import SpanContext
 from deepdiff import DeepDiff
-import orjson
 from app.core.auth import AuthException, Authenticator, AuthenticatorDep
 from fastapi import Request, Depends
 from app.core.database import Base, DbDep
@@ -102,7 +102,7 @@ class AuditLogger:
             elif self.tracked_value is not None:
                 audit_log.old_value = self.tracked_value
                 changed_value = DeepDiff(audit_log.old_value, audit_log.new_value)
-                audit_log.changed_value = orjson.loads(orjson.dumps(changed_value))
+                audit_log.changed_value = json.loads(json.dumps(changed_value))
 
             # Persist audit log (Do not commit here, commit should be handled by caller)
             # ----------------------------------------------------------------------------------------------------------
