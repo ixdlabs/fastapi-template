@@ -19,7 +19,7 @@ async def test_openapi_endpoint_serves_schema_successfully(test_client_fixture: 
 
 @pytest.mark.asyncio
 async def test_apidoc_endpoint_serves_swagger_ui_successfully(test_client_fixture: TestClient):
-    response = test_client_fixture.get("/api/docs")
+    response = test_client_fixture.get("/docs")
     assert response.status_code == 200
 
 

@@ -134,7 +134,7 @@ Run after applying migrations:
 uv run fastapi dev app/web_app.py
 ```
 
-Docs available at: [http://127.0.0.1:8000/api/docs](http://127.0.0.1:8000/api/docs)
+Docs available at: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 ## 🧰 Included Packages
 
