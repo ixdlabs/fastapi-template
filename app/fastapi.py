@@ -28,8 +28,8 @@ def create_fastapi_app(settings: Settings) -> FastAPI:
     setup_open_telemetry(app, db_engine, settings)
     app.openapi = openapi.custom(app)
 
-    app.include_router(openapi.router)
-    app.include_router(health.router)
+    app.include_router(openapi.router, tags=["OpenAPI"])
+    app.include_router(health.router, tags=["Health"])
     app.include_router(api.router)
 
     register_exception_handlers(app)
