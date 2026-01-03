@@ -45,7 +45,7 @@ async def test_health_readiness_check_fails_when_celery_is_unreachable(
 
     response = test_client_fixture.get("/health/ready")
     assert response.status_code == 503
-    assert response.json()["detail"] == "Celery service is unavailable"
+    assert response.json()["detail"] == "Background workers are unavailable"
 
 
 @pytest.mark.asyncio
