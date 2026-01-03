@@ -35,7 +35,10 @@ class Settings(BaseSettings):
     password_reset_expiration_minutes: int = 60
 
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
+
     cache_url: str = "memory://"
+
+    rate_limit_backend_url: str = "async+memory://"
 
     celery_task_always_eager: bool = False
     celery_broker_url: str = "sqla+sqlite:///sqlite.celery.db"

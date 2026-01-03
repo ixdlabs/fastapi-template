@@ -12,13 +12,14 @@ from inspect import Parameter
 import time
 from typing import Annotated, ParamSpec, TypeVar
 from fastapi import Depends, Request, status
-from limits.aio.storage import MemoryStorage
+import limits
 from limits.aio.strategies import MovingWindowRateLimiter, RateLimiter
 from limits import parse
 from fastapi.dependencies.utils import get_typed_signature, get_typed_return_annotation
 
 from app.core.exceptions import ServiceException
 from app.core.helpers import inspect_locate_param
+from app.core.settings import SettingsDep
 
 
 # Rate Limiter Class that applies the rate limiting strategy.
@@ -53,8 +54,12 @@ class RateLimit:
 
 
 @lru_cache
-def get_rate_limit_strategy():
-    backend = MemoryStorage()
+def get_rate_limit_backend_from_url(rate_limit_backend_url: str):
+    return limits.storage.storage_from_string(rate_limit_backend_url)
+
+
+def get_rate_limit_strategy(settings: SettingsDep) -> RateLimiter:
+    backend = get_rate_limit_backend_from_url(settings.rate_limit_backend_url)
     return MovingWindowRateLimiter(backend)
 
 
