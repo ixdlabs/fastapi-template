@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, overload
 from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,11 +18,18 @@ class Preferences:
         self.settings = settings
         self.db = db
 
+    @overload
+    async def get(self, key: str, default: str) -> str: ...
+    @overload
+    async def get(self, key: str, default: None = None) -> None: ...
+
     async def get(self, key: str, default: str | None = None) -> str | None:
+        """Get preference value by key with optional default."""
         all_preferences = await self.get_all()
         return all_preferences.get(key, default)
 
     async def get_all(self) -> dict[str, str]:
+        """Get all preferences as a dictionary."""
         if cached_value := await self.cache.get():
             return cached_value
         stmt = select(Preference)

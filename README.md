@@ -203,6 +203,41 @@ To switch to redis, start the redis service and set the `CACHE_URL` environment 
 CACHE_URL=redis://localhost:6379/0
 ```
 
+## 🚩 Feature Flags
+
+Feature flags can be managed via environment variables and database preferences.
+Environment variable flags take precedence over database preferences.
+For example, to enable a feature flag named `new_dashboard`, add it to the environment variable `FEATURE_FLAGS` as:
+
+```bash
+FEATURE_FLAGS=new_dashboard,another_flag
+```
+
+In the database, feature flags are stored as preferences with keys prefixed by `feature_flag.`
+(e.g., `feature_flag.new_dashboard`).
+The value should be set to `"true"` or `"false"`.
+
+The clients can indicate supported feature flags via the `X-Feature-Flags` request header,
+which should contain a comma-separated list of supported flags.
+
+```
+X-Feature-Flags: new_dashboard,another_flag
+```
+
+The code can check feature flags as follows:
+
+```python
+# Check if a feature flag is enabled
+if await preferences.enabled_feature_flag("new_dashboard"):
+    ...
+# Check if a feature flag is supported by the client
+if await preferences.supported_feature_flag("new_dashboard"):
+    ...
+# Check if a feature flag is enabled and supported by the client
+if await preferences.enabled_and_supported_feature_flag("new_dashboard"):
+    ...
+```
+
 ## 🐳 Docker Setup
 
 Build & run the production image:
