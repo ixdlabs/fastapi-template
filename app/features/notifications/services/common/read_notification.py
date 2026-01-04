@@ -1,6 +1,5 @@
 import uuid
 
-from datetime import datetime, timezone
 from fastapi import APIRouter, status
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -8,6 +7,7 @@ from sqlalchemy import select
 from app.core.auth import AuthenticationFailedException, CurrentUserDep
 from app.core.database import DbDep
 from app.core.exceptions import ServiceException, raises
+from app.core.timezone import utc_now
 from app.features.notifications.models.notification import Notification
 from app.features.notifications.models.notification_delivery import NotificationDelivery, NotificationStatus
 
@@ -59,6 +59,6 @@ async def read_notification(
     if notification.read_at is not None:
         return ReadNotificationOutput()
 
-    notification.read_at = datetime.now(timezone.utc)
+    notification.read_at = utc_now()
     await db.commit()
     return ReadNotificationOutput()

@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 import logging
 from pathlib import Path
 from typing import Annotated
@@ -14,6 +13,7 @@ from app.core.database import DbWorkerDep
 from app.core.email_sender import Email, EmailSenderDep, EmailSenderWorkerDep
 from app.core.exceptions import ServiceException
 from app.core.settings import SettingsDep, SettingsWorkerDep
+from app.core.timezone import utc_now
 from app.features.notifications.models.notification import Notification, NotificationType
 from app.features.notifications.models.notification_delivery import (
     NotificationChannel,
@@ -106,7 +106,7 @@ async def send_notification(
             .where(NotificationDelivery.id == successful.delivery_id)
             .values(
                 status=NotificationStatus.SENT,
-                sent_at=datetime.now(timezone.utc),
+                sent_at=utc_now(),
                 provider_ref=successful.message_id,
             )
         )

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 import logging
 from pathlib import Path
 from typing import Annotated
@@ -12,6 +12,7 @@ from app.core.background import BackgroundTask, TaskRegistry
 from app.core.database import DbWorkerDep
 from app.core.email_sender import Email, EmailSenderWorkerDep
 from app.core.settings import SettingsWorkerDep
+from app.core.timezone import utc_now
 from app.features.users.models.user_action import UserAction, UserActionState, UserActionType
 
 
@@ -61,7 +62,7 @@ async def send_password_reset_email(
 
     # Create a new password reset action
     token = str(uuid.uuid4())
-    expiration = datetime.now(timezone.utc) + timedelta(minutes=settings.password_reset_expiration_minutes)
+    expiration = utc_now() + timedelta(minutes=settings.password_reset_expiration_minutes)
     action = UserAction(type=UserActionType.PASSWORD_RESET, user_id=task_input.user_id, expires_at=expiration)
     action.set_token(token)
     db.add(action)

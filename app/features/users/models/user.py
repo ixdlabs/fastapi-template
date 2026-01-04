@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 import enum
 import uuid
 import typing
@@ -72,7 +72,7 @@ class User(Base):
     def set_password(self, password: str):
         password_hasher = PasswordHasher()
         self.hashed_password = password_hasher.hash(password)
-        self.password_set_at = datetime.now(timezone.utc)
+        self.password_set_at = utc_now()
 
     def check_password(self, password: str) -> bool:
         password_hasher = PasswordHasher()

@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 import logging
 from fastapi import APIRouter
 from pydantic import AwareDatetime, BaseModel
@@ -8,6 +7,7 @@ from celery import current_app
 from app.core.cache import CacheDep
 from app.core.database import DbDep
 from app.core.exceptions import ServiceException, raises
+from app.core.timezone import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -73,5 +73,4 @@ async def health_readiness_check(db: DbDep, cache: CacheDep) -> HealthReadinessC
         if not pongs:
             raise BackgroundWorkersUnavailableException()
 
-    current_time = datetime.now(timezone.utc)
-    return await response_cache.set(HealthReadinessCheckResponseModel(last_check=current_time))
+    return await response_cache.set(HealthReadinessCheckResponseModel(last_check=utc_now()))
