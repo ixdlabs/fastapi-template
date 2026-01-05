@@ -42,7 +42,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: SonarQube Scan
-        if: secrets.SONAR_PROJECT_KEY != ''
+        if: ${{ secrets.SONAR_PROJECT_KEY != '' }}
         run: uv run pysonar \
           --sonar-host-url={{ secrets.SONAR_HOST_URL }} \
           --sonar-token={{ secrets.SONAR_TOKEN }} \
