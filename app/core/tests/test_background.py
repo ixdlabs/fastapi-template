@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel
 import pytest
 from pytest import MonkeyPatch
-from app.core.background import BackgroundTask, TaskRegistry
+from app.core.background import CeleryBackgroundTask, TaskRegistry
 from app.core.database import DbDep
 from app.core.settings import Settings, SettingsDep, SettingsWorkerDep
 from celery.app.task import Task as CeleryTask
@@ -45,7 +45,7 @@ def test_task_factory_creates_background_task(settings_fixture: Settings):
     factory = task_registry.background_task("sample_task_2")(sample_task)
     background_task = factory(settings_fixture)
 
-    assert isinstance(background_task, BackgroundTask)
+    assert isinstance(background_task, CeleryBackgroundTask)
     assert isinstance(background_task.celery_task, CeleryTask)
 
 
@@ -56,6 +56,7 @@ async def test_background_task_submit_calls_celery_apply_async(monkeypatch: Monk
     background_task = factory(settings_fixture)
 
     mock_apply_async = MagicMock()
+    assert isinstance(background_task, CeleryBackgroundTask)
     monkeypatch.setattr(background_task.celery_task, "apply_async", mock_apply_async)
 
     input_model = InputModel(value=42)

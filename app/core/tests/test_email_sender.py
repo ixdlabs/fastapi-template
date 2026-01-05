@@ -3,7 +3,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from app.core.email_sender import EmailSender, LocalEmailSender, SmtpEmailSender, get_email_sender
+from app.core.email_sender import LocalEmailSender, SmtpEmailSender, get_email_sender
 from app.core.settings import SettingsDep
 from app.fixtures.email_factory import EmailFactory
 
@@ -13,13 +13,15 @@ def email_templates_fixture(tmp_path: Path) -> tuple[Path, Path]:
     html_template = tmp_path / "test.mjml"
     text_template = tmp_path / "test.txt"
 
-    _ = html_template.write_text("""
+    _ = html_template.write_text(
+        """
     <mjml>
         <mj-body>
             <mj-text>Hello {{ name}}</mj-text>
         </mj-body>
     </mjml>
-    """)
+    """
+    )
 
     _ = text_template.write_text("Hello {{ name }}")
 
@@ -48,18 +50,6 @@ def test_get_email_sender_raises_not_implemented_error_for_invalid_email_sender_
     settings_fixture.email_sender_type = "invalid"  # pyright: ignore[reportAttributeAccessIssue]
     with pytest.raises(NotImplementedError, match="Email sender type 'invalid' is not implemented."):
         _ = get_email_sender(settings_fixture)
-
-
-@pytest.mark.asyncio
-async def test_base_email_sender_raises_not_implemented(
-    settings_fixture: SettingsDep, email_templates_fixture: tuple[Path, Path]
-):
-    html_template, text_template = email_templates_fixture
-    email = EmailFactory.build(body_html_template=html_template, body_text_template=text_template)
-    mock_self = MagicMock()
-
-    with pytest.raises(NotImplementedError):
-        _ = await EmailSender.send_email(mock_self, email)  # pyright: ignore[reportAbstractUsage]
 
 
 def test_render_logs_error_and_returns_raw_content_on_mjml_failure(
