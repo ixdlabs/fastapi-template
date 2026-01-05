@@ -1,11 +1,11 @@
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
-from fastapi import Request, UploadFile
+from fastapi import FastAPI, Request, UploadFile
 from sqlalchemy_file import File
 from sqlalchemy_file.storage import StorageManager
 
-from app.core.storage import Storage, setup_storage
+from app.core.storage import add_storage_route, get_storage, Storage, setup_storage
 from app.core.settings import Settings
 
 
@@ -63,6 +63,14 @@ def test_cdn_url_returns_remote_url_when_backend_is_dummy(
     assert url == "http://cdn.example.com/file-123"
 
 
+def test_get_storage_returns_storage(mock_request: MagicMock, settings_fixture: Settings):
+    storage = get_storage(request=mock_request, settings=settings_fixture)
+
+    assert isinstance(storage, Storage)
+    assert storage.request is mock_request
+    assert storage.settings is settings_fixture
+
+
 def test_setup_storage_configures_local_backend(
     settings_fixture: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -115,3 +123,26 @@ def test_setup_storage_raises_error_for_invalid_backend(settings_fixture: Settin
 
     with pytest.raises(ValueError, match="Unsupported storage backend"):
         setup_storage(settings_fixture)
+
+
+def test_add_storage_route_mounts_static_files_for_local_backend(
+    settings_fixture: Settings,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    app = FastAPI()
+    monkeypatch.setattr(settings_fixture, "storage_backend", "local")
+    monkeypatch.setattr(settings_fixture, "storage_local_base_path", str(tmp_path))
+    app.mount = MagicMock()
+    mock_static_files = MagicMock()
+    monkeypatch.setattr(
+        "app.core.storage.StaticFiles",
+        mock_static_files,
+    )
+    add_storage_route(app, settings_fixture)
+
+    app.mount.assert_called_once()
+    args, kwargs = app.mount.call_args
+    assert args[0] == "/storage"
+    assert kwargs["name"] == "storage"
+    mock_static_files.assert_called_once()
