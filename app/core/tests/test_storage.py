@@ -2,7 +2,6 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
 from fastapi import Request, UploadFile
-
 from sqlalchemy_file import File
 from sqlalchemy_file.storage import StorageManager
 
@@ -59,8 +58,8 @@ def test_cdn_url_returns_remote_url_when_backend_is_dummy(
     monkeypatch.setattr(settings_fixture, "storage_backend", "dummy")
     storage = Storage(request=mock_request, settings=settings_fixture)
     mock_file = {"url": "http://cdn.example.com/file-123"}
-
     url = storage.cdn_url(mock_file)  # pyright: ignore[reportArgumentType, reportCallIssue]
+
     assert url == "http://cdn.example.com/file-123"
 
 
@@ -69,52 +68,41 @@ def test_setup_storage_configures_local_backend(
 ):
     monkeypatch.setattr(settings_fixture, "storage_backend", "local")
     monkeypatch.setattr(settings_fixture, "storage_local_base_path", str(tmp_path))
-
     mock_driver_cls = MagicMock()
     mock_driver = mock_driver_cls.return_value
     mock_container = MagicMock()
-
     mock_driver.get_container.return_value = mock_container
-
     monkeypatch.setattr(
         "app.core.storage.LocalStorageDriver",
         mock_driver_cls,
     )
-
     monkeypatch.setattr(
         "app.core.storage.StorageManager.add_storage",
         MagicMock(),
     )
-
     setup_storage(settings_fixture)
-
     files_path = tmp_path / "files"
+
     assert files_path.exists()
     assert files_path.is_dir()
-
     mock_driver.get_container.assert_called_once_with("files")
     StorageManager.add_storage.assert_called_once_with("default", mock_container)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
 
 
 def test_setup_storage_configures_dummy_backend(settings_fixture: Settings, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings_fixture, "storage_backend", "dummy")
-
     mock_driver_cls = MagicMock()
     mock_driver = mock_driver_cls.return_value
     mock_container = MagicMock()
-
     mock_driver.create_container.return_value = mock_container
-
     monkeypatch.setattr(
         "app.core.storage.DummyStorageDriver",
         mock_driver_cls,
     )
-
     monkeypatch.setattr(
         "app.core.storage.StorageManager.add_storage",
         MagicMock(),
     )
-
     setup_storage(settings_fixture)
 
     mock_driver_cls.assert_called_once_with("key", "secret")
