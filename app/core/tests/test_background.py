@@ -107,7 +107,7 @@ async def test_task_factory_submission_executes_task(settings_fixture: Settings)
 
     input_model = InputModel(value=10)
     await background_task.submit(input_model)
-    result = await background_task.wait_and_get_result(OutputModel)
+    result = background_task.wait_and_get_result(OutputModel)
     assert result.result == 10
 
 
@@ -128,7 +128,7 @@ async def test_task_with_dependencies_execution(settings_fixture: Settings, db_f
 
     input_model = InputModel(value=5)
     await background_task.submit(input_model)
-    task_output = await background_task.wait_and_get_result(OutputModel)
+    task_output = background_task.wait_and_get_result(OutputModel)
     assert task_output.result == 10
     assert len(called_settings) == 1
     assert called_settings[0] is settings_fixture

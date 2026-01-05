@@ -116,7 +116,7 @@ class DbAuditLogger(AuditLogger):
                 audit_log.old_value = audit_log.new_value
                 audit_log.new_value = None
             elif action == "create":
-                pass
+                audit_log.old_value = None
             elif self.tracked_value is not None:
                 audit_log.old_value = self.tracked_value
                 changed_value = DeepDiff(audit_log.old_value, audit_log.new_value)

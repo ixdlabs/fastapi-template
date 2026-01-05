@@ -57,33 +57,42 @@ class Base(DeclarativeBase):
         Adapted from https://github.com/absent1706/sqlalchemy-mixins/blob/master/sqlalchemy_mixins/serialize.py
         """
         result: dict[str, object] = dict()
+        exclude_cols = exclude or []
 
-        if exclude is None:
-            view_cols = self.columns()
-        else:
-            view_cols = filter(lambda e: e not in exclude, self.columns())
-
-        for key in view_cols:
+        for key in self.columns():
+            if key in exclude_cols:
+                continue
             result[key] = getattr(self, key)
 
         if hybrid_attributes:
             for key in self.hybrid_properties():
+                if key in exclude_cols:
+                    continue
                 result[key] = getattr(self, key)
 
         if nested:
-            for key in self.relations():
-                state = attributes.instance_state(self)
-                if key in state.unloaded:
-                    continue
-                obj = getattr(self, key)
-                if isinstance(obj, Base):
-                    result[key] = obj.to_dict(hybrid_attributes=hybrid_attributes)
-                if isinstance(obj, Iterable):
-                    result[key] = [o.to_dict(hybrid_attributes=hybrid_attributes) for o in obj if isinstance(o, Base)]
+            nested_result = self.nested_to_dict(hybrid_attributes, exclude_cols)
+            result.update(nested_result)
 
         # Convert to standard dict to handle any non-serializable types.
         # Convert any non-serializable types (eg: datetime) to string.
         result = json.loads(json.dumps(result, default=str))
+        return result
+
+    def nested_to_dict(self, hybrid_attributes: bool, exclude_cols: list[str]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key in self.relations():
+            if key in exclude_cols:
+                continue
+            state = attributes.instance_state(self)
+            if key in state.unloaded:
+                continue
+            obj = getattr(self, key)
+            if isinstance(obj, Base):
+                result[key] = obj.to_dict(hybrid_attributes=hybrid_attributes)
+            if isinstance(obj, Iterable):
+                result[key] = [o.to_dict(hybrid_attributes=hybrid_attributes) for o in obj if isinstance(o, Base)]
+
         return result
 
 

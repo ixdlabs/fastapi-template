@@ -36,7 +36,7 @@ class BackgroundTask(abc.ABC):
         """Submit a function to be run in the background."""
 
     @abc.abstractmethod
-    async def wait_and_get_result[T: BaseModel](self, output_cls: type[T], timeout: float | None = None) -> T:
+    def wait_and_get_result[T: BaseModel](self, output_cls: type[T], timeout: float | None = None) -> T:
         """Wait for the task to complete and get the result as a Pydantic model."""
 
 
@@ -56,7 +56,7 @@ class CeleryBackgroundTask(BackgroundTask):
         logger.info(f"Submitted background task {self.celery_task.name} with id {self.result.id}")
 
     @override
-    async def wait_and_get_result[T: BaseModel](self, output_cls: type[T], timeout: float | None = None) -> T:
+    def wait_and_get_result[T: BaseModel](self, output_cls: type[T], timeout: float | None = None) -> T:
         if self.result is None:
             raise RuntimeError("Task has not been submitted yet.")
         raw_result = self.result.get(timeout=timeout)

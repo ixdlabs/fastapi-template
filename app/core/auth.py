@@ -36,10 +36,15 @@ class AuthUser(BaseModel):
     worker_id: str | None = None
 
 
-class AuthException(BaseException):
+class AuthException(Exception):
     def __init__(self, message: str) -> None:
         self.message = message
         super().__init__()
+
+
+class JwtDecodeAuthException(AuthException):
+    def __init__(self) -> None:
+        super().__init__("JWT decode error")
 
 
 class Authenticator:
@@ -113,7 +118,7 @@ class Authenticator:
         try:
             payload: dict[str, object] = self.jwt_decode(access_token)
         except jwt.PyJWTError as e:
-            raise AuthException("JWT decode error") from e
+            raise JwtDecodeAuthException() from e
 
         if payload.get("type") != "access":
             raise AuthException("Invalid JWT access token (wrong type)")
@@ -134,7 +139,7 @@ class Authenticator:
         try:
             payload: dict[str, object] = self.jwt_decode(token)
         except jwt.PyJWTError as e:
-            raise AuthException("JWT decode error") from e
+            raise JwtDecodeAuthException() from e
 
         scope_str = str(payload.get("scope", ""))
         return set(scope_str.split()) if scope_str else set()
@@ -144,7 +149,7 @@ class Authenticator:
         try:
             payload: dict[str, object] = self.jwt_decode(token)
         except jwt.PyJWTError as e:
-            raise AuthException("JWT decode error") from e
+            raise JwtDecodeAuthException() from e
 
         sub = payload.get("sub")
         if sub is None or not isinstance(sub, str):
@@ -162,7 +167,7 @@ class Authenticator:
         try:
             payload: dict[str, object] = self.jwt_decode(token)
         except jwt.PyJWTError as e:
-            raise AuthException("JWT decode error") from e
+            raise JwtDecodeAuthException() from e
 
         iat_timestamp = payload.get("iat")
         if iat_timestamp is None or not isinstance(iat_timestamp, (int, float)):

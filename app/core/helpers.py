@@ -58,7 +58,7 @@ def run_as_sync(func: Callable[P, Coroutine[object, object, R]], *args: P.args, 
     def runner():
         try:
             result_container["result"] = asyncio.run(func(*args, **kwargs))
-        except BaseException as exc:
+        except Exception as exc:
             error_container["error"] = exc
 
     thread = threading.Thread(target=runner, daemon=True)
