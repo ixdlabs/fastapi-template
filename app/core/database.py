@@ -56,7 +56,7 @@ class Base(DeclarativeBase):
 
         Adapted from https://github.com/absent1706/sqlalchemy-mixins/blob/master/sqlalchemy_mixins/serialize.py
         """
-        result: dict[str, object] = dict()
+        result: dict[str, object] = {}
         exclude_cols = exclude or []
 
         for key in self.columns():
