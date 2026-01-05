@@ -43,6 +43,6 @@ jobs:
 
       - name: SonarQube Scan
         run: uv run pysonar \
-          --sonar-host-url ${{ secrets.SONAR_HOST_URL }} \
-          --sonar-token ${{ secrets.SONAR_TOKEN }} \
-          --sonar-project-key ${{ secrets.SONAR_PROJECT_KEY }}
+          --sonar-host-url ${{ env.SONAR_HOST_URL }} \
+          --sonar-project-key ${{ env.SONAR_PROJECT_KEY }} \
+          --sonar-token ${{ secrets.SONAR_TOKEN }}
