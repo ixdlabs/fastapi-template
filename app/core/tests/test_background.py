@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import pytest
 from pytest import MonkeyPatch
 
-from app.core.background import BackgroundTask, TaskRegistry, WorkerScope, get_worker_scope
+from app.core.background import CeleryBackgroundTask, TaskRegistry, WorkerScope, get_worker_scope
 from app.core.database import DbDep
 from app.core.settings import Settings, SettingsDep, SettingsWorkerDep
 from celery.app.task import Task as CeleryTask
@@ -50,7 +50,7 @@ def test_task_factory_creates_background_task(settings_fixture: Settings):
     factory = task_registry.background_task("sample_task_2")(sample_task)
     background_task = factory(settings_fixture)
 
-    assert isinstance(background_task, BackgroundTask)
+    assert isinstance(background_task, CeleryBackgroundTask)
     assert isinstance(background_task.celery_task, CeleryTask)
 
 
@@ -61,7 +61,7 @@ async def test_wait_and_get_result_raises_error_if_not_submitted(settings_fixtur
     background_task = factory(settings_fixture)
 
     with pytest.raises(RuntimeError, match="Task has not been submitted yet"):
-        await background_task.wait_and_get_result(OutputModel)  # pyright: ignore[reportUnusedCallResult]4
+        await background_task.wait_and_get_result(OutputModel)  # pyright: ignore[reportGeneralTypeIssues]
 
 
 @pytest.mark.asyncio
@@ -71,6 +71,7 @@ async def test_background_task_submit_calls_celery_apply_async(monkeypatch: Monk
     background_task = factory(settings_fixture)
 
     mock_apply_async = MagicMock()
+    assert isinstance(background_task, CeleryBackgroundTask)
     monkeypatch.setattr(background_task.celery_task, "apply_async", mock_apply_async)
 
     input_model = InputModel(value=42)
@@ -129,7 +130,7 @@ async def test_task_factory_submission_executes_task(settings_fixture: Settings)
 
     input_model = InputModel(value=10)
     await background_task.submit(input_model)
-    result = await background_task.wait_and_get_result(OutputModel)
+    result = background_task.wait_and_get_result(OutputModel)
     assert result.result == 10
 
 
@@ -150,7 +151,7 @@ async def test_task_with_dependencies_execution(settings_fixture: Settings, db_f
 
     input_model = InputModel(value=5)
     await background_task.submit(input_model)
-    task_output = await background_task.wait_and_get_result(OutputModel)
+    task_output = background_task.wait_and_get_result(OutputModel)
     assert task_output.result == 10
     assert len(called_settings) == 1
     assert called_settings[0] is settings_fixture

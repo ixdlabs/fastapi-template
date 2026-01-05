@@ -44,7 +44,7 @@ async def test_send_password_reset_email_creates_action_and_invalidates_previous
     task_input = SendPasswordResetInput(user_id=user_id, email=email)
     background_task = send_password_reset_email(settings_fixture)
     await background_task.submit(task_input)
-    task_output = await background_task.wait_and_get_result(SendPasswordResetOutput)
+    task_output = background_task.wait_and_get_result(SendPasswordResetOutput)
     assert task_output.detail == "Password reset email sent successfully."
     after_call = datetime.now(timezone.utc)
 

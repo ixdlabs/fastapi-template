@@ -40,3 +40,9 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         with:
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: SonarQube Scan
+        run: uv run pysonar \
+          --sonar-host-url={{ secrets.SONAR_HOST_URL }} \
+          --sonar-token={{ secrets.SONAR_TOKEN }} \
+          --sonar-project-key={{ secrets.SONAR_PROJECT_KEY }}

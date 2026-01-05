@@ -3,10 +3,11 @@ This module defines the Background class and its dependency for managing backgro
 The Background class provides a method to submit tasks to be executed asynchronously.
 """
 
+import abc
 from collections.abc import Callable
 import functools
 import logging
-from typing import Annotated, ParamSpec, Protocol, TypeVar
+from typing import Annotated, ParamSpec, Protocol, TypeVar, override
 import uuid
 from fast_depends import dependency_provider, inject, Depends as WorkerDepends
 from fastapi.dependencies.utils import get_typed_signature
@@ -25,26 +26,37 @@ logger = logging.getLogger(__name__)
 
 type BackgroundTaskFactory = Callable[[SettingsDep], BackgroundTask]
 
-# Dependency that provides application background task runner.
-# The background is cached to avoid recreating it on each request.
+# Background Task Interface
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class BackgroundTask:
+class BackgroundTask(abc.ABC):
+    @abc.abstractmethod
+    async def submit(self, input_model: BaseModel) -> None:
+        """Submit a function to be run in the background."""
+
+    @abc.abstractmethod
+    def wait_and_get_result[T: BaseModel](self, output_cls: type[T], timeout: float | None = None) -> T:
+        """Wait for the task to complete and get the result as a Pydantic model."""
+
+
+# Background Task Implementation using Celery
+# ----------------------------------------------------------------------------------------------------------------------
+class CeleryBackgroundTask(BackgroundTask):
     def __init__(self, celery_task: "CeleryTask[[str], str]", settings: SettingsDep):
         super().__init__()
         self.celery_task = celery_task
         self.settings = settings
         self.result: AsyncResult[str] | None = None
 
+    @override
     async def submit(self, input_model: BaseModel) -> None:
-        """Submit a function to be run in the background as a Celery task."""
         task_input_raw = input_model.model_dump_json()
         self.result = self.celery_task.apply_async(kwargs={"raw_task_input": task_input_raw})
         logger.info(f"Submitted background task {self.celery_task.name} with id {self.result.id}")
 
-    async def wait_and_get_result[T: BaseModel](self, output_cls: type[T], timeout: float | None = None) -> T:
-        """Wait for the task to complete and get the result as a Pydantic model."""
+    @override
+    def wait_and_get_result[T: BaseModel](self, output_cls: type[T], timeout: float | None = None) -> T:
         if self.result is None:
             raise RuntimeError("Task has not been submitted yet.")
         raw_result = self.result.get(timeout=timeout)
@@ -112,7 +124,7 @@ class TaskRegistry:
             # This will be called by FastAPI to provide the dependency
             # The settings object here is the one in FastAPI context
             def dependency(settings: SettingsDep) -> BackgroundTask:
-                return BackgroundTask(celery_task=task, settings=settings)
+                return CeleryBackgroundTask(celery_task=task, settings=settings)
 
             return dependency
 

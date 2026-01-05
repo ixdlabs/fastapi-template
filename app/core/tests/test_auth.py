@@ -13,6 +13,7 @@ from app.core.auth import (
     get_current_user,
     get_authenticator,
 )
+from starlette.datastructures import Headers
 from app.core.auth import Authenticator
 from app.core.settings import Settings
 
@@ -54,6 +55,34 @@ def debug_false_settings_fixture(settings_fixture: Settings):
 def test_get_authenticator_returns_authenticator_configured_with_settings(settings_fixture: Settings):
     authenticator = get_authenticator(settings_fixture)
     assert isinstance(authenticator, Authenticator)
+
+
+# Tests for access_token_from_headers
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def test_access_token_from_headers_returns_token_when_authorization_header_present(
+    authenticator_fixture: Authenticator,
+):
+    headers = Headers({"Authorization": "Bearer testtoken"})
+    token = authenticator_fixture.access_token_from_headers(headers)
+    assert token == "testtoken"
+
+
+def test_access_token_from_headers_raises_auth_exception_when_authorization_header_missing(
+    authenticator_fixture: Authenticator,
+):
+    headers = Headers({})
+    with pytest.raises(AuthException):
+        _ = authenticator_fixture.access_token_from_headers(headers)
+
+
+def test_access_token_from_headers_raises_auth_exception_when_authorization_header_malformed(
+    authenticator_fixture: Authenticator,
+):
+    headers = Headers({"Authorization": "InvalidHeaderFormat"})
+    with pytest.raises(AuthException):
+        _ = authenticator_fixture.access_token_from_headers(headers)
 
 
 # JWT Encode Tests

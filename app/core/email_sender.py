@@ -45,11 +45,10 @@ class EmailSender(abc.ABC):
     @abc.abstractmethod
     async def send_email(self, email: Email) -> str:
         """Sends an email and returns the email provider's message ID."""
-        raise NotImplementedError()
 
     def render(self, type: Literal["text", "html"], template: Path, data: dict[str, object] | None) -> str:
         """Renders an email template of the given type ('text' or 'html') using Jinja2 and MJML."""
-        env = Environment(loader=FileSystemLoader([base_email_template_path, template.parent]))
+        env = Environment(loader=FileSystemLoader([base_email_template_path, template.parent]), autoescape=True)
         jinja_template: Template = env.get_template(template.name)
         content = jinja_template.render(data or {})
         if type == "html":

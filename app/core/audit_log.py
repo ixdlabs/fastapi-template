@@ -4,9 +4,10 @@ for resource changes within the application. It captures actor information, requ
 resource identity, and snapshots of the resource before and after changes.
 """
 
+import abc
 import json
 import logging
-from typing import Annotated, Literal
+from typing import Annotated, Literal, override
 from opentelemetry import trace
 from opentelemetry.trace import SpanContext
 from deepdiff import DeepDiff
@@ -22,16 +23,12 @@ tracer = trace.get_tracer(__name__)
 # Update this list to exclude any additional columns from audit logging.
 default_exclude_columns = ["hashed_password", "hashed_token"]
 
+# Audit Logger Interface
+# ----------------------------------------------------------------------------------------------------------------------
 
-class AuditLogger:
-    tracked_value: dict[str, object] | None = None
 
-    def __init__(self, request: Request | None, authenticator: Authenticator, db: DbDep):
-        super().__init__()
-        self.request = request
-        self.authenticator = authenticator
-        self.db = db
-
+class AuditLogger(abc.ABC):
+    @abc.abstractmethod
     async def track(self, resource: Base):
         """
         Track the current state of the resource before any changes are made.
@@ -39,8 +36,8 @@ class AuditLogger:
 
         This is ignored for `create` and `delete` actions.
         """
-        self.tracked_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
 
+    @abc.abstractmethod
     async def record(self, action: Literal["create", "delete"] | str, resource: Base) -> None:
         """
         Record an audit log entry for the specified action and resource.
@@ -49,6 +46,27 @@ class AuditLogger:
         For `delete` actions, call this before deleting the resource from the database.
         For other actions, call this making the change but before committing the transaction.
         """
+
+
+# Audit Logger Implementation that uses the database
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class DbAuditLogger(AuditLogger):
+    tracked_value: dict[str, object] | None = None
+
+    def __init__(self, request: Request | None, authenticator: Authenticator, db: DbDep):
+        super().__init__()
+        self.request = request
+        self.authenticator = authenticator
+        self.db = db
+
+    @override
+    async def track(self, resource: Base):
+        self.tracked_value = resource.to_dict(nested=True, exclude=default_exclude_columns)
+
+    @override
+    async def record(self, action: Literal["create", "delete"] | str, resource: Base) -> None:
         with tracer.start_as_current_span("audit-logging") as span:
             audit_log = AuditLog()
             audit_log.action = action
@@ -56,13 +74,9 @@ class AuditLogger:
             # Actor
             # ----------------------------------------------------------------------------------------------------------
             audit_log.actor_type = ActorType.ANONYMOUS
-            if (
-                self.request is not None
-                and "Authorization" in self.request.headers
-                and self.request.headers["Authorization"].startswith("Bearer ")
-            ):
-                token = self.request.headers["Authorization"].split(" ")[1]
+            if self.request is not None:
                 try:
+                    token = self.authenticator.access_token_from_headers(self.request.headers)
                     user = self.authenticator.user(token)
                     audit_log.actor_type = ActorType.USER
                     audit_log.actor_id = user.id
@@ -98,7 +112,7 @@ class AuditLogger:
                 audit_log.old_value = audit_log.new_value
                 audit_log.new_value = None
             elif action == "create":
-                pass
+                audit_log.old_value = None
             elif self.tracked_value is not None:
                 audit_log.old_value = self.tracked_value
                 changed_value = DeepDiff(audit_log.old_value, audit_log.new_value)
@@ -109,8 +123,12 @@ class AuditLogger:
             self.db.add(audit_log)
 
 
+# Dependency to get the AuditLogger in FastAPI context
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 def get_audit_logger(request: Request, authenticator: AuthenticatorDep, db: DbDep):
-    return AuditLogger(request, authenticator, db)
+    return DbAuditLogger(request, authenticator, db)
 
 
 AuditLoggerDep = Annotated[AuditLogger, Depends(get_audit_logger)]

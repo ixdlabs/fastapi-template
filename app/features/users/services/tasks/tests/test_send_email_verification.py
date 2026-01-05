@@ -44,7 +44,7 @@ async def test_send_email_verification_creates_action_and_invalidates_previous(
     task_input = SendEmailVerificationInput(user_id=user_id, email=email)
     background_task = send_email_verification(settings_fixture)
     await background_task.submit(task_input)
-    task_output = await background_task.wait_and_get_result(SendEmailVerificationOutput)
+    task_output = background_task.wait_and_get_result(SendEmailVerificationOutput)
     assert task_output.detail == "Email verification sent successfully."
     after_call = datetime.now(timezone.utc)
 

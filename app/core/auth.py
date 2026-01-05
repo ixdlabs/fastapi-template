@@ -16,6 +16,7 @@ from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 import jwt
 from pydantic import BaseModel, ValidationError
 
+from starlette.datastructures import Headers
 from app.core.exceptions import ServiceException
 from app.core.settings import Settings, SettingsDep
 from app.core.timezone import utc_now
@@ -36,10 +37,15 @@ class AuthUser(BaseModel):
     worker_id: str | None = None
 
 
-class AuthException(BaseException):
+class AuthException(Exception):
     def __init__(self, message: str) -> None:
         self.message = message
         super().__init__()
+
+
+class JwtDecodeAuthException(AuthException):
+    def __init__(self) -> None:
+        super().__init__("JWT decode error")
 
 
 class Authenticator:
@@ -108,12 +114,21 @@ class Authenticator:
 
         return access_token, refresh_token
 
+    def access_token_from_headers(self, headers: Headers) -> str:
+        """Extract the access token from the Authorization header."""
+        authorization_header = headers.get("Authorization")
+        if authorization_header is None:
+            raise AuthException("Missing Authorization header")
+        if not authorization_header.startswith("Bearer "):
+            raise AuthException("Invalid Authorization header format")
+        return authorization_header.split(" ")[1]
+
     def user(self, access_token: str) -> AuthUser:
         """Extract the user information from the given JWT access token."""
         try:
             payload: dict[str, object] = self.jwt_decode(access_token)
         except jwt.PyJWTError as e:
-            raise AuthException("JWT decode error") from e
+            raise JwtDecodeAuthException() from e
 
         if payload.get("type") != "access":
             raise AuthException("Invalid JWT access token (wrong type)")
@@ -134,7 +149,7 @@ class Authenticator:
         try:
             payload: dict[str, object] = self.jwt_decode(token)
         except jwt.PyJWTError as e:
-            raise AuthException("JWT decode error") from e
+            raise JwtDecodeAuthException() from e
 
         scope_str = str(payload.get("scope", ""))
         return set(scope_str.split()) if scope_str else set()
@@ -144,7 +159,7 @@ class Authenticator:
         try:
             payload: dict[str, object] = self.jwt_decode(token)
         except jwt.PyJWTError as e:
-            raise AuthException("JWT decode error") from e
+            raise JwtDecodeAuthException() from e
 
         sub = payload.get("sub")
         if sub is None or not isinstance(sub, str):
@@ -162,7 +177,7 @@ class Authenticator:
         try:
             payload: dict[str, object] = self.jwt_decode(token)
         except jwt.PyJWTError as e:
-            raise AuthException("JWT decode error") from e
+            raise JwtDecodeAuthException() from e
 
         iat_timestamp = payload.get("iat")
         if iat_timestamp is None or not isinstance(iat_timestamp, (int, float)):

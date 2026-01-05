@@ -7,7 +7,7 @@ from app.core.auth import Authenticator
 from starlette.types import Scope
 from starlette.datastructures import Headers
 
-from app.core.audit_log import AuditLogger, get_audit_logger
+from app.core.audit_log import AuditLogger, DbAuditLogger, get_audit_logger
 from app.features.audit_logs.models.audit_log import ActorType, AuditLog
 
 from app.features.users.models.user import User
@@ -49,7 +49,7 @@ async def fetch_single_audit_log(db_fixture: AsyncSession) -> AuditLog:
 async def test_audit_logger_raises_value_error_when_resource_missing_id(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
-    logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
+    logger = DbAuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=None)
 
     with pytest.raises(ValueError, match="Resource must have an ID to be logged in audit log"):
@@ -60,7 +60,7 @@ async def test_audit_logger_raises_value_error_when_resource_missing_id(
 async def test_audit_logger_create_records_anonymous_actor_and_request_metadata(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
-    logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
+    logger = DbAuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4())
     await logger.record("create", resource)
     db_fixture.add(resource)
@@ -88,7 +88,7 @@ async def test_audit_logger_create_records_anonymous_actor_and_request_metadata(
 async def test_audit_logger_delete_records_anonymous_actor_and_old_value(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
-    logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
+    logger = DbAuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4())
     await logger.record("delete", resource)
     db_fixture.add(resource)
@@ -119,7 +119,7 @@ async def test_audit_logger_uses_user_actor_when_token_is_valid(
     token, _ = authenticator_fixture.encode(user)
     request = make_request_with_token(token)
 
-    logger = AuditLogger(request=request, authenticator=authenticator_fixture, db=db_fixture)
+    logger = DbAuditLogger(request=request, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4())
     await logger.record("update", resource)
     db_fixture.add(resource)
@@ -147,7 +147,7 @@ async def test_audit_logger_defaults_to_anonymous_actor_when_token_invalid(
 ):
     request = make_request_with_token("invalid-token")
 
-    logger = AuditLogger(request=request, authenticator=authenticator_fixture, db=db_fixture)
+    logger = DbAuditLogger(request=request, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4())
     await logger.record("create", resource)
     db_fixture.add(resource)
@@ -172,7 +172,7 @@ async def test_audit_logger_defaults_to_anonymous_actor_when_token_invalid(
 async def test_audit_logger_update_records_old_new_and_changed_values_after_track(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator, request_fixture: Request
 ):
-    logger = AuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
+    logger = DbAuditLogger(request=request_fixture, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4(), email="user@example.com")
     await logger.track(resource)
 
@@ -208,7 +208,7 @@ async def test_audit_logger_update_records_old_new_and_changed_values_after_trac
 async def test_audit_logger_logs_without_request_present(
     db_fixture: AsyncSession, authenticator_fixture: Authenticator
 ):
-    logger = AuditLogger(request=None, authenticator=authenticator_fixture, db=db_fixture)
+    logger = DbAuditLogger(request=None, authenticator=authenticator_fixture, db=db_fixture)
     resource: User = UserFactory.build(id=uuid.uuid4(), email="user@example.com")
 
     await logger.record("create", resource)

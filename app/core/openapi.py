@@ -70,29 +70,20 @@ def custom(app: FastAPI):
 
         # Fix for adding exception responses from @raises decorator
         for route in app.routes:
-            if getattr(route, "include_in_schema", None):
-                endpoint = getattr(route, "endpoint")
-                raises: dict[int, list[type[ServiceException] | None]] = getattr(
-                    endpoint, "__raised_service_exceptions", {}
-                )
-                for status_code, exceptions in raises.items():
-                    exceptions = [exc for exc in exceptions if exc is not None]
-                    add_service_exception_documentation(route, openapi_schema, status_code, exceptions)
+            if not getattr(route, "include_in_schema", None):
+                continue
+            endpoint = getattr(route, "endpoint")
+            raises: dict[int, list[type[ServiceException] | None]] = getattr(
+                endpoint, "__raised_service_exceptions", {}
+            )
+            for status_code, exceptions in raises.items():
+                exceptions = [exc for exc in exceptions if exc is not None]
+                add_service_exception_documentation(route, openapi_schema, status_code, exceptions)
 
         # Add security scope badges to operations
         for _, methods in openapi_schema["paths"].items():
             for _, operation in methods.items():
-                operation_security = operation.get("security", [])
-                if operation_security:
-                    scopes: list[str] = []
-                    for security_requirement in operation_security:
-                        for scheme_key, scheme_scopes in dict(security_requirement).items():
-                            for scheme_scope in scheme_scopes:
-                                scopes.append(f"{scheme_key}:{scheme_scope}")
-                    for scope in scopes:
-                        if "x-badges" not in operation:
-                            operation["x-badges"] = []
-                        operation["x-badges"].append({"name": scope})
+                add_badges_for_security_scopes(operation)
 
         app.openapi_schema = openapi_schema
         return app.openapi_schema
@@ -136,3 +127,21 @@ def add_service_exception_documentation(
                 },
             },
         }
+
+
+def add_badges_for_security_scopes(operation: dict[str, object]):
+    """Add x-badges to OpenAPI operation for security scopes."""
+    operation_security = operation.get("security", [])
+    assert isinstance(operation_security, list)
+    if not operation_security:
+        return
+    scopes: list[str] = []
+    for security_requirement in operation_security:
+        for scheme_key, scheme_scopes in dict(security_requirement).items():
+            for scheme_scope in scheme_scopes:
+                scopes.append(f"{scheme_key}:{scheme_scope}")
+    for scope in scopes:
+        if "x-badges" not in operation:
+            operation["x-badges"] = []
+        assert isinstance(operation["x-badges"], list)
+        operation["x-badges"] = [*operation["x-badges"], {"name": scope}]
