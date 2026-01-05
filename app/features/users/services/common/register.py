@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 import uuid
 from fastapi import APIRouter, status
 from pydantic import AwareDatetime, BaseModel, EmailStr, Field
@@ -8,6 +7,7 @@ from app.core.audit_log import AuditLoggerDep
 from app.core.auth import AuthenticatorDep
 from app.core.database import DbDep
 from app.core.exceptions import ServiceException, raises
+from app.core.timezone import utc_now
 from app.features.users.models.user import User, UserType
 from app.features.users.services.tasks.send_email_verification import (
     SendEmailVerificationInput,
@@ -102,7 +102,7 @@ async def register(
         type=UserType.CUSTOMER,
         first_name=form.first_name,
         last_name=form.last_name,
-        joined_at=datetime.now(timezone.utc),
+        joined_at=utc_now(),
     )
     user.set_password(form.password)
     db.add(user)

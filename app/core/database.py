@@ -9,13 +9,13 @@ Fast API Docs: https://fastapi.tiangolo.com/tutorial/sql-databases/
 """
 
 from collections.abc import Iterable
+import json
 from typing import Annotated
 from functools import lru_cache
 import logging
 import uuid
 from fastapi import Depends
 from fast_depends import Depends as WorkerDepends
-import orjson
 from sqlalchemy import UUID, inspect
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapped, RelationshipProperty, attributes, mapped_column
@@ -83,7 +83,7 @@ class Base(DeclarativeBase):
 
         # Convert to standard dict to handle any non-serializable types.
         # Convert any non-serializable types (eg: datetime) to string.
-        result = orjson.loads(orjson.dumps(result, default=str))
+        result = json.loads(json.dumps(result, default=str))
         return result
 
 

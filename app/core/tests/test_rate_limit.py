@@ -13,6 +13,9 @@ from app.core.rate_limit import (
 )
 import time_machine
 
+from app.core.settings import Settings
+from limits.aio.strategies import RateLimiter
+
 
 def make_request(path: str = "/test", client_host: str | None = "127.0.0.1") -> Request:
     return Request(
@@ -30,25 +33,25 @@ def make_request(path: str = "/test", client_host: str | None = "127.0.0.1") -> 
     )
 
 
+@pytest.fixture
+def rate_limit_strategy_fixture(settings_fixture: Settings):
+    return get_rate_limit_strategy(settings_fixture)
+
+
 # Key generation
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_rate_limit_key_includes_path_and_client_ip_when_present():
+def test_rate_limit_key_includes_path_and_client_ip_when_present(rate_limit_strategy_fixture: RateLimiter):
     request = make_request("/api/resource", "10.0.0.1")
-    strategy = get_rate_limit_strategy()
-
-    rate_limit = RateLimit(strategy=strategy, request=request)
+    rate_limit = RateLimit(strategy=rate_limit_strategy_fixture, request=request)
 
     assert rate_limit.key() == "/api/resource:10.0.0.1"
 
 
-def test_rate_limit_key_defaults_to_unknown_when_client_missing():
+def test_rate_limit_key_defaults_to_unknown_when_client_missing(rate_limit_strategy_fixture: RateLimiter):
     request = make_request("/api/resource", None)
-    strategy = get_rate_limit_strategy()
-
-    rate_limit = RateLimit(strategy=strategy, request=request)
-
+    rate_limit = RateLimit(strategy=rate_limit_strategy_fixture, request=request)
     assert rate_limit.key() == "/api/resource:unknown"
 
 
@@ -57,23 +60,21 @@ def test_rate_limit_key_defaults_to_unknown_when_client_missing():
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_allows_first_request_within_window():
+async def test_rate_limit_allows_first_request_within_window(rate_limit_strategy_fixture: RateLimiter):
     with time_machine.travel("2025-01-01 00:00:00"):
         request = make_request()
-        strategy = get_rate_limit_strategy()
-        rate_limit = RateLimit(strategy=strategy, request=request)
-
+        rate_limit = RateLimit(strategy=rate_limit_strategy_fixture, request=request)
         # Should not raise
         await rate_limit.limit("1/minute")
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_blocks_second_request_in_same_window_and_returns_headers():
+async def test_rate_limit_blocks_second_request_in_same_window_and_returns_headers(
+    rate_limit_strategy_fixture: RateLimiter,
+):
     with time_machine.travel("2025-01-01 00:00:00"):
         request = make_request()
-        strategy = get_rate_limit_strategy()
-        rate_limit = RateLimit(strategy=strategy, request=request)
-
+        rate_limit = RateLimit(strategy=rate_limit_strategy_fixture, request=request)
         # First hit is allowed
         await rate_limit.limit("1/minute")
         # Second hit in same window should fail
@@ -88,12 +89,10 @@ async def test_rate_limit_blocks_second_request_in_same_window_and_returns_heade
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_allows_request_after_window_resets():
+async def test_rate_limit_allows_request_after_window_resets(rate_limit_strategy_fixture: RateLimiter):
     with time_machine.travel("2025-01-01 00:00:00"):
         request = make_request()
-        strategy = get_rate_limit_strategy()
-        rate_limit = RateLimit(strategy=strategy, request=request)
-
+        rate_limit = RateLimit(strategy=rate_limit_strategy_fixture, request=request)
         # First request
         await rate_limit.limit("1/minute")
         # Second request blocked
@@ -106,12 +105,10 @@ async def test_rate_limit_allows_request_after_window_resets():
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_sets_reset_header_within_window_bounds():
+async def test_rate_limit_sets_reset_header_within_window_bounds(rate_limit_strategy_fixture: RateLimiter):
     with time_machine.travel("2025-01-01 00:00:00"):
         request = make_request()
-        strategy = get_rate_limit_strategy()
-        rate_limit = RateLimit(strategy=strategy, request=request)
-
+        rate_limit = RateLimit(strategy=rate_limit_strategy_fixture, request=request)
         await rate_limit.limit("1/minute")
 
         with pytest.raises(RateLimitExceededException) as exc:
@@ -168,10 +165,9 @@ async def test_rate_limit_reuses_existing_dependency_param():
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_calls_limit():
+async def test_rate_limit_calls_limit(rate_limit_strategy_fixture: RateLimiter):
     request = make_request()
-    strategy = get_rate_limit_strategy()
-    rate_limit_obj = RateLimit(strategy=strategy, request=request)
+    rate_limit_obj = RateLimit(strategy=rate_limit_strategy_fixture, request=request)
 
     async def handler(x: int):
         return "ok"
@@ -189,10 +185,9 @@ async def test_rate_limit_calls_limit():
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_strips_dependency_kwarg():
+async def test_rate_limit_strips_dependency_kwarg(rate_limit_strategy_fixture: RateLimiter):
     request = make_request()
-    strategy = get_rate_limit_strategy()
-    limiter = RateLimit(strategy=strategy, request=request)
+    limiter = RateLimit(strategy=rate_limit_strategy_fixture, request=request)
 
     async def handler():
         return "ok"
@@ -221,9 +216,7 @@ async def test_rate_limit_raises_when_dependency_missing():
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def test_get_rate_limit_returns_rate_limit_instance():
+def test_get_rate_limit_returns_rate_limit_instance(rate_limit_strategy_fixture: RateLimiter):
     request = make_request()
-    strategy = get_rate_limit_strategy()
-
-    rate_limit = get_rate_limit(request, strategy)
+    rate_limit = get_rate_limit(request, rate_limit_strategy_fixture)
     assert isinstance(rate_limit, RateLimit)

@@ -56,8 +56,8 @@ async def list_users(
     This endpoint is rate-limited and cached for demonstration purposes.
     """
     # Check and return from cache
-    response_cache = cache.vary_on_path().vary_on_query().vary_on_auth().with_ttl(60).build()
-    if cache_result := await response_cache.get(Page[UserListOutput]):
+    response_cache = cache.vary_on_path().vary_on_query().vary_on_auth().with_ttl(60).build(Page[UserListOutput])
+    if cache_result := await response_cache.get():
         return cache_result
 
     # Build query with filters

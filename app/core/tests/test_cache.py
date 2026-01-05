@@ -6,8 +6,15 @@ from starlette.datastructures import Headers
 from starlette.types import Scope
 
 from aiocache import BaseCache
+import time_machine
 
-from app.core.cache import CacheBuilder, CacheDep, get_cache_backend, Cache, get_cache_builder
+from app.core.cache import (
+    CacheBuilder,
+    CacheDep,
+    Cache,
+    get_cache_backend_from_url,
+    get_cache_builder,
+)
 
 
 @pytest.fixture
@@ -33,7 +40,7 @@ def cache_fixture(request_fixture: Request, cache_backend_fixture: BaseCache) ->
 
 
 def test_cache_initializes_with_default_key(cache_fixture: CacheDep):
-    cache_default = cache_fixture.build()
+    cache_default = cache_fixture.build(str)
     assert cache_default.key == "cache"
 
 
@@ -41,8 +48,8 @@ def test_vary_appends_hashed_component_to_cache_key(cache_fixture: CacheDep):
     value = "example"
     expected_hash = md5(value.encode()).hexdigest()
 
-    cache_default = cache_fixture.build()
-    cache = cache_fixture.vary("custom", value).build()
+    cache_default = cache_fixture.build(str)
+    cache = cache_fixture.vary("custom", value).build(str)
 
     assert cache_default.key == "cache"
     assert cache.key == f"cache:[custom:{expected_hash}]"
@@ -51,7 +58,7 @@ def test_vary_appends_hashed_component_to_cache_key(cache_fixture: CacheDep):
 def test_vary_on_path_uses_request_path_hash_in_key(cache_fixture: CacheDep, request_fixture: Request):
     expected_hash = md5(request_fixture.url.path.encode()).hexdigest()
 
-    cache = cache_fixture.vary_on_path().build()
+    cache = cache_fixture.vary_on_path().build(str)
     assert cache.key == f"cache:[path:{expected_hash}]"
 
 
@@ -60,7 +67,7 @@ def test_vary_on_auth_uses_authorization_header_hash_in_key(cache_fixture: Cache
     assert auth_header is not None
     expected_hash = md5(auth_header.encode()).hexdigest()
 
-    cache = cache_fixture.vary_on_auth().build()
+    cache = cache_fixture.vary_on_auth().build(str)
     assert cache.key == f"cache:[auth:{expected_hash}]"
 
 
@@ -68,7 +75,7 @@ def test_vary_on_query_uses_sorted_query_params_hash_in_key(cache_fixture: Cache
     query_str = str(sorted(request_fixture.query_params.items()))
     expected_hash = md5(query_str.encode()).hexdigest()
 
-    cache = cache_fixture.vary_on_query().build()
+    cache = cache_fixture.vary_on_query().build(str)
     assert cache.key == f"cache:[query:{expected_hash}]"
 
 
@@ -76,7 +83,7 @@ def test_vary_chains_components_in_cache_key(cache_fixture: CacheDep, request_fi
     path_hash = md5(request_fixture.url.path.encode()).hexdigest()
     auth_hash = md5(request_fixture.headers["Authorization"].encode()).hexdigest()
 
-    cache = cache_fixture.vary_on_path().vary_on_auth().build()
+    cache = cache_fixture.vary_on_path().vary_on_auth().build(str)
     assert cache.key == f"cache:[path:{path_hash}]:[auth:{auth_hash}]"
 
 
@@ -92,30 +99,52 @@ class ExampleModel(BaseModel):
 @pytest.mark.asyncio
 async def test_set_stores_value_and_get_retrieves_it_from_backend(cache_fixture: CacheDep):
     value = ExampleModel(a=42, b="test")
-    result_cache = cache_fixture.with_ttl(10).build()
+    result_cache = cache_fixture.with_ttl(10).build(ExampleModel)
     result = await result_cache.set(value)
 
     assert result == value
-    cached_value = await result_cache.get(ExampleModel)
+    cached_value = await result_cache.get()
+    assert cached_value == value
+
+
+@pytest.mark.asyncio
+async def test_set_stores_list_value_and_get_retrieves_it_from_backend(cache_fixture: CacheDep):
+    value = ExampleModel(a=42, b="test")
+    result_cache = cache_fixture.with_ttl(10).build(list[ExampleModel])
+    result = await result_cache.set([value])
+
+    assert result == [value]
+    cached_value = await result_cache.get()
+    assert cached_value == [value]
+
+
+@pytest.mark.asyncio
+async def test_set_stores_dict_value_and_get_retrieves_it_from_backend(cache_fixture: CacheDep):
+    value = {"key1": "value1", "key2": "value2"}
+    result_cache = cache_fixture.with_ttl(10).build(dict[str, str])
+    result = await result_cache.set(value)
+
+    assert result == value
+    cached_value = await result_cache.get()
     assert cached_value == value
 
 
 @pytest.mark.asyncio
 async def test_distinct_cache_instances_do_not_collide_on_different_keys(cache_fixture: CacheDep):
-    cache1 = cache_fixture.vary_on_path().with_ttl(10).build()
-    cache2 = cache_fixture.vary_on_auth().with_ttl(10).build()
+    cache1 = cache_fixture.vary_on_path().with_ttl(10).build(ExampleModel)
+    cache2 = cache_fixture.vary_on_auth().with_ttl(10).build(ExampleModel)
 
     _ = await cache1.set(ExampleModel(a=1, b="path-value"))
     _ = await cache2.set(ExampleModel(a=2, b="auth-value"))
 
-    assert await cache1.get(ExampleModel) == ExampleModel(a=1, b="path-value")
-    assert await cache2.get(ExampleModel) == ExampleModel(a=2, b="auth-value")
+    assert await cache1.get() == ExampleModel(a=1, b="path-value")
+    assert await cache2.get() == ExampleModel(a=2, b="auth-value")
 
 
 @pytest.mark.asyncio
 async def test_get_returns_none_for_missing_cache_entry(cache_fixture: CacheDep):
-    cache = cache_fixture.with_ttl(10).build()
-    cached_value = await cache.get(ExampleModel)
+    cache = cache_fixture.with_ttl(10).build(ExampleModel)
+    cached_value = await cache.get()
     assert cached_value is None
 
 
@@ -124,11 +153,28 @@ async def test_get_handles_validation_error_gracefully(cache_fixture: CacheDep, 
     class InvalidModel(BaseModel):
         x: int
 
-    cache = cache_fixture.vary_on_path().with_ttl(10).build()
-    _ = await cache.set(InvalidModel(x=100))
+    cache = cache_fixture.with_key("custom-key").with_ttl(10).build(ExampleModel)
+    _ = await cache.set(ExampleModel(a=100, b="valid"))
 
-    cached_value = await cache.get(ExampleModel)
+    invalid_cache = cache_fixture.with_key("custom-key").with_ttl(10).build(InvalidModel)
+    cached_value = await invalid_cache.get()
     assert cached_value is None
+
+
+@pytest.mark.skip(reason="aiocache does not support time manipulation for TTL expiry testing")
+@pytest.mark.asyncio
+async def test_cache_ttl_expires_properly(cache_fixture: CacheDep):
+    with time_machine.travel("2024-01-01 12:00:00"):
+        cache = cache_fixture.with_ttl(300).build(ExampleModel)
+        _ = await cache.set(ExampleModel(a=10, b="to-expire"))
+
+    with time_machine.travel("2024-01-01 12:04:00"):
+        cached_value = await cache.get()
+        assert cached_value == ExampleModel(a=10, b="to-expire")
+
+    with time_machine.travel("2024-01-01 12:06:00"):
+        cached_value = await cache.get()
+        assert cached_value is None
 
 
 # Backend & dependency tests
@@ -136,8 +182,8 @@ async def test_get_handles_validation_error_gracefully(cache_fixture: CacheDep, 
 
 
 def test_get_cache_backend_returns_singleton_instance():
-    backend1 = get_cache_backend()
-    backend2 = get_cache_backend()
+    backend1 = get_cache_backend_from_url("memory://")
+    backend2 = get_cache_backend_from_url("memory://")
 
     assert backend1 is backend2
 
@@ -146,7 +192,7 @@ def test_get_cache_dependency_returns_cache_with_injected_backend_and_request(
     cache_backend_fixture: BaseCache, request_fixture: Request
 ):
     cache_builder = get_cache_builder(request=request_fixture, cache_backend=cache_backend_fixture)
-    cache = cache_builder.build()
+    cache = cache_builder.build(str)
 
     assert isinstance(cache, Cache)
     assert cache.backend is cache_backend_fixture

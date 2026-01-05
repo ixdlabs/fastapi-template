@@ -18,6 +18,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.core.exceptions import ServiceException
 from app.core.settings import Settings, SettingsDep
+from app.core.timezone import utc_now
 from app.features.users.models.user import User, UserType
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ class Authenticator:
 
     def encode(self, user: User, requested_scopes: set[str] | None = None) -> tuple[str, str]:
         """Encode a JWT access token + refresh token for the given user."""
-        current_time = datetime.now(timezone.utc)
+        current_time = utc_now()
         access_exp = current_time + timedelta(minutes=self.settings.jwt_access_expiration_minutes)
         refresh_exp = current_time + timedelta(minutes=self.settings.jwt_refresh_expiration_minutes)
 

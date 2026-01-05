@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 import enum
 import uuid
 import typing
@@ -58,7 +58,7 @@ class UserAction(Base):
     def is_valid(self, token: str) -> bool:
         if self.state != UserActionState.PENDING:
             return False
-        if self.expires_at < datetime.now(timezone.utc):
+        if self.expires_at < utc_now():
             return False
 
         password_hasher = PasswordHasher()

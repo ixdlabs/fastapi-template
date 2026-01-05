@@ -36,6 +36,10 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite+aiosqlite:///./sqlite.db"
 
+    cache_url: str = "memory://"
+
+    rate_limit_backend_url: str = "async+memory://"
+
     celery_task_always_eager: bool = False
     celery_broker_url: str = "sqla+sqlite:///sqlite.celery.db"
     celery_result_backend_url: str = "rpc"
@@ -59,6 +63,8 @@ class Settings(BaseSettings):
 
     storage_backend: Literal["local", "dummy"] = "local"
     storage_local_base_path: str = "./.storage"
+
+    feature_flags: set[str] = set()
 
     frontend_base_url: str = "http://localhost:3000"
 

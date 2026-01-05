@@ -134,7 +134,7 @@ Run after applying migrations:
 uv run fastapi dev app/web_app.py
 ```
 
-Docs available at: [http://127.0.0.1:8000/api/docs](http://127.0.0.1:8000/api/docs)
+Docs available at: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 ## 🧰 Included Packages
 
@@ -166,6 +166,76 @@ Default queue backend is SQLite. Run following commands to start the worker and 
 uv run celery -A app.worker_app worker
 # Beat Scheduler - schedule periodic tasks
 uv run celery -A app.worker_app beat
+```
+
+### Using RabbitMQ as Broker
+
+Celery is configured to use a SQLite database by default.
+To switch to RabbitMQ, start the RabbitMQ service and set the `CELERY_BROKER_URL` environment variable.
+
+```bash
+# Start the rabbitmq service using docker:
+# docker run -d --hostname rabbitmq --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+CELERY_BROKER_URL=amqp://guest:guest@localhost//
+```
+
+### Using Redis as Backend
+
+Celery is configured to run in eager mode by default.
+To use Redis as the results backend, first turn eager mode off and set the `CELERY_RESULT_BACKEND_URL` environment variable.
+
+```bash
+# Start the redis service using docker:
+# docker run --name redis -d -p 6379:6379 redis
+CELERY_RESULT_BACKEND_URL=redis://localhost:6379/0
+# Eager mode must be disabled for redis to take effect.
+CELERY_TASK_ALWAYS_EAGER=False
+```
+
+## 📦 Cache Setup
+
+Cache is configured to use in-memory storage (`memory://`) by default.
+To switch to redis, start the redis service and set the `CACHE_URL` environment variable.
+
+```bash
+# Start the redis service using docker:
+# docker run --name redis -d -p 6379:6379 redis
+CACHE_URL=redis://localhost:6379/0
+```
+
+## 🚩 Feature Flags
+
+Feature flags can be managed via environment variables and database preferences.
+Environment variable flags take precedence over database preferences.
+For example, to enable a feature flag named `new_dashboard`, add it to the environment variable `FEATURE_FLAGS` as:
+
+```bash
+FEATURE_FLAGS=new_dashboard,another_flag
+```
+
+In the database, feature flags are stored as preferences with keys prefixed by `feature_flag.`
+(e.g., `feature_flag.new_dashboard`).
+The value should be set to `"true"` or `"false"`.
+
+The clients can indicate supported feature flags via the `X-Feature-Flags` request header,
+which should contain a comma-separated list of supported flags.
+
+```
+X-Feature-Flags: new_dashboard,another_flag
+```
+
+The code can check feature flags as follows:
+
+```python
+# Check if a feature flag is enabled
+if await preferences.enabled_feature_flag("new_dashboard"):
+    ...
+# Check if a feature flag is supported by the client
+if await preferences.supported_feature_flag("new_dashboard"):
+    ...
+# Check if a feature flag is enabled and supported by the client
+if await preferences.enabled_and_supported_feature_flag("new_dashboard"):
+    ...
 ```
 
 ## 🐳 Docker Setup

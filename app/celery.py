@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_celery_app(settings: Settings) -> Celery:
-    app = Celery("tasks", broker=settings.celery_broker_url)
+    app = Celery("tasks", broker=settings.celery_broker_url, backend=settings.celery_result_backend_url)
     app.conf.task_always_eager = settings.celery_task_always_eager
     app.conf.timezone = settings.celery_timezone
 

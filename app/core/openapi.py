@@ -1,6 +1,6 @@
 """
 This file is to customize the OpenAPI documentation interface.
-It serves Scalar at /api/docs.
+It serves Scalar at /docs.
 
 Scalara Docs: https://github.com/scalar/scalar <br/>
 Approach: https://github.com/fastapi/fastapi/issues/1198#issuecomment-609019113
@@ -17,7 +17,7 @@ from app.core.exceptions import ServiceException
 router = APIRouter()
 
 
-@router.get("/api/docs", response_class=HTMLResponse, include_in_schema=False)
+@router.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 async def scalar(request: Request):
     return """
 <!doctype html>

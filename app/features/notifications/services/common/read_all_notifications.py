@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import update
@@ -6,6 +5,7 @@ from sqlalchemy import update
 from app.core.auth import AuthenticationFailedException, CurrentUserDep
 from app.core.database import DbDep
 from app.core.exceptions import raises
+from app.core.timezone import utc_now
 from app.features.notifications.models.notification import Notification
 from app.features.notifications.models.notification_delivery import (
     NotificationDelivery,
@@ -41,7 +41,7 @@ async def read_all_notifications(current_user: CurrentUserDep, db: DbDep) -> Rea
         .where(NotificationDelivery.channel == NotificationChannel.INAPP)
         .where(NotificationDelivery.status == NotificationStatus.SENT)
         .where(NotificationDelivery.read_at.is_(None))
-        .values(read_at=datetime.now(timezone.utc))
+        .values(read_at=utc_now())
     )
     _ = await db.execute(stmt)
     await db.commit()
