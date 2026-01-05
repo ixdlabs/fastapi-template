@@ -238,6 +238,27 @@ if await preferences.enabled_and_supported_feature_flag("new_dashboard"):
     ...
 ```
 
+## 📊 SonarQube Setup
+
+To run SonarQube analysis locally, ensure you have SonarQube server running.
+Then execute the following command in the project root:
+
+```bash
+# Run via docker:
+# docker run -d --name sonarqube -p 9000:9000 sonarqube:community
+uv run pysonar --sonar-host-url http://localhost:9000 --sonar-project-key your-project-key --sonar-token your-sonar-token
+```
+
+To run SonarQube analysis in CI pipelines, set the following environment variables:
+
+```bash
+# In Github "Repository variables"
+SONAR_HOST_URL=http://your-sonarqube-server
+SONAR_PROJECT_KEY=your-project-key
+# In Github "Repository secrets"
+SONAR_TOKEN=your-sonar-token
+```
+
 ## 🐳 Docker Setup
 
 Build & run the production image:
