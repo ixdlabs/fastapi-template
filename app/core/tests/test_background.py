@@ -2,7 +2,8 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel
 import pytest
 from pytest import MonkeyPatch
-from app.core.background import BackgroundTask, TaskRegistry
+
+from app.core.background import BackgroundTask, TaskRegistry, WorkerScope, get_worker_scope
 from app.core.database import DbDep
 from app.core.settings import Settings, SettingsDep, SettingsWorkerDep
 from celery.app.task import Task as CeleryTask
@@ -18,6 +19,10 @@ class OutputModel(BaseModel):
 
 async def sample_task(task_input: InputModel, settings: SettingsWorkerDep) -> OutputModel:
     return OutputModel(result=task_input.value)
+
+
+async def sample_periodic_task() -> OutputModel:
+    return OutputModel(result=999)
 
 
 # Background Tasks
@@ -47,6 +52,16 @@ def test_task_factory_creates_background_task(settings_fixture: Settings):
 
     assert isinstance(background_task, BackgroundTask)
     assert isinstance(background_task.celery_task, CeleryTask)
+
+
+@pytest.mark.asyncio
+async def test_wait_and_get_result_raises_error_if_not_submitted(settings_fixture: Settings):
+    task_registry = TaskRegistry()
+    factory = task_registry.background_task("sample_task_error")(sample_task)
+    background_task = factory(settings_fixture)
+
+    with pytest.raises(RuntimeError, match="Task has not been submitted yet"):
+        await background_task.wait_and_get_result(OutputModel)  # pyright: ignore[reportUnusedCallResult]4
 
 
 @pytest.mark.asyncio
@@ -94,6 +109,14 @@ def test_task_registry_background_task_without_schedule():
     assert "sample_task" not in registry.beat_schedule
 
 
+def test_periodic_task_runs_and_returns_json():
+    registry = TaskRegistry()
+    celery_task = registry.periodic_task("test_periodic_task", schedule=60)(sample_periodic_task)
+    result = celery_task.apply()
+
+    assert result.result == '{"result":999}'
+
+
 # Background Task Execution
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -131,3 +154,22 @@ async def test_task_with_dependencies_execution(settings_fixture: Settings, db_f
     assert task_output.result == 10
     assert len(called_settings) == 1
     assert called_settings[0] is settings_fixture
+
+
+# Test WorkerScope
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def test_worker_scope_auth_user_returns_dummy_user():
+    mock_task = MagicMock()
+    mock_task.request.id = "test-uuid-1111"
+    scope = WorkerScope(task=mock_task)
+    user = scope.auth_user
+
+    assert user.worker_id == "test-uuid-1111"
+    assert user.type == "task_runner"
+
+
+def test_get_worker_scope_raises_error_in_main_context():
+    with pytest.raises(NotImplementedError, match="This dependency should only be used in worker context"):
+        get_worker_scope()
