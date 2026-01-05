@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 import time_machine
+from app.core.auth import Authenticator
 from app.core.cache import CacheBuilder
 from app.core.preferences import Preferences, get_preferences
 from app.core.settings import Settings
@@ -10,9 +11,16 @@ from aiocache.base import BaseCache
 
 
 @pytest.fixture
-def preference_fixture(settings_fixture: Settings, db_fixture: AsyncSession, cache_backend_fixture: BaseCache):
+def preference_fixture(
+    settings_fixture: Settings,
+    db_fixture: AsyncSession,
+    cache_backend_fixture: BaseCache,
+    authenticator_fixture: Authenticator,
+) -> Preferences:
     return get_preferences(
-        settings=settings_fixture, db=db_fixture, cache=CacheBuilder(backend=cache_backend_fixture, request=MagicMock())
+        settings=settings_fixture,
+        db=db_fixture,
+        cache=CacheBuilder(backend=cache_backend_fixture, request=MagicMock(), authenticator=authenticator_fixture),
     )
 
 

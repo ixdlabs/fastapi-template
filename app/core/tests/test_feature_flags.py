@@ -3,6 +3,7 @@ from fastapi import Request
 import pytest
 from pytest import MonkeyPatch
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.auth import Authenticator
 from app.core.cache import CacheBuilder
 from app.core.feature_flags import FeatureFlags, get_feature_flags
 from app.core.preferences import get_preferences
@@ -18,7 +19,11 @@ def request_fixture():
 
 @pytest.fixture
 def feature_flags_fixture(
-    request_fixture: MagicMock, settings_fixture: Settings, db_fixture: AsyncSession, cache_backend_fixture: BaseCache
+    request_fixture: MagicMock,
+    settings_fixture: Settings,
+    db_fixture: AsyncSession,
+    cache_backend_fixture: BaseCache,
+    authenticator_fixture: Authenticator,
 ):
     return get_feature_flags(
         request=request_fixture,
@@ -26,7 +31,7 @@ def feature_flags_fixture(
         preferences=get_preferences(
             settings=settings_fixture,
             db=db_fixture,
-            cache=CacheBuilder(backend=cache_backend_fixture, request=request_fixture),
+            cache=CacheBuilder(backend=cache_backend_fixture, request=MagicMock(), authenticator=authenticator_fixture),
         ),
     )
 

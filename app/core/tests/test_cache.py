@@ -1,6 +1,6 @@
+from unittest.mock import MagicMock
 from pydantic import BaseModel
 import pytest
-from hashlib import md5
 from fastapi import Request
 from starlette.datastructures import Headers
 from starlette.types import Scope
@@ -8,6 +8,7 @@ from starlette.types import Scope
 from aiocache import BaseCache
 import time_machine
 
+from app.core.auth import Authenticator
 from app.core.cache import (
     CacheBuilder,
     CacheDep,
@@ -31,8 +32,10 @@ def request_fixture() -> Request:
 
 
 @pytest.fixture
-def cache_fixture(request_fixture: Request, cache_backend_fixture: BaseCache) -> CacheDep:
-    return CacheBuilder(backend=cache_backend_fixture, request=request_fixture)
+def cache_fixture(
+    request_fixture: Request, authenticator_fixture: Authenticator, cache_backend_fixture: BaseCache
+) -> CacheBuilder:
+    return CacheBuilder(backend=cache_backend_fixture, request=request_fixture, authenticator=authenticator_fixture)
 
 
 # Cache key behavior
@@ -44,47 +47,44 @@ def test_cache_initializes_with_default_key(cache_fixture: CacheDep):
     assert cache_default.key == "cache"
 
 
-def test_vary_appends_hashed_component_to_cache_key(cache_fixture: CacheDep):
+def test_vary_appends_component_to_cache_key(cache_fixture: CacheDep):
     value = "example"
-    expected_hash = md5(value.encode()).hexdigest()
-
     cache_default = cache_fixture.build(str)
     cache = cache_fixture.vary("custom", value).build(str)
 
     assert cache_default.key == "cache"
-    assert cache.key == f"cache:[custom:{expected_hash}]"
+    assert cache.key == "cache:[custom:example]"
 
 
-def test_vary_on_path_uses_request_path_hash_in_key(cache_fixture: CacheDep, request_fixture: Request):
-    expected_hash = md5(request_fixture.url.path.encode()).hexdigest()
-
+def test_vary_on_path_uses_request_path_in_key(cache_fixture: CacheDep):
     cache = cache_fixture.vary_on_path().build(str)
-    assert cache.key == f"cache:[path:{expected_hash}]"
+    assert cache.key == "cache:[path:/test/path]"
 
 
-def test_vary_on_auth_uses_authorization_header_hash_in_key(cache_fixture: CacheDep, request_fixture: Request):
+def test_vary_on_auth_uses_invalid_header_anonymous_in_key(cache_fixture: CacheDep, request_fixture: Request):
     auth_header = request_fixture.headers.get("Authorization")
     assert auth_header is not None
-    expected_hash = md5(auth_header.encode()).hexdigest()
-
     cache = cache_fixture.vary_on_auth().build(str)
-    assert cache.key == f"cache:[auth:{expected_hash}]"
+    assert cache.key == "cache:[auth:anonymous]"
 
 
-def test_vary_on_query_uses_sorted_query_params_hash_in_key(cache_fixture: CacheDep, request_fixture: Request):
-    query_str = str(sorted(request_fixture.query_params.items()))
-    expected_hash = md5(query_str.encode()).hexdigest()
+def test_vary_on_auth_uses_user_id_in_key(cache_backend_fixture: BaseCache, request_fixture: Request):
+    authenticator = MagicMock()
+    authenticator.access_token_from_header.return_value = "valid-token"
+    authenticator.sub.return_value = "user-123"
+    cache_builder = CacheBuilder(backend=cache_backend_fixture, request=request_fixture, authenticator=authenticator)
+    cache = cache_builder.vary_on_auth().build(str)
+    assert cache.key == "cache:[auth:user-123]"
 
+
+def test_vary_on_query_uses_sorted_query_params_hash_in_key(cache_fixture: CacheDep):
     cache = cache_fixture.vary_on_query().build(str)
-    assert cache.key == f"cache:[query:{expected_hash}]"
+    assert cache.key == "cache:[query:param1=value1&param2=value2]"
 
 
-def test_vary_chains_components_in_cache_key(cache_fixture: CacheDep, request_fixture: Request):
-    path_hash = md5(request_fixture.url.path.encode()).hexdigest()
-    auth_hash = md5(request_fixture.headers["Authorization"].encode()).hexdigest()
-
+def test_vary_chains_components_in_cache_key(cache_fixture: CacheDep):
     cache = cache_fixture.vary_on_path().vary_on_auth().build(str)
-    assert cache.key == f"cache:[path:{path_hash}]:[auth:{auth_hash}]"
+    assert cache.key == "cache:[path:/test/path]:[auth:anonymous]"
 
 
 # Cache get / set behavior
@@ -189,9 +189,11 @@ def test_get_cache_backend_returns_singleton_instance():
 
 
 def test_get_cache_dependency_returns_cache_with_injected_backend_and_request(
-    cache_backend_fixture: BaseCache, request_fixture: Request
+    cache_backend_fixture: BaseCache, request_fixture: Request, authenticator_fixture: Authenticator
 ):
-    cache_builder = get_cache_builder(request=request_fixture, cache_backend=cache_backend_fixture)
+    cache_builder = get_cache_builder(
+        request=request_fixture, authenticator=authenticator_fixture, backend=cache_backend_fixture
+    )
     cache = cache_builder.build(str)
 
     assert isinstance(cache, Cache)

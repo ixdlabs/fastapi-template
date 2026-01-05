@@ -16,6 +16,7 @@ from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 import jwt
 from pydantic import BaseModel, ValidationError
 
+from starlette.datastructures import Headers
 from app.core.exceptions import ServiceException
 from app.core.settings import Settings, SettingsDep
 from app.core.timezone import utc_now
@@ -112,6 +113,15 @@ class Authenticator:
         )
 
         return access_token, refresh_token
+
+    def access_token_from_headers(self, headers: Headers) -> str:
+        """Extract the access token from the Authorization header."""
+        authorization_header = headers.get("Authorization")
+        if authorization_header is None:
+            raise AuthException("Missing Authorization header")
+        if not authorization_header.startswith("Bearer "):
+            raise AuthException("Invalid Authorization header format")
+        return authorization_header.split(" ")[1]
 
     def user(self, access_token: str) -> AuthUser:
         """Extract the user information from the given JWT access token."""

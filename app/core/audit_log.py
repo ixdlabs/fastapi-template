@@ -74,13 +74,9 @@ class DbAuditLogger(AuditLogger):
             # Actor
             # ----------------------------------------------------------------------------------------------------------
             audit_log.actor_type = ActorType.ANONYMOUS
-            if (
-                self.request is not None
-                and "Authorization" in self.request.headers
-                and self.request.headers["Authorization"].startswith("Bearer ")
-            ):
-                token = self.request.headers["Authorization"].split(" ")[1]
+            if self.request is not None:
                 try:
+                    token = self.authenticator.access_token_from_headers(self.request.headers)
                     user = self.authenticator.user(token)
                     audit_log.actor_type = ActorType.USER
                     audit_log.actor_id = user.id
