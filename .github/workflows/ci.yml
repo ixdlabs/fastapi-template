@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -42,7 +44,5 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: SonarQube Scan
-        run: uv run pysonar \
-          --sonar-host-url ${{ env.SONAR_HOST_URL }} \
-          --sonar-project-key ${{ env.SONAR_PROJECT_KEY }} \
-          --sonar-token ${{ secrets.SONAR_TOKEN }}
+        if: ${{ vars.SONAR_HOST_URL && vars.SONAR_PROJECT_KEY }}
+        run: uv run pysonar --sonar-host-url ${{ vars.SONAR_HOST_URL }} --sonar-project-key ${{ vars.SONAR_PROJECT_KEY }} --sonar-token ${{ secrets.SONAR_TOKEN }}
