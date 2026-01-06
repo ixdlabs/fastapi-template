@@ -14,6 +14,10 @@ def mock_request():
     return MagicMock(spec=Request, base_url="http://testserver/")
 
 
+# Test prepare
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 @pytest.mark.asyncio
 async def test_storage_prepare_reads_uploadfile_and_returns_sqlalchemy_file(
     mock_request: MagicMock, settings_fixture: Settings
@@ -34,6 +38,8 @@ async def test_storage_prepare_reads_uploadfile_and_returns_sqlalchemy_file(
     assert result.content_type == "image/jpeg"
 
 
+# Test cdn_url
+# ----------------------------------------------------------------------------------------------------------------------
 def test_cdn_url_returns_none_when_file_is_none(mock_request: MagicMock, settings_fixture: Settings):
     storage = Storage(request=mock_request, settings=settings_fixture)
 
@@ -63,12 +69,20 @@ def test_cdn_url_returns_remote_url_when_backend_is_dummy(
     assert url == "http://cdn.example.com/file-123"
 
 
+# Test get_storage
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 def test_get_storage_returns_storage(mock_request: MagicMock, settings_fixture: Settings):
     storage = get_storage(request=mock_request, settings=settings_fixture)
 
     assert isinstance(storage, Storage)
     assert storage.request is mock_request
     assert storage.settings is settings_fixture
+
+
+# Test storage setup function
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 def test_setup_storage_configures_local_backend(
@@ -123,6 +137,10 @@ def test_setup_storage_raises_error_for_invalid_backend(settings_fixture: Settin
 
     with pytest.raises(ValueError, match="Unsupported storage backend"):
         setup_storage(settings_fixture)
+
+
+# Test add_storage
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 def test_add_storage_route_mounts_static_files_for_local_backend(
